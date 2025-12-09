@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { useFrame, useThree, ThreeElements } from '@react-three/fiber';
 import { Float } from '@react-three/drei';
@@ -17,7 +16,7 @@ declare global {
 // --- AUDIO SYSTEM ---
 const playSound = (type: 'pop' | 'swing') => {
     try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new ((window as any).AudioContext || (window as any).webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -45,26 +44,20 @@ const playSound = (type: 'pop' | 'swing') => {
     }
 };
 
-// --- COMPONENTS ---
-
-const Floor = () => {
-    return (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <planeGeometry args={[1000, 1000]} />
-            <meshStandardMaterial color="#E6C288" />
-        </mesh>
-    );
-};
+const Floor = () => (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[1000, 1000]} />
+        <meshStandardMaterial color="#E6C288" />
+    </mesh>
+);
 
 const Ruins = () => {
-    // Generate some random pillars
     const pillars = useMemo(() => {
         const items = [];
         for (let i = 0; i < 20; i++) {
             const x = (Math.random() - 0.5) * 80;
             const z = (Math.random() - 0.5) * 80;
-            // Don't spawn too close to center
-            if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+            if (Math.abs(x) < 5 && Math.abs(z) < 5) continue; 
             
             items.push({
                 position: [x, 2, z] as [number, number, number],
@@ -79,11 +72,11 @@ const Ruins = () => {
         <group>
             {pillars.map((p, i) => (
                 <mesh key={i} position={p.position} scale={p.scale} rotation={p.rotation} castShadow receiveShadow>
-                    <boxGeometry />
+                    <boxGeometry args={[1, 1, 1]} />
                     <meshStandardMaterial color="#D2B48C" roughness={0.9} />
                 </mesh>
             ))}
-            {/* Archway example */}
+            {/* Archway */}
             <mesh position={[0, 3, -15]} castShadow receiveShadow>
                 <boxGeometry args={[2, 6, 2]} />
                 <meshStandardMaterial color="#C19A6B" />
@@ -119,7 +112,7 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
 
         const { up, down, left, right, attack } = controlsRef.current;
         
-        // Movement
+        // Manual Movement Logic (No Physics)
         const moveVec = new THREE.Vector3(0, 0, 0);
         if (up) moveVec.z -= 1;
         if (down) moveVec.z += 1;
@@ -135,13 +128,16 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
             group.current.rotation.y = angle;
         }
 
+        // Keep player on ground
+        group.current.position.y = 0;
+
         // Sync ref position for game logic
         positionRef.current.copy(group.current.position);
 
         // Camera Follow
         const targetCamPos = group.current.position.clone().add(new THREE.Vector3(0, 8, 12));
         camera.position.lerp(targetCamPos, 0.1);
-        camera.lookAt(group.current.position);
+        camera.lookAt(group.current.position.x, group.current.position.y + 1, group.current.position.z);
 
         // Attack Logic
         if (attack && !isAttacking.current) {
@@ -155,8 +151,7 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
             attackTime.current += delta;
             const progress = Math.min(attackTime.current / ATTACK_DURATION, 1);
             
-            // Swing animation (rotate arm/sword)
-            // Start: -0.5 rad, Swing to: 1.5 rad, End: -0.5 rad
+            // Swing animation
             const swingAngle = Math.sin(progress * Math.PI) * 2;
             swordRef.current.rotation.x = swingAngle;
 
@@ -168,18 +163,15 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
     });
 
     return (
-        <group ref={group} position={[0, 1, 0]}>
-            {/* Body */}
+        <group ref={group} position={[0, 0, 0]}>
             <mesh castShadow position={[0, 0.75, 0]}>
                 <cylinderGeometry args={[0.5, 0.5, 1.5, 16]} />
                 <meshStandardMaterial color="#3b82f6" />
             </mesh>
-            {/* Head */}
             <mesh castShadow position={[0, 1.75, 0]}>
                 <sphereGeometry args={[0.4, 32, 32]} />
                 <meshStandardMaterial color="#fcd34d" metalness={0.5} roughness={0.2} />
             </mesh>
-            {/* Plume */}
             <mesh position={[0, 2.2, -0.2]} rotation={[Math.PI/4, 0, 0]}>
                 <boxGeometry args={[0.1, 0.5, 0.5]} />
                 <meshStandardMaterial color="red" />
@@ -188,17 +180,14 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
             {/* Sword Arm Pivot */}
             <group position={[0.6, 1.2, 0]} ref={swordRef}>
                 <mesh position={[0, 0.5, 0.3]} castShadow>
-                     {/* Blade */}
                     <boxGeometry args={[0.1, 1.5, 0.2]} />
                     <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.2} />
                 </mesh>
                 <mesh position={[0, -0.3, 0.3]}>
-                     {/* Handle */}
                     <cylinderGeometry args={[0.08, 0.08, 0.4]} />
                     <meshStandardMaterial color="#78350f" />
                 </mesh>
                 <mesh position={[0, -0.1, 0.3]} rotation={[Math.PI/2, 0, 0]}>
-                     {/* Guard */}
                     <boxGeometry args={[0.4, 0.1, 0.1]} />
                     <meshStandardMaterial color="#fcd34d" />
                 </mesh>
@@ -207,17 +196,14 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
     );
 };
 
-const Balloon = ({ position, color, id, onPop }: { position: [number, number, number], color: string, id: string, onPop: (id: string, pos: THREE.Vector3) => void }) => {
+const Balloon = ({ position, color, id }: { position: [number, number, number], color: string, id: string }) => {
     const mesh = useRef<THREE.Mesh>(null);
-    
-    // Random bobbing offset
     const offset = useMemo(() => Math.random() * 100, []);
 
     useFrame((state) => {
         if (!mesh.current) return;
-        // Bobbing
+        // Simple gentle bobbing
         mesh.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2 + offset) * 0.5;
-        // Gentle rotation
         mesh.current.rotation.y += 0.01;
     });
 
@@ -230,12 +216,10 @@ const Balloon = ({ position, color, id, onPop }: { position: [number, number, nu
                         color={color} 
                         roughness={0.1} 
                         clearcoat={1} 
-                        clearcoatRoughness={0.1}
                         transmission={0.2}
                         thickness={1}
                     />
                 </mesh>
-                {/* String */}
                 <mesh position={[0, position[1] - 1.2, 0]}>
                     <cylinderGeometry args={[0.02, 0.02, 1.5]} />
                     <meshBasicMaterial color="white" transparent opacity={0.5} />
@@ -246,7 +230,6 @@ const Balloon = ({ position, color, id, onPop }: { position: [number, number, nu
 };
 
 const Particles = ({ particles }: { particles: { pos: THREE.Vector3, color: string, id: string }[] }) => {
-    // Simple particle system for pops
     return (
         <group>
             {particles.map(p => (
@@ -258,25 +241,19 @@ const Particles = ({ particles }: { particles: { pos: THREE.Vector3, color: stri
 
 const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: string }) => {
     const group = useRef<THREE.Group>(null);
-    
     useFrame((state, delta) => {
         if (!group.current) return;
-        group.current.children.forEach((child, i) => {
+        group.current.children.forEach((child) => {
             const mesh = child as THREE.Mesh;
-            // Expand
             mesh.position.add(mesh.userData.velocity.clone().multiplyScalar(delta * 5));
-            // Fade scale
             mesh.scale.multiplyScalar(0.9);
         });
     });
 
-    // Create particles once
-    const parts = useMemo(() => {
-        return new Array(8).fill(0).map(() => ({
-            velocity: new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize(),
-            scale: Math.random() * 0.5 + 0.2
-        }));
-    }, []);
+    const parts = useMemo(() => new Array(8).fill(0).map(() => ({
+        velocity: new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize(),
+        scale: Math.random() * 0.5 + 0.2
+    })), []);
 
     return (
         <group ref={group} position={position}>
@@ -293,17 +270,27 @@ const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: st
 const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) => {
     const [balloons, setBalloons] = useState<{ id: string, position: [number, number, number], color: string }[]>([]);
     const [particles, setParticles] = useState<{ id: string, pos: THREE.Vector3, color: string }[]>([]);
-    const playerPos = useRef(new THREE.Vector3(0, 1, 0));
     
+    const playerPos = useRef(new THREE.Vector3(0, 0, 0));
+
+    useEffect(() => {
+        console.log("Game3D Mounted");
+    }, []);
+
     // Initialize Balloons
     useEffect(() => {
         if (isPlaying) {
             const newBalloons = [];
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            for(let i=0; i<50; i++) {
+            for(let i=0; i<40; i++) {
+                let x = (Math.random()-0.5)*120;
+                let z = (Math.random()-0.5)*120;
+                // Keep starting area clear
+                if (Math.abs(x) < 10 && Math.abs(z) < 10) x += 20;
+
                 newBalloons.push({
                     id: Math.random().toString(),
-                    position: [(Math.random()-0.5)*100, 2 + Math.random()*2, (Math.random()-0.5)*100] as [number, number, number],
+                    position: [x, 2 + Math.random()*3, z] as [number, number, number],
                     color: colors[Math.floor(Math.random() * colors.length)]
                 });
             }
@@ -311,79 +298,73 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
         }
     }, [isPlaying]);
 
+    const handlePopEffect = (pos: THREE.Vector3, color: string) => {
+        const id = Math.random().toString();
+        setParticles(prev => [...prev, { id, pos, color }]);
+        setTimeout(() => setParticles(prev => prev.filter(p => p.id !== id)), 1000);
+    };
+
     const handleAttack = () => {
-        // Check collisions
-        const swordPos = playerPos.current.clone().add(new THREE.Vector3(0, 0, 0)); // Approx range
-        const RANGE = 3.5;
+        const swordPos = playerPos.current.clone();
+        // Shift check position slightly forward and up to match sword location
+        swordPos.y += 1;
+        
+        const RANGE = 4.0;
+        let hits = 0;
 
         setBalloons(prev => {
             const next = prev.filter(b => {
-                const bPos = new THREE.Vector3(...b.position);
-                const dist = bPos.distanceTo(swordPos);
-                
-                if (dist < RANGE) {
-                    // POP!
+                const bPos = new THREE.Vector3(b.position[0], b.position[1], b.position[2]);
+                if (bPos.distanceTo(swordPos) < RANGE) {
                     playSound('pop');
                     handlePopEffect(bPos, b.color);
-                    onScoreUpdate(prevScore => prevScore + 1);
+                    hits++;
                     return false;
                 }
                 return true;
             });
             
-            // Respawn logic (keep population up)
-            if (next.length < 45) {
+            // Respawn mechanic: if low on balloons, add some more far away
+            if (next.length < 20) {
                 const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-                const p = playerPos.current;
-                // Spawn far away
-                let x = (Math.random()-0.5)*100;
-                let z = (Math.random()-0.5)*100;
-                if (Math.abs(x - p.x) < 10) x += 20;
-
+                let x = (Math.random()-0.5)*120;
+                let z = (Math.random()-0.5)*120;
+                if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
                 next.push({
                     id: Math.random().toString(),
-                    position: [x, 2 + Math.random()*2, z],
+                    position: [x, 2 + Math.random()*3, z],
                     color: colors[Math.floor(Math.random() * colors.length)]
                 });
             }
-
             return next;
         });
-    };
 
-    const handlePopEffect = (pos: THREE.Vector3, color: string) => {
-        const id = Math.random().toString();
-        setParticles(prev => [...prev, { id, pos, color }]);
-        // Cleanup particle after 1s
-        setTimeout(() => {
-            setParticles(prev => prev.filter(p => p.id !== id));
-        }, 1000);
+        if (hits > 0) {
+            onScoreUpdate(prev => prev + hits);
+        }
     };
 
     return (
         <>
-            {/* LIGHTING */}
             <ambientLight intensity={0.6} />
             <directionalLight 
                 position={[50, 100, 50]} 
                 intensity={1.5} 
                 castShadow 
                 shadow-mapSize={[2048, 2048]}
-                shadow-camera-left={-50}
-                shadow-camera-right={50}
-                shadow-camera-top={50}
-                shadow-camera-bottom={-50}
+                shadow-camera-left={-60}
+                shadow-camera-right={60}
+                shadow-camera-top={60}
+                shadow-camera-bottom={-60}
             />
 
-            {/* ENVIRONMENT */}
             <Floor />
             <Ruins />
-
-            {/* GAME OBJECTS */}
+            
             <Player controlsRef={controlsRef} onAttack={handleAttack} positionRef={playerPos} />
             
             {balloons.map(b => (
-                <Balloon key={b.id} {...b} onPop={() => {}} />
+                <Balloon key={b.id} {...b} />
             ))}
 
             <Particles particles={particles} />

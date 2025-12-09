@@ -1,5 +1,5 @@
 {
-  "name": "gladiator-balloon-pop",
+  "name": "tatchamashay",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,11 +11,9 @@
   "dependencies": {
     "lucide-react": "0.263.1",
     "react": "^19.2.1",
-    "phaser": "3.60.0",
     "three": "0.160.0",
     "@react-three/fiber": "8.15.16",
     "@react-three/drei": "9.99.0",
-    "uuid": "9.0.1",
     "react-dom": "^19.2.1"
   },
   "devDependencies": {

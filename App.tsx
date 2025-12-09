@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, Play, RotateCcw } from 'lucide-react';
 import { Canvas, ThreeElements } from '@react-three/fiber';
@@ -27,9 +26,13 @@ const App: React.FC = () => {
     attack: false,
   });
 
+  useEffect(() => {
+    console.log("App Mounted");
+  }, []);
+
   // Keyboard listeners
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: any) => {
       switch (e.code) {
         case 'KeyW': case 'ArrowUp': controlsRef.current.up = true; break;
         case 'KeyS': case 'ArrowDown': controlsRef.current.down = true; break;
@@ -39,7 +42,7 @@ const App: React.FC = () => {
       }
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const handleKeyUp = (e: any) => {
       switch (e.code) {
         case 'KeyW': case 'ArrowUp': controlsRef.current.up = false; break;
         case 'KeyS': case 'ArrowDown': controlsRef.current.down = false; break;
@@ -49,11 +52,11 @@ const App: React.FC = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    (window as any).addEventListener('keydown', handleKeyDown);
+    (window as any).addEventListener('keyup', handleKeyUp);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      (window as any).removeEventListener('keydown', handleKeyDown);
+      (window as any).removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
@@ -75,6 +78,7 @@ const App: React.FC = () => {
         camera={{ position: [0, 8, 12], fov: 50 }}
         dpr={[1, 2]} // Handle high-dpi screens
         className="absolute inset-0 z-0"
+        onError={(e) => console.error("Canvas Error:", e)}
       >
         <Suspense fallback={null}>
           <color attach="background" args={['#87CEEB']} />
@@ -94,7 +98,7 @@ const App: React.FC = () => {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white/90 p-8 rounded-3xl shadow-2xl text-center border-4 border-yellow-400 max-w-md w-full mx-4 transform transition-all hover:scale-105">
             <h1 className="text-5xl md:text-6xl font-black text-blue-600 mb-2 drop-shadow-md tracking-wider">
-              GLADIATOR
+              TATCHAMASHAY
             </h1>
             <h2 className="text-3xl md:text-4xl font-bold text-orange-500 mb-8 tracking-wide">
               BALLOON POP 3D
