@@ -262,16 +262,17 @@ const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: st
         });
     });
 
-    const parts = useMemo(() => new Array(8).fill(0).map(() => ({
-        velocity: new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize(),
-        scale: Math.random() * 0.5 + 0.2
+    // Increased to 400 particles (50x original)
+    const parts = useMemo(() => new Array(400).fill(0).map(() => ({
+        velocity: new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize().multiplyScalar(Math.random() + 0.5),
+        scale: Math.random() * 0.3 + 0.1 // Smaller scale so it looks like confetti, not boxes
     })), []);
 
     return (
         <group ref={group} position={position}>
             {parts.map((p, i) => (
                 <mesh key={i} userData={{ velocity: p.velocity }} scale={[p.scale, p.scale, p.scale]}>
-                    <boxGeometry args={[0.3, 0.3, 0.3]} />
+                    <boxGeometry args={[0.2, 0.2, 0.2]} />
                     <meshBasicMaterial color={color} />
                 </mesh>
             ))}
@@ -294,8 +295,8 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
         if (isPlaying) {
             const newBalloons = [];
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            // Increased to 400 balloons for a denser field
-            for(let i=0; i<400; i++) {
+            // Tripled to 1200 balloons for a super dense field
+            for(let i=0; i<1200; i++) {
                 let x = (Math.random()-0.5)*120;
                 let z = (Math.random()-0.5)*120;
                 // Keep starting area clear
@@ -338,17 +339,20 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
                 return true;
             });
             
-            // Respawn mechanic: Keep the world full
-            if (next.length < 350) {
+            // Respawn mechanic: Keep the world full (Threshold raised to 1100)
+            if (next.length < 1100) {
                 const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-                let x = (Math.random()-0.5)*120;
-                let z = (Math.random()-0.5)*120;
-                if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
-                next.push({
-                    id: Math.random().toString(),
-                    position: [x, 1 + Math.random() * 2.5, z],
-                    color: colors[Math.floor(Math.random() * colors.length)]
-                });
+                // Spawn multiple at once to refill faster
+                for(let k=0; k<3; k++) {
+                    let x = (Math.random()-0.5)*120;
+                    let z = (Math.random()-0.5)*120;
+                    if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
+                    next.push({
+                        id: Math.random().toString(),
+                        position: [x, 1 + Math.random() * 2.5, z],
+                        color: colors[Math.floor(Math.random() * colors.length)]
+                    });
+                }
             }
             return next;
         });
