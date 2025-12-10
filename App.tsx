@@ -82,7 +82,7 @@ const App: React.FC = () => {
       >
         <Suspense fallback={null}>
           <color attach="background" args={['#87CEEB']} />
-          <fog attach="fog" args={['#87CEEB', 20, 60]} />
+          <fog attach="fog" args={['#87CEEB', 40, 150]} />
           <Game3D 
             isPlaying={gameState === 'playing'} 
             controlsRef={controlsRef} 
