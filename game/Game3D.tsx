@@ -105,6 +105,7 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
     const { camera } = useThree();
 
     const SPEED = 10;
+    const ROTATION_SPEED = 2.5;
     const ATTACK_DURATION = 0.2;
 
     useFrame((state, delta) => {
@@ -112,21 +113,20 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
 
         const { up, down, left, right, attack } = controlsRef.current;
         
-        // Manual Movement Logic (No Physics)
-        const moveVec = new THREE.Vector3(0, 0, 0);
-        if (up) moveVec.z -= 1;
-        if (down) moveVec.z += 1;
-        if (left) moveVec.x -= 1;
-        if (right) moveVec.x += 1;
+        // --- TANK CONTROLS ---
+        
+        // Rotation
+        if (left) group.current.rotation.y += ROTATION_SPEED * delta;
+        if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
 
-        if (moveVec.length() > 0) {
-            moveVec.normalize().multiplyScalar(SPEED * delta);
-            group.current.position.add(moveVec);
-            
-            // Rotate player to face movement
-            const angle = Math.atan2(moveVec.x, moveVec.z);
-            group.current.rotation.y = angle;
-        }
+        // Calculate Forward Vector based on current rotation
+        // Assuming 0 rotation = Facing Z+
+        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), group.current.rotation.y);
+
+        // Movement
+        const speed = SPEED * delta;
+        if (up) group.current.position.add(forward.clone().multiplyScalar(speed));
+        if (down) group.current.position.add(forward.clone().multiplyScalar(-speed * 0.6));
 
         // Keep player on ground
         group.current.position.y = 0;
@@ -134,12 +134,23 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
         // Sync ref position for game logic
         positionRef.current.copy(group.current.position);
 
-        // Camera Follow
-        const targetCamPos = group.current.position.clone().add(new THREE.Vector3(0, 8, 12));
+        // --- STICKY CAMERA FOLLOW ---
+        // Camera stays locked behind the player
+        const dist = 12;
+        const height = 8;
+        
+        // Calculate ideal camera position: PlayerPos + (Forward * -dist) + (Up * height)
+        const camOffset = forward.clone().multiplyScalar(-dist).add(new THREE.Vector3(0, height, 0));
+        const targetCamPos = group.current.position.clone().add(camOffset);
+        
+        // Smoothly lerp camera to target
         camera.position.lerp(targetCamPos, 0.1);
-        camera.lookAt(group.current.position.x, group.current.position.y + 1, group.current.position.z);
+        
+        // Camera always looks at player's head area
+        const lookTarget = group.current.position.clone().add(new THREE.Vector3(0, 2, 0));
+        camera.lookAt(lookTarget);
 
-        // Attack Logic
+        // --- ATTACK LOGIC ---
         if (attack && !isAttacking.current) {
             isAttacking.current = true;
             attackTime.current = 0;
@@ -163,7 +174,8 @@ const Player = ({ controlsRef, onAttack, positionRef }: {
     });
 
     return (
-        <group ref={group} position={[0, 0, 0]}>
+        // Initial rotation Math.PI ensures player starts facing away from camera (Z-)
+        <group ref={group} position={[0, 0, 0]} rotation={[0, Math.PI, 0]}>
             <mesh castShadow position={[0, 0.75, 0]}>
                 <cylinderGeometry args={[0.5, 0.5, 1.5, 16]} />
                 <meshStandardMaterial color="#3b82f6" />
@@ -282,7 +294,8 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
         if (isPlaying) {
             const newBalloons = [];
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            for(let i=0; i<40; i++) {
+            // Increased to 400 balloons for a denser field
+            for(let i=0; i<400; i++) {
                 let x = (Math.random()-0.5)*120;
                 let z = (Math.random()-0.5)*120;
                 // Keep starting area clear
@@ -290,7 +303,8 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
 
                 newBalloons.push({
                     id: Math.random().toString(),
-                    position: [x, 2 + Math.random()*3, z] as [number, number, number],
+                    // Lowered height range: 1.0 to 3.5 (Player height is ~1.5)
+                    position: [x, 1 + Math.random() * 2.5, z] as [number, number, number],
                     color: colors[Math.floor(Math.random() * colors.length)]
                 });
             }
@@ -324,15 +338,15 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
                 return true;
             });
             
-            // Respawn mechanic: if low on balloons, add some more far away
-            if (next.length < 20) {
+            // Respawn mechanic: Keep the world full
+            if (next.length < 350) {
                 const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
                 let x = (Math.random()-0.5)*120;
                 let z = (Math.random()-0.5)*120;
                 if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
                 next.push({
                     id: Math.random().toString(),
-                    position: [x, 2 + Math.random()*3, z],
+                    position: [x, 1 + Math.random() * 2.5, z],
                     color: colors[Math.floor(Math.random() * colors.length)]
                 });
             }
