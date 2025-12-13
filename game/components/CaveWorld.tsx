@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Door } from './Door';
 
@@ -14,6 +14,27 @@ interface CaveWorldProps {
 const seededRandom = (seed: number) => {
     const x = Math.sin(seed * 12.9898) * 43758.5453;
     return x - Math.floor(x);
+};
+
+// Helper to dispose material and its textures
+const disposeMaterial = (material: THREE.Material) => {
+    material.dispose();
+    
+    // Dispose textures if they exist
+    const mat = material as any;
+    if (mat.map) mat.map.dispose();
+    if (mat.lightMap) mat.lightMap.dispose();
+    if (mat.bumpMap) mat.bumpMap.dispose();
+    if (mat.normalMap) mat.normalMap.dispose();
+    if (mat.specularMap) mat.specularMap.dispose();
+    if (mat.envMap) mat.envMap.dispose();
+    if (mat.alphaMap) mat.alphaMap.dispose();
+    if (mat.aoMap) mat.aoMap.dispose();
+    if (mat.displacementMap) mat.displacementMap.dispose();
+    if (mat.emissiveMap) mat.emissiveMap.dispose();
+    if (mat.gradientMap) mat.gradientMap.dispose();
+    if (mat.metalnessMap) mat.metalnessMap.dispose();
+    if (mat.roughnessMap) mat.roughnessMap.dispose();
 };
 
 // Cave floor component - covers the entire cave area
@@ -257,6 +278,37 @@ export const CaveWorld: React.FC<CaveWorldProps> = ({
     children,
     offset = [0, 0, 1000] // Default offset to separate from overworld
 }) => {
+    const { gl, scene } = useThree();
+    
+    // Cleanup on unmount - dispose of Three.js resources to free memory
+    useEffect(() => {
+        return () => {
+            // Traverse scene and dispose of geometries and materials
+            scene.traverse((object) => {
+                if (object instanceof THREE.Mesh) {
+                    // Dispose geometry
+                    if (object.geometry) {
+                        object.geometry.dispose();
+                    }
+                    
+                    // Dispose material(s)
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach((material) => {
+                                disposeMaterial(material);
+                            });
+                        } else {
+                            disposeMaterial(object.material);
+                        }
+                    }
+                }
+            });
+            
+            // Force garbage collection hint
+            gl.dispose();
+        };
+    }, [gl, scene]);
+    
     return (
         <>
             {/* Cave atmosphere */}
