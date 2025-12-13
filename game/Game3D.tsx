@@ -963,6 +963,193 @@ const PoopPile = () => {
     );
 };
 
+// --- CHRISTMAS TREE ---
+// Festive Christmas tree with ornaments, lights, and a star on top
+const ChristmasTree = ({ position }: { position: [number, number, number] }) => {
+    const starRef = useRef<THREE.Mesh>(null);
+    const lightsRef = useRef<THREE.Group>(null);
+    
+    // Animate the star and lights
+    useFrame((state) => {
+        if (starRef.current) {
+            starRef.current.rotation.y = state.clock.elapsedTime * 0.5;
+            // Pulsing glow effect
+            const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.1;
+            starRef.current.scale.set(scale, scale, scale);
+        }
+    });
+    
+    // Generate ornament positions
+    const ornaments = useMemo(() => {
+        const result: { position: [number, number, number], color: string }[] = [];
+        const ornamentColors = ['#ef4444', '#3b82f6', '#fbbf24', '#a855f7', '#ec4899', '#22c55e'];
+        
+        // Place ornaments on each tier
+        const tiers = [
+            { height: 4, radius: 8, count: 16 },
+            { height: 10, radius: 6, count: 12 },
+            { height: 16, radius: 4, count: 8 },
+            { height: 22, radius: 2.5, count: 5 },
+        ];
+        
+        tiers.forEach((tier, tierIndex) => {
+            for (let i = 0; i < tier.count; i++) {
+                const angle = (i / tier.count) * Math.PI * 2 + tierIndex * 0.3;
+                result.push({
+                    position: [
+                        Math.cos(angle) * tier.radius * 0.85,
+                        tier.height,
+                        Math.sin(angle) * tier.radius * 0.85
+                    ],
+                    color: ornamentColors[(i + tierIndex) % ornamentColors.length]
+                });
+            }
+        });
+        
+        return result;
+    }, []);
+    
+    // Generate twinkling lights positions
+    const lights = useMemo(() => {
+        const result: { position: [number, number, number], color: string, phase: number }[] = [];
+        const lightColors = ['#fef08a', '#fde047', '#facc15', '#ffffff', '#fef9c3'];
+        
+        // Spiral pattern of lights
+        const numLights = 60;
+        for (let i = 0; i < numLights; i++) {
+            const t = i / numLights;
+            const height = 2 + t * 24;
+            const radius = 10 * (1 - t * 0.85);
+            const angle = t * Math.PI * 8; // 4 full spirals
+            
+            result.push({
+                position: [
+                    Math.cos(angle) * radius,
+                    height,
+                    Math.sin(angle) * radius
+                ],
+                color: lightColors[i % lightColors.length],
+                phase: i * 0.5
+            });
+        }
+        
+        return result;
+    }, []);
+    
+    return (
+        <group position={position}>
+            {/* Tree trunk */}
+            <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[1.5, 2, 3, 12]} />
+                <meshStandardMaterial color="#5D4037" roughness={0.9} />
+            </mesh>
+            
+            {/* Tree tiers (bottom to top) - classic pyramid shape */}
+            {/* Bottom tier */}
+            <mesh position={[0, 6, 0]} castShadow receiveShadow>
+                <coneGeometry args={[10, 10, 16]} />
+                <meshStandardMaterial color="#15803d" roughness={0.8} />
+            </mesh>
+            
+            {/* Second tier */}
+            <mesh position={[0, 12, 0]} castShadow receiveShadow>
+                <coneGeometry args={[7.5, 9, 16]} />
+                <meshStandardMaterial color="#16a34a" roughness={0.8} />
+            </mesh>
+            
+            {/* Third tier */}
+            <mesh position={[0, 17, 0]} castShadow receiveShadow>
+                <coneGeometry args={[5, 7, 16]} />
+                <meshStandardMaterial color="#22c55e" roughness={0.8} />
+            </mesh>
+            
+            {/* Top tier */}
+            <mesh position={[0, 22, 0]} castShadow receiveShadow>
+                <coneGeometry args={[3, 6, 16]} />
+                <meshStandardMaterial color="#4ade80" roughness={0.8} />
+            </mesh>
+            
+            {/* Star on top */}
+            <group position={[0, 26, 0]}>
+                <mesh ref={starRef} rotation={[0, 0, 0]}>
+                    {/* 3D star shape using octahedron */}
+                    <octahedronGeometry args={[2, 0]} />
+                    <meshStandardMaterial 
+                        color="#fcd34d" 
+                        emissive="#fcd34d"
+                        emissiveIntensity={1}
+                        metalness={0.8}
+                        roughness={0.2}
+                    />
+                </mesh>
+                {/* Star glow light */}
+                <pointLight color="#fcd34d" intensity={5} distance={20} decay={2} />
+            </group>
+            
+            {/* Ornaments (colorful balls) */}
+            {ornaments.map((orn, i) => (
+                <mesh key={`ornament-${i}`} position={orn.position} castShadow>
+                    <sphereGeometry args={[0.6, 12, 12]} />
+                    <meshStandardMaterial 
+                        color={orn.color} 
+                        metalness={0.4} 
+                        roughness={0.2}
+                        emissive={orn.color}
+                        emissiveIntensity={0.2}
+                    />
+                </mesh>
+            ))}
+            
+            {/* Twinkling lights - using emissive materials instead of 60 point lights for performance */}
+            <group ref={lightsRef}>
+                {lights.map((light, i) => (
+                    <mesh key={`light-${i}`} position={light.position}>
+                        <sphereGeometry args={[0.25, 6, 6]} />
+                        <meshBasicMaterial color={light.color} />
+                    </mesh>
+                ))}
+            </group>
+            
+            {/* Single ambient glow light for all tree lights */}
+            <pointLight position={[0, 12, 0]} color="#fef08a" intensity={2} distance={15} decay={2} />
+            
+            {/* Snow at the base */}
+            <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+                <circleGeometry args={[12, 24]} />
+                <meshStandardMaterial color="#f0f9ff" roughness={0.9} />
+            </mesh>
+            
+            {/* Presents under the tree */}
+            <mesh position={[-4, 1, 3]} rotation={[0, 0.3, 0]} castShadow>
+                <boxGeometry args={[2, 2, 2]} />
+                <meshStandardMaterial color="#ef4444" roughness={0.6} />
+            </mesh>
+            <mesh position={[-4, 2.1, 3]} rotation={[0, 0.3, Math.PI / 2]}>
+                <boxGeometry args={[0.1, 2.2, 2.2]} />
+                <meshStandardMaterial color="#fbbf24" metalness={0.5} />
+            </mesh>
+            
+            <mesh position={[3, 0.75, 4]} rotation={[0, -0.5, 0]} castShadow>
+                <boxGeometry args={[1.5, 1.5, 1.5]} />
+                <meshStandardMaterial color="#3b82f6" roughness={0.6} />
+            </mesh>
+            <mesh position={[3, 1.6, 4]} rotation={[0, -0.5, Math.PI / 2]}>
+                <boxGeometry args={[0.1, 1.7, 1.7]} />
+                <meshStandardMaterial color="#f472b6" metalness={0.5} />
+            </mesh>
+            
+            <mesh position={[0, 0.6, 5]} rotation={[0, 0.8, 0]} castShadow>
+                <boxGeometry args={[1.2, 1.2, 1.2]} />
+                <meshStandardMaterial color="#a855f7" roughness={0.6} />
+            </mesh>
+            <mesh position={[0, 1.3, 5]} rotation={[0, 0.8, Math.PI / 2]}>
+                <boxGeometry args={[0.1, 1.4, 1.4]} />
+                <meshStandardMaterial color="#22c55e" metalness={0.5} />
+            </mesh>
+        </group>
+    );
+};
+
 // Complete circular mountain boundary
 const MountainBoundary = () => {
     const ARENA_RADIUS = 80; // Distance from center to mountain ring
@@ -1048,8 +1235,8 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     const footprintSide = useRef(0); // Alternates 0, 1 for left/right foot
     const { camera } = useThree();
     
-    // Load the character model
-    const { scene } = useGLTF('/models/deathvader.glb');
+    // Load the character model (Draco-compressed for 95% smaller file size)
+    const { scene } = useGLTF('/models/deathvader-optimized.glb');
     
     // Clone the scene so we can modify it without affecting the cached original
     const clonedScene = useMemo(() => {
@@ -1268,8 +1455,8 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     );
 };
 
-// Preload the model for better performance
-useGLTF.preload('/models/deathvader.glb');
+// Preload the model for better performance (Draco-compressed)
+useGLTF.preload('/models/deathvader-optimized.glb');
 
 // Balloon physics constants
 const BALLOON_RADIUS = 0.8;
@@ -1320,7 +1507,7 @@ const BalloonSystem = ({
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const dummy = useMemo(() => new THREE.Object3D(), []);
     const colorArray = useRef<Float32Array | null>(null);
-    const MAX_BALLOONS = 3100; // Slightly more than needed for respawns
+    const MAX_BALLOONS = 800; // Slightly more than needed for respawns
 
     // Initialize color array
     useEffect(() => {
@@ -1773,8 +1960,8 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
             
             const newBalloons: BalloonPhysics[] = [];
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            // Create balloons with physics properties
-            for(let i=0; i<3000; i++) {
+            // Create balloons with physics properties (750 for better performance)
+            for(let i=0; i<750; i++) {
                 let x = (Math.random()-0.5)*120;
                 let z = (Math.random()-0.5)*120;
                 // Keep starting area clear - also avoid the poop pile area
@@ -1847,7 +2034,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         }
 
         // Respawn mechanic: Keep the world full
-        if (surviving.length < 2900) {
+        if (surviving.length < 700) {
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
             // Spawn multiple at once to refill faster
             for(let k=0; k<3; k++) {
@@ -1906,6 +2093,9 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                 <Ruins />
                 <MountainBoundary />
                 <PoopPile />
+                
+                {/* Christmas Tree - 500 units from the poop pile */}
+                <ChristmasTree position={[500, 0, 0]} />
                 
                 {/* Portal door to cave */}
                 <Door 
