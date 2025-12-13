@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, Suspense } from 'react';
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, Play, RotateCcw } from 'lucide-react';
+import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, Play, RotateCcw, Gem } from 'lucide-react';
 import { Canvas, ThreeElements } from '@react-three/fiber';
+import { Html, useProgress } from '@react-three/drei';
 import Game3D from './game/Game3D';
-import { Controls } from './game/types';
+import { Controls, Level } from './game/types';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -13,9 +14,38 @@ declare global {
   }
 }
 
+// Loading fallback shown while 3D assets load (inside Canvas)
+const LoadingFallback = () => {
+  const { progress, errors } = useProgress();
+  
+  return (
+    <>
+      <color attach="background" args={['#87CEEB']} />
+      <ambientLight intensity={0.6} />
+      <Html center>
+        <div className="text-center p-8 bg-white/90 rounded-2xl shadow-xl border-4 border-yellow-400">
+          <h2 className="text-2xl font-bold text-blue-600 mb-4">Loading Game...</h2>
+          <div className="w-64 h-4 bg-gray-200 rounded-full overflow-hidden mb-2">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-gray-600">{Math.round(progress)}%</p>
+          {errors.length > 0 && (
+            <p className="text-red-500 mt-2 text-sm">Error loading assets</p>
+          )}
+        </div>
+      </Html>
+    </>
+  );
+};
+
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<'menu' | 'playing'>('menu');
   const [score, setScore] = useState(0);
+  const [currentLevel, setCurrentLevel] = useState<Level>('overworld');
+  const [gemsCollected, setGemsCollected] = useState(0);
   
   // Control state ref to pass to the 3D loop without re-renders
   const controlsRef = useRef<Controls>({
@@ -25,6 +55,15 @@ const App: React.FC = () => {
     right: false,
     attack: false,
   });
+  
+  // Callbacks for level and gem updates
+  const handleLevelChange = useCallback((level: Level) => {
+    setCurrentLevel(level);
+  }, []);
+  
+  const handleGemsChange = useCallback((count: number) => {
+    setGemsCollected(count);
+  }, []);
 
   useEffect(() => {
     console.log("App Mounted");
@@ -70,23 +109,24 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full h-full bg-[#87CEEB] overflow-hidden select-none font-sans">
+    <div className={`relative w-full h-full overflow-hidden select-none font-sans ${currentLevel === 'cave' ? 'bg-[#1a1a2e]' : 'bg-[#87CEEB]'}`}>
       
       {/* 3D Scene */}
       <Canvas
         shadows
-        camera={{ position: [0, 8, 12], fov: 50 }}
+        camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
         dpr={[1, 2]} // Handle high-dpi screens
         className="absolute inset-0 z-0"
         onError={(e) => console.error("Canvas Error:", e)}
       >
-        <Suspense fallback={null}>
-          <color attach="background" args={['#87CEEB']} />
-          <fog attach="fog" args={['#87CEEB', 40, 150]} />
+        <Suspense fallback={<LoadingFallback />}>
+          {/* Background and fog are set per-level in Game3D */}
           <Game3D 
             isPlaying={gameState === 'playing'} 
             controlsRef={controlsRef} 
             onScoreUpdate={setScore}
+            onLevelChange={handleLevelChange}
+            onGemsChange={handleGemsChange}
           />
         </Suspense>
       </Canvas>
@@ -95,25 +135,40 @@ const App: React.FC = () => {
 
       {/* Main Menu Overlay */}
       {gameState === 'menu' && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white/90 p-8 rounded-3xl shadow-2xl text-center border-4 border-yellow-400 max-w-md w-full mx-4 transform transition-all hover:scale-105">
-            <h1 className="text-5xl md:text-6xl font-black text-blue-600 mb-2 drop-shadow-md tracking-wider">
-              TATCHAMASHAY
-            </h1>
-            <h2 className="text-3xl md:text-4xl font-bold text-orange-500 mb-8 tracking-wide">
-              BALLOON POP 3D
-            </h2>
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-gradient-to-b from-white to-gray-50 p-8 rounded-2xl shadow-2xl text-center border-2 border-yellow-400 max-w-sm w-full mx-4">
+            {/* Title Section */}
+            <div className="mb-6">
+              <h1 className="text-3xl font-black text-blue-600 leading-tight tracking-tight">
+                TATCHAMASHAY
+              </h1>
+              <h2 className="text-xl font-bold text-orange-500 mt-1">
+                Balloon Pop 3D
+              </h2>
+            </div>
             
+            {/* Play Button */}
             <button 
               onClick={startGame}
-              className="bg-green-500 hover:bg-green-600 text-white text-3xl font-bold py-4 px-12 rounded-full shadow-lg transform transition active:scale-95 flex items-center justify-center gap-3 mx-auto border-b-8 border-green-700 active:border-b-0 active:translate-y-2"
+              className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-2xl font-bold py-4 px-10 rounded-xl shadow-lg transform transition-all duration-150 active:scale-95 flex items-center justify-center gap-3 mx-auto border-b-4 border-green-700 active:border-b-0 active:translate-y-1"
             >
-              <Play fill="currentColor" size={32} /> PLAY
+              <Play fill="currentColor" size={28} /> PLAY
             </button>
 
-            <p className="mt-8 text-gray-500 text-lg font-medium">
-              Use WASD or Joystick to Move<br/>SPACE to Pop!
-            </p>
+            {/* Divider */}
+            <div className="my-6 border-t border-gray-200"></div>
+
+            {/* Controls Info */}
+            <div className="text-gray-600 text-sm space-y-1">
+              <p className="flex items-center justify-center gap-2">
+                <span className="bg-gray-200 px-2 py-0.5 rounded font-mono text-xs">WASD</span>
+                <span>or Joystick to Move</span>
+              </p>
+              <p className="flex items-center justify-center gap-2">
+                <span className="bg-gray-200 px-2 py-0.5 rounded font-mono text-xs">SPACE</span>
+                <span>to Pop Balloons</span>
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -123,9 +178,31 @@ const App: React.FC = () => {
         <>
           {/* Score & Menu Button */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 px-6 shadow-xl border-4 border-yellow-400 transform transition-transform key-score-pulse">
-              <span className="text-yellow-600 font-bold text-xl uppercase tracking-wider block text-xs">Score</span>
-              <span className="text-4xl font-black text-gray-800">{score}</span>
+            <div className="flex gap-3">
+              {/* Score display */}
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 px-6 shadow-xl border-4 border-yellow-400 transform transition-transform">
+                <span className="text-yellow-600 font-bold text-xl uppercase tracking-wider block text-xs">Score</span>
+                <span className="text-4xl font-black text-gray-800">{score}</span>
+              </div>
+              
+              {/* Gem counter - only show in cave */}
+              {currentLevel === 'cave' && (
+                <div className="bg-purple-900/80 backdrop-blur-md rounded-2xl p-3 px-6 shadow-xl border-4 border-purple-400 transform transition-transform">
+                  <span className="text-purple-300 font-bold text-xl uppercase tracking-wider block text-xs">Gems</span>
+                  <div className="flex items-center gap-2">
+                    <Gem size={24} className="text-purple-300" />
+                    <span className="text-4xl font-black text-white">{gemsCollected}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Level indicator */}
+              {currentLevel === 'cave' && (
+                <div className="bg-gray-800/80 backdrop-blur-md rounded-2xl p-3 px-4 shadow-xl border-2 border-gray-600">
+                  <span className="text-gray-400 font-bold text-xs uppercase">Location</span>
+                  <span className="text-lg font-bold text-white block">Cave</span>
+                </div>
+              )}
             </div>
 
             <button 
@@ -186,10 +263,17 @@ const App: React.FC = () => {
           </div>
 
           {/* Desktop Helper */}
-          <div className="hidden sm:block absolute bottom-6 left-6 bg-white/20 backdrop-blur text-white p-4 rounded-xl border border-white/30 pointer-events-none">
+          <div className={`hidden sm:block absolute bottom-6 left-6 backdrop-blur p-4 rounded-xl border pointer-events-none ${currentLevel === 'cave' ? 'bg-purple-900/40 text-purple-100 border-purple-500/30' : 'bg-white/20 text-white border-white/30'}`}>
             <p className="font-bold text-lg mb-1">Controls</p>
             <div className="flex items-center gap-2 text-sm"><span className="bg-white/20 px-2 py-1 rounded">WASD</span> Move</div>
-            <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Pop Balloon</div>
+            {currentLevel === 'cave' ? (
+              <>
+                <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Kick Potato</div>
+                <div className="flex items-center gap-2 text-sm mt-1 text-purple-300">Walk into gems to collect</div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Pop Balloon</div>
+            )}
           </div>
         </>
       )}

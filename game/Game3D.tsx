@@ -1,8 +1,17 @@
-import React, { useRef, useState, useMemo, useEffect } from 'react';
+import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
 import { useFrame, useThree, ThreeElements } from '@react-three/fiber';
 import { Float, useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Controls, GameProps } from './types';
+import { Controls, GameProps, Level } from './types';
+import { Door } from './components/Door';
+import { CaveWorld } from './components/CaveWorld';
+import { GemSystem, GemData, generateCaveGems } from './components/Gem';
+import { PotatoSystem, PotatoPhysics, generateCavePotatoes } from './components/Potato';
+
+// Door position in overworld (near the poop pile)
+export const OVERWORLD_DOOR_POSITION = new THREE.Vector3(12, 0, 0);
+// Door position in cave (for returning)
+export const CAVE_RETURN_DOOR_POSITION = new THREE.Vector3(0, 0, 50);
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -115,7 +124,7 @@ const getPoopPileHeight = (x: number, z: number): number => {
     return Math.max(0, linearHeight + layerBump);
 };
 
-// Collision check function (poop pile is climbable, not a collision)
+// Collision check function for OVERWORLD (poop pile is climbable, not a collision)
 const checkCollision = (newX: number, newZ: number): boolean => {
     // Check mountain boundary (circular)
     const distFromCenter = Math.sqrt(newX * newX + newZ * newZ);
@@ -134,6 +143,70 @@ const checkCollision = (newX: number, newZ: number): boolean => {
     }
     
     return false; // No collision
+};
+
+// --- CAVE WORLD OFFSET ---
+// Cave world is offset to prevent overlap with overworld
+const CAVE_OFFSET = { x: 0, z: 1000 };
+
+// --- CAVE COLLISION SYSTEM ---
+// Tunnel path waypoints (must match CaveWorld.tsx) - relative to cave offset
+const TUNNEL_PATH = [
+    { x: CAVE_OFFSET.x + 0, z: CAVE_OFFSET.z + 0 },
+    { x: CAVE_OFFSET.x + 5, z: CAVE_OFFSET.z + 15 },
+    { x: CAVE_OFFSET.x + -3, z: CAVE_OFFSET.z + 30 },
+    { x: CAVE_OFFSET.x + 8, z: CAVE_OFFSET.z + 45 },
+    { x: CAVE_OFFSET.x + 0, z: CAVE_OFFSET.z + 60 },
+];
+const TUNNEL_WIDTH = 5; // Half-width of tunnel
+const CHAMBER_CENTER = { x: CAVE_OFFSET.x + 0, z: CAVE_OFFSET.z + 75 };
+const CHAMBER_RADIUS = 24; // Slightly smaller than visual for collision
+
+// Cave spawn position (where player appears when entering cave)
+// Position in the center of the cave entrance
+const CAVE_SPAWN = { x: CAVE_OFFSET.x, z: CAVE_OFFSET.z + 10 };
+
+// Get the tunnel center X at a given Z position
+const getTunnelCenterX = (z: number): number => {
+    // Find which segment we're in
+    for (let i = 0; i < TUNNEL_PATH.length - 1; i++) {
+        const p1 = TUNNEL_PATH[i];
+        const p2 = TUNNEL_PATH[i + 1];
+        
+        if (z >= p1.z && z <= p2.z) {
+            // Interpolate between waypoints
+            const t = (z - p1.z) / (p2.z - p1.z);
+            return p1.x + (p2.x - p1.x) * t;
+        }
+    }
+    
+    // Before tunnel start
+    if (z < TUNNEL_PATH[0].z) {
+        return TUNNEL_PATH[0].x;
+    }
+    
+    // After tunnel end (in chamber area)
+    return TUNNEL_PATH[TUNNEL_PATH.length - 1].x;
+};
+
+// Collision check function for CAVE - simplified for now
+const checkCaveCollision = (newX: number, newZ: number): boolean => {
+    // Simple bounds check - allow movement within a large area
+    // Cave spans from z=1000 to z=1100, x from -30 to 30
+    const minZ = CAVE_OFFSET.z - 5;
+    const maxZ = CAVE_OFFSET.z + 100;
+    const minX = CAVE_OFFSET.x - 30;
+    const maxX = CAVE_OFFSET.x + 30;
+    
+    if (newZ < minZ || newZ > maxZ) {
+        return true; // Out of bounds
+    }
+    
+    if (newX < minX || newX > maxX) {
+        return true; // Out of bounds
+    }
+    
+    return false; // No collision - free movement in cave
 };
 
 const Floor = () => (
@@ -959,12 +1032,13 @@ const MountainBoundary = () => {
     );
 };
 
-const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef }: {
+const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld' }: {
     controlsRef: React.MutableRefObject<Controls>,
     onAttack: () => void,
     positionRef: React.MutableRefObject<THREE.Vector3>,
     onFootprint: (x: number, z: number, rotation: number) => void,
-    hasClimbedPoopRef: React.MutableRefObject<boolean>
+    hasClimbedPoopRef: React.MutableRefObject<boolean>,
+    currentLevel?: Level
 }) => {
     const group = useRef<THREE.Group>(null);
     const swordRef = useRef<THREE.Group>(null);
@@ -1015,20 +1089,23 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         const currentPos = group.current.position.clone();
         const isMoving = up || down;
         
+        // Use appropriate collision check based on level
+        const collisionCheck = currentLevel === 'cave' ? checkCaveCollision : checkCollision;
+        
         if (up) {
             const movement = forward.clone().multiplyScalar(speed);
             const newX = currentPos.x + movement.x;
             const newZ = currentPos.z + movement.z;
             
             // Check collision and apply movement if no collision
-            if (!checkCollision(newX, newZ)) {
+            if (!collisionCheck(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
                 // Try sliding along obstacles (check X and Z separately)
-                if (!checkCollision(newX, currentPos.z)) {
+                if (!collisionCheck(newX, currentPos.z)) {
                     group.current.position.x = newX;
-                } else if (!checkCollision(currentPos.x, newZ)) {
+                } else if (!collisionCheck(currentPos.x, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
@@ -1039,32 +1116,36 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             const newX = currentPos.x + movement.x;
             const newZ = currentPos.z + movement.z;
             
-            if (!checkCollision(newX, newZ)) {
+            if (!collisionCheck(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
                 // Try sliding along obstacles
-                if (!checkCollision(newX, currentPos.z)) {
+                if (!collisionCheck(newX, currentPos.z)) {
                     group.current.position.x = newX;
-                } else if (!checkCollision(currentPos.x, newZ)) {
+                } else if (!collisionCheck(currentPos.x, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
         }
 
-        // Calculate height based on poop pile (climbing!)
-        const poopHeight = getPoopPileHeight(group.current.position.x, group.current.position.z);
-        group.current.position.y = poopHeight;
+        // Calculate height based on level
+        // Overworld has poop pile climbing, cave is flat
+        let groundHeight = 0;
+        if (currentLevel === 'overworld') {
+            groundHeight = getPoopPileHeight(group.current.position.x, group.current.position.z);
+        }
+        group.current.position.y = groundHeight;
         
-        // Track if player has reached the top of the poop
-        if (poopHeight >= POOP_TOP_THRESHOLD) {
+        // Track if player has reached the top of the poop (overworld only)
+        if (currentLevel === 'overworld' && groundHeight >= POOP_TOP_THRESHOLD) {
             hasClimbedPoopRef.current = true;
         }
         
         // Leave footprints when on ground (or very close to it) after climbing poop
         // Use threshold < 0.5 to account for floating point and slight slopes
-        const isOnGround = poopHeight < 0.5;
-        if (hasClimbedPoopRef.current && isOnGround && isMoving) {
+        const isOnGround = groundHeight < 0.5;
+        if (hasClimbedPoopRef.current && isOnGround && isMoving && currentLevel === 'overworld') {
             const currentTime = state.clock.elapsedTime;
             if (currentTime - lastFootprintTime.current > FOOTPRINT_INTERVAL) {
                 lastFootprintTime.current = currentTime;
@@ -1122,29 +1203,65 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         }
     });
 
+    // Sync group position with positionRef on mount/level change
+    useEffect(() => {
+        if (group.current) {
+            group.current.position.copy(positionRef.current);
+        }
+    }, [currentLevel, positionRef]);
+
     return (
         // Initial rotation Math.PI ensures player starts facing away from camera (Z-)
-        // Start position offset to avoid spawning inside the poop pile
-        <group ref={group} position={[0, 0, 8]} rotation={[0, Math.PI, 0]}>
+        <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
             {/* Character Model */}
             <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />
             
             {/* Sword Arm Pivot (kept for attack animation) */}
             <group position={[0.6, 1.2, 0]} ref={swordRef}>
-                {/* Blade - single tapered cone from base to point */}
+                {/* Sword glow light */}
+                <pointLight 
+                    position={[0, 0.7, 0.3]}
+                    color="#60A5FA" 
+                    intensity={1.5} 
+                    distance={6}
+                    decay={2}
+                />
+                
+                {/* Blade - single tapered cone from base to point with glow */}
                 <mesh position={[0, 0.7, 0.3]} rotation={[0, Math.PI/4, 0]} castShadow>
                     <coneGeometry args={[0.12, 1.6, 4]} />
-                    <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.2} />
+                    <meshStandardMaterial 
+                        color="#a5d8ff"
+                        emissive="#60A5FA"
+                        emissiveIntensity={0.6}
+                        metalness={0.9} 
+                        roughness={0.1} 
+                    />
                 </mesh>
+                
+                {/* Inner glow core along blade */}
+                <mesh position={[0, 0.7, 0.3]} rotation={[0, Math.PI/4, 0]} scale={[0.6, 0.9, 0.6]}>
+                    <coneGeometry args={[0.12, 1.6, 4]} />
+                    <meshBasicMaterial 
+                        color="#93C5FD"
+                        transparent
+                        opacity={0.4}
+                    />
+                </mesh>
+                
                 {/* Handle */}
                 <mesh position={[0, -0.3, 0.3]}>
                     <cylinderGeometry args={[0.08, 0.08, 0.4]} />
                     <meshStandardMaterial color="#78350f" />
                 </mesh>
-                {/* Cross guard */}
+                {/* Cross guard with subtle glow */}
                 <mesh position={[0, -0.1, 0.3]} rotation={[Math.PI/2, 0, 0]}>
                     <boxGeometry args={[0.4, 0.1, 0.1]} />
-                    <meshStandardMaterial color="#fcd34d" />
+                    <meshStandardMaterial 
+                        color="#fcd34d" 
+                        emissive="#fcd34d"
+                        emissiveIntensity={0.3}
+                    />
                 </mesh>
             </group>
         </group>
@@ -1579,7 +1696,21 @@ const FootprintSystem = ({ footprints }: { footprints: Footprint[] }) => {
     );
 };
 
-const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) => {
+const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange }) => {
+    // Level state management
+    const [currentLevel, setCurrentLevel] = useState<Level>('overworld');
+    const [gemsCollected, setGemsCollected] = useState(0);
+    
+    // Notify parent of level changes
+    useEffect(() => {
+        onLevelChange?.(currentLevel);
+    }, [currentLevel, onLevelChange]);
+    
+    // Notify parent of gem count changes
+    useEffect(() => {
+        onGemsChange?.(gemsCollected);
+    }, [gemsCollected, onGemsChange]);
+    
     // Use a ref to store balloon physics data (mutable, doesn't trigger re-renders)
     const balloonsRef = useRef<BalloonPhysics[]>([]);
     const [particles, setParticles] = useState<{ id: string, pos: THREE.Vector3, color: string }[]>([]);
@@ -1587,6 +1718,43 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
     const hasClimbedPoopRef = useRef(false);
     
     const playerPos = useRef(new THREE.Vector3(0, 0, 8));
+    const playerRotation = useRef(0);
+    
+    // Cave gems and potatoes
+    const [caveGems, setCaveGems] = useState<GemData[]>([]);
+    const caveGemsRef = useRef<GemData[]>([]);
+    const cavePotatoesRef = useRef<PotatoPhysics[]>([]);
+    
+    // Keep ref in sync with state
+    useEffect(() => {
+        caveGemsRef.current = caveGems;
+    }, [caveGems]);
+    
+    // Level transition handler
+    const handleEnterDoor = useCallback((targetLevel: Level) => {
+        setCurrentLevel(targetLevel);
+        // Reset player position for new level
+        if (targetLevel === 'cave') {
+            // Spawn in cave (offset by CAVE_OFFSET)
+            playerPos.current.set(CAVE_SPAWN.x, 0, CAVE_SPAWN.z);
+            // Initialize cave gems and potatoes with offset
+            const chamberCenter = new THREE.Vector3(CHAMBER_CENTER.x, 0, CHAMBER_CENTER.z);
+            const gems = generateCaveGems(chamberCenter, 12);
+            setCaveGems(gems);
+            caveGemsRef.current = gems;
+            cavePotatoesRef.current = generateCavePotatoes(chamberCenter, 10);
+        } else {
+            // Spawn in overworld
+            playerPos.current.set(0, 0, 8);
+        }
+    }, []);
+    
+    // Gem collection handler
+    const handleCollectGem = useCallback((gemId: string) => {
+        setCaveGems(prev => prev.map(g => g.id === gemId ? { ...g, collected: true } : g));
+        setGemsCollected(prev => prev + 1);
+        onScoreUpdate(prev => prev + 10); // Gems are worth 10 points
+    }, [onScoreUpdate]);
 
     useEffect(() => {
         console.log("Game3D Mounted");
@@ -1598,6 +1766,10 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
             // Reset footprints and climbing state for new game
             setFootprints([]);
             hasClimbedPoopRef.current = false;
+            // Reset level state
+            setCurrentLevel('overworld');
+            setGemsCollected(0);
+            playerPos.current.set(0, 0, 8);
             
             const newBalloons: BalloonPhysics[] = [];
             const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
@@ -1706,45 +1878,97 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate }) 
         }
     };
 
-    return (
-        <>
-            <ambientLight intensity={0.6} />
-            <hemisphereLight args={['#87CEEB', '#5C4033', 0.6]} />
-            <Environment preset="sunset" environmentIntensity={0.5} />
-            <directionalLight 
-                position={[80, 150, 80]} 
-                intensity={1.5} 
-                castShadow 
-                shadow-mapSize={[2048, 2048]}
-                shadow-camera-left={-120}
-                shadow-camera-right={120}
-                shadow-camera-top={120}
-                shadow-camera-bottom={-120}
-                shadow-camera-far={400}
-            />
+    // Render overworld
+    if (currentLevel === 'overworld') {
+        return (
+            <>
+                {/* Overworld atmosphere */}
+                <color attach="background" args={['#87CEEB']} />
+                <fog attach="fog" args={['#87CEEB', 40, 150]} />
+                
+                <ambientLight intensity={0.6} />
+                <hemisphereLight args={['#87CEEB', '#5C4033', 0.6]} />
+                <Environment preset="sunset" environmentIntensity={0.5} />
+                <directionalLight 
+                    position={[80, 150, 80]} 
+                    intensity={1.5} 
+                    castShadow 
+                    shadow-mapSize={[2048, 2048]}
+                    shadow-camera-left={-120}
+                    shadow-camera-right={120}
+                    shadow-camera-top={120}
+                    shadow-camera-bottom={-120}
+                    shadow-camera-far={400}
+                />
 
-            <Floor />
-            <GrassPatches />
-            <Ruins />
-            <MountainBoundary />
-            <PoopPile />
-            
+                <Floor />
+                <GrassPatches />
+                <Ruins />
+                <MountainBoundary />
+                <PoopPile />
+                
+                {/* Portal door to cave */}
+                <Door 
+                    position={[12, 0, 0]}
+                    rotation={[0, -Math.PI / 2, 0]}
+                    playerPosRef={playerPos}
+                    onPlayerNear={() => handleEnterDoor('cave')}
+                />
+                
+                <Player 
+                    controlsRef={controlsRef} 
+                    onAttack={handleAttack} 
+                    positionRef={playerPos}
+                    onFootprint={handleFootprint}
+                    hasClimbedPoopRef={hasClimbedPoopRef}
+                    currentLevel="overworld"
+                />
+                
+                {/* Footprints left after climbing poop */}
+                <FootprintSystem footprints={footprints} />
+                
+                {/* Instanced balloon system - single draw call for all balloons */}
+                <BalloonSystem balloonsRef={balloonsRef} playerPosRef={playerPos} />
+
+                <Particles particles={particles} />
+            </>
+        );
+    }
+    
+    // Render cave world
+    return (
+        <CaveWorld 
+            playerPosRef={playerPos}
+            onReturnToOverworld={() => handleEnterDoor('overworld')}
+        >
+            {/* Player */}
             <Player 
                 controlsRef={controlsRef} 
                 onAttack={handleAttack} 
                 positionRef={playerPos}
                 onFootprint={handleFootprint}
                 hasClimbedPoopRef={hasClimbedPoopRef}
+                currentLevel="cave"
             />
             
-            {/* Footprints left after climbing poop */}
-            <FootprintSystem footprints={footprints} />
+            {/* Collectible gems */}
+            <GemSystem 
+                gems={caveGems}
+                onCollectGem={handleCollectGem}
+                playerPosRef={playerPos}
+            />
             
-            {/* Instanced balloon system - single draw call for all balloons */}
-            <BalloonSystem balloonsRef={balloonsRef} playerPosRef={playerPos} />
-
+            {/* Kickable potatoes */}
+            <PotatoSystem 
+                potatoesRef={cavePotatoesRef}
+                playerPosRef={playerPos}
+                gemsRef={caveGemsRef}
+                onAttack={controlsRef.current.attack}
+                onGemCollect={handleCollectGem}
+            />
+            
             <Particles particles={particles} />
-        </>
+        </CaveWorld>
     );
 };
 
