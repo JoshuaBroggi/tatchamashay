@@ -11,8 +11,8 @@ export type Controls = {
 
 export type Level = 'overworld' | 'cave';
 
-// Character variants - different cloak colors for Darth Vader
-export type CharacterVariant = 'purple' | 'black';
+// Character variants - different characters and cloak colors
+export type CharacterVariant = 'purple' | 'black' | 'fluffy';
 
 export interface CharacterConfig {
   id: CharacterVariant;
@@ -33,6 +33,12 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
     name: 'Dark Lord',
     cloakColor: '#1a1a1a', // Near black
     description: 'The classic fearsome Sith warrior'
+  },
+  {
+    id: 'fluffy',
+    name: 'Fluffy',
+    cloakColor: '#FFFFFF', // Not used for Fluffy
+    description: 'A magical unicorn with a pointy horn'
   }
 ];
 

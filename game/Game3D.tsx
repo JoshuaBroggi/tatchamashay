@@ -2,7 +2,7 @@ import React, { useRef, useState, useMemo, useEffect, useCallback, Suspense, laz
 import { useFrame, useThree, ThreeElements } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { Controls, GameProps, Level } from './types';
+import { Controls, GameProps, Level, CharacterVariant, CHARACTER_CONFIGS } from './types';
 import { LoadingScreen } from './components/LoadingScreen';
 import { GemSystem, GemData, generateCaveGems } from './components/Gem';
 import { PotatoSystem, PotatoPhysics, generateCavePotatoes } from './components/Potato';
@@ -63,6 +63,221 @@ const playSound = (type: 'pop' | 'swing') => {
     }
 };
 
+// --- FLUFFY UNICORN MODEL (Procedural) ---
+interface FluffyModelProps {
+    headRef?: React.RefObject<THREE.Group>;
+    scale?: number;
+}
+
+const FluffyModel = React.forwardRef<THREE.Group, FluffyModelProps>(
+    ({ headRef, scale = 1 }, ref) => {
+        // Colors matching the reference image
+        const bodyColor = '#FAFAFA';
+        const maneColors = ['#E879F9', '#A855F7', '#6366F1']; // Pink, Purple, Blue
+        const hornColor = '#FCD34D';
+        const hoofColor = '#4B5563';
+        const noseColor = '#FDA4AF';
+        const eyeColor = '#1F2937';
+        
+        return (
+            <group ref={ref} scale={0.9 * scale}>
+                {/* Body - elongated ellipsoid */}
+                <mesh position={[0, 1.2, 0]} castShadow>
+                    <sphereGeometry args={[0.8, 16, 16]} />
+                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                </mesh>
+                <mesh position={[0, 1.2, 0]} scale={[0.9, 0.7, 1.3]} castShadow>
+                    <sphereGeometry args={[0.8, 16, 16]} />
+                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                </mesh>
+                
+                {/* Neck */}
+                <mesh position={[0, 1.6, 0.6]} rotation={[0.4, 0, 0]} castShadow>
+                    <cylinderGeometry args={[0.25, 0.35, 0.6, 12]} />
+                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                </mesh>
+                
+                {/* Head group (for attack animation) */}
+                <group ref={headRef} position={[0, 2.0, 0.9]}>
+                    {/* Head */}
+                    <mesh castShadow>
+                        <sphereGeometry args={[0.45, 16, 16]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    
+                    {/* Snout */}
+                    <mesh position={[0, -0.1, 0.35]} castShadow>
+                        <sphereGeometry args={[0.22, 12, 12]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    
+                    {/* Nose */}
+                    <mesh position={[0, -0.08, 0.52]}>
+                        <sphereGeometry args={[0.08, 8, 8]} />
+                        <meshStandardMaterial color={noseColor} roughness={0.4} />
+                    </mesh>
+                    
+                    {/* Eyes */}
+                    <group position={[0.18, 0.08, 0.28]}>
+                        <mesh>
+                            <sphereGeometry args={[0.1, 8, 8]} />
+                            <meshStandardMaterial color={eyeColor} roughness={0.3} />
+                        </mesh>
+                        <mesh position={[0.03, 0.03, 0.05]}>
+                            <sphereGeometry args={[0.03, 6, 6]} />
+                            <meshBasicMaterial color="#FFFFFF" />
+                        </mesh>
+                    </group>
+                    <group position={[-0.18, 0.08, 0.28]}>
+                        <mesh>
+                            <sphereGeometry args={[0.1, 8, 8]} />
+                            <meshStandardMaterial color={eyeColor} roughness={0.3} />
+                        </mesh>
+                        <mesh position={[-0.03, 0.03, 0.05]}>
+                            <sphereGeometry args={[0.03, 6, 6]} />
+                            <meshBasicMaterial color="#FFFFFF" />
+                        </mesh>
+                    </group>
+                    
+                    {/* Ears */}
+                    <mesh position={[0.25, 0.35, -0.05]} rotation={[0.2, 0.3, 0.4]} castShadow>
+                        <coneGeometry args={[0.1, 0.25, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[0.22, 0.32, -0.03]} rotation={[0.2, 0.3, 0.4]} scale={0.6}>
+                        <coneGeometry args={[0.08, 0.15, 8]} />
+                        <meshStandardMaterial color={noseColor} roughness={0.5} />
+                    </mesh>
+                    <mesh position={[-0.25, 0.35, -0.05]} rotation={[0.2, -0.3, -0.4]} castShadow>
+                        <coneGeometry args={[0.1, 0.25, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[-0.22, 0.32, -0.03]} rotation={[0.2, -0.3, -0.4]} scale={0.6}>
+                        <coneGeometry args={[0.08, 0.15, 8]} />
+                        <meshStandardMaterial color={noseColor} roughness={0.5} />
+                    </mesh>
+                    
+                    {/* Horn - golden spiral */}
+                    <group position={[0, 0.45, 0.1]} rotation={[-0.3, 0, 0]}>
+                        <mesh castShadow>
+                            <coneGeometry args={[0.08, 0.5, 8]} />
+                            <meshStandardMaterial 
+                                color={hornColor} 
+                                emissive={hornColor}
+                                emissiveIntensity={0.3}
+                                metalness={0.6} 
+                                roughness={0.3} 
+                            />
+                        </mesh>
+                        {/* Horn glow */}
+                        <pointLight position={[0, 0.3, 0]} color="#FCD34D" intensity={0.5} distance={2} />
+                    </group>
+                    
+                    {/* Mane on head - flowing locks */}
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <mesh 
+                            key={`head-mane-${i}`}
+                            position={[0, 0.2 - i * 0.12, -0.25 - i * 0.08]} 
+                            rotation={[0.5 + i * 0.1, 0, 0]}
+                            castShadow
+                        >
+                            <capsuleGeometry args={[0.08 - i * 0.01, 0.15, 4, 8]} />
+                            <meshStandardMaterial 
+                                color={maneColors[i % 3]} 
+                                roughness={0.5}
+                            />
+                        </mesh>
+                    ))}
+                </group>
+                
+                {/* Mane on neck - flowing down */}
+                {[0, 1, 2, 3].map((i) => (
+                    <mesh 
+                        key={`neck-mane-${i}`}
+                        position={[0, 1.7 - i * 0.15, 0.3 + i * 0.1]} 
+                        rotation={[0.8 + i * 0.15, 0, 0]}
+                        castShadow
+                    >
+                        <capsuleGeometry args={[0.1 - i * 0.015, 0.2, 4, 8]} />
+                        <meshStandardMaterial 
+                            color={maneColors[(i + 1) % 3]} 
+                            roughness={0.5}
+                        />
+                    </mesh>
+                ))}
+                
+                {/* Legs */}
+                {/* Front Right */}
+                <group position={[0.3, 0.4, 0.5]}>
+                    <mesh castShadow>
+                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[0, -0.45, 0]} castShadow>
+                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
+                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
+                    </mesh>
+                </group>
+                {/* Front Left */}
+                <group position={[-0.3, 0.4, 0.5]}>
+                    <mesh castShadow>
+                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[0, -0.45, 0]} castShadow>
+                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
+                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
+                    </mesh>
+                </group>
+                {/* Back Right */}
+                <group position={[0.3, 0.4, -0.5]}>
+                    <mesh castShadow>
+                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[0, -0.45, 0]} castShadow>
+                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
+                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
+                    </mesh>
+                </group>
+                {/* Back Left */}
+                <group position={[-0.3, 0.4, -0.5]}>
+                    <mesh castShadow>
+                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
+                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
+                    </mesh>
+                    <mesh position={[0, -0.45, 0]} castShadow>
+                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
+                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
+                    </mesh>
+                </group>
+                
+                {/* Tail */}
+                <group position={[0, 1.1, -0.9]} rotation={[-0.8, 0, 0]}>
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <mesh 
+                            key={`tail-${i}`}
+                            position={[
+                                Math.sin(i * 0.3) * 0.05,
+                                -i * 0.12,
+                                -i * 0.03
+                            ]} 
+                            rotation={[i * 0.15, 0, Math.sin(i * 0.5) * 0.2]}
+                            castShadow
+                        >
+                            <capsuleGeometry args={[0.1 - i * 0.012, 0.15, 4, 8]} />
+                            <meshStandardMaterial 
+                                color={maneColors[i % 3]} 
+                                roughness={0.5}
+                            />
+                        </mesh>
+                    ))}
+                </group>
+            </group>
+        );
+    }
+);
+
 // --- CAVE WORLD OFFSET ---
 const CAVE_OFFSET = { x: 0, z: 1000 };
 const CHAMBER_CENTER = { x: CAVE_OFFSET.x + 0, z: CAVE_OFFSET.z + 75 };
@@ -82,38 +297,80 @@ const checkCaveCollision = (newX: number, newZ: number): boolean => {
 };
 
 // --- PLAYER COMPONENT ---
-const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld' }: {
+const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld', characterVariant = 'black' }: {
     controlsRef: React.MutableRefObject<Controls>,
     onAttack: () => void,
     positionRef: React.MutableRefObject<THREE.Vector3>,
     onFootprint: (x: number, z: number, rotation: number) => void,
     hasClimbedPoopRef: React.MutableRefObject<boolean>,
-    currentLevel?: Level
+    currentLevel?: Level,
+    characterVariant?: CharacterVariant
 }) => {
     const group = useRef<THREE.Group>(null);
     const swordRef = useRef<THREE.Group>(null);
+    const fluffyHeadRef = useRef<THREE.Group>(null);
     const isAttacking = useRef(false);
     const attackTime = useRef(0);
     const lastFootprintTime = useRef(0);
     const footprintSide = useRef(0);
     const { camera } = useThree();
     
+    const isFluffy = characterVariant === 'fluffy';
+
     const { scene } = useGLTF('/models/deathvader-optimized.glb');
     
+    // Get cloak color from character config
+    const cloakColor = useMemo(() => {
+        const config = CHARACTER_CONFIGS.find(c => c.id === characterVariant);
+        return config?.cloakColor || '#1a1a1a';
+    }, [characterVariant]);
+
     const clonedScene = useMemo(() => {
+        if (isFluffy) return null; // Don't need GLB for Fluffy
+        
         const clone = scene.clone();
+        const cloakColorObj = new THREE.Color(cloakColor);
+        
         clone.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                const applyColorToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    
+                    if (clonedMat instanceof THREE.MeshStandardMaterial || 
+                        clonedMat instanceof THREE.MeshBasicMaterial ||
+                        clonedMat instanceof THREE.MeshPhongMaterial ||
+                        clonedMat instanceof THREE.MeshLambertMaterial) {
+                        
+                        const originalColor = clonedMat.color;
+                        const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
+                        
+                        // Apply to dark materials (cloak)
+                        if (luminance < 0.5) {
+                            clonedMat.color = cloakColorObj.clone();
+                        }
+                    }
+                    return clonedMat;
+                };
+                
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material = mesh.material.map(applyColorToMaterial);
+                    } else {
+                        mesh.material = applyColorToMaterial(mesh.material);
+                    }
+                }
             }
         });
         return clone;
-    }, [scene]);
+    }, [scene, cloakColor, isFluffy]);
 
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
-    const ATTACK_DURATION = 0.2;
+    const ATTACK_DURATION = 0.25;
     const FOOTPRINT_INTERVAL = 0.25;
     const POOP_TOP_THRESHOLD = 6.0;
 
@@ -213,16 +470,35 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             onAttack();
         }
 
-        if (isAttacking.current && swordRef.current) {
+        // Attack animation - different for each character
+        if (isAttacking.current) {
             attackTime.current += delta;
             const progress = Math.min(attackTime.current / ATTACK_DURATION, 1);
             
-            const swingAngle = Math.sin(progress * Math.PI) * 2;
-            swordRef.current.rotation.x = swingAngle;
+            if (isFluffy && fluffyHeadRef.current) {
+                // Fluffy: Head swing with horn thrust
+                // Forward tilt + side swing for dramatic horn attack
+                const thrustAngle = Math.sin(progress * Math.PI) * 0.8; // Forward thrust
+                const swingAngle = Math.sin(progress * Math.PI * 2) * 0.4; // Side to side
+                fluffyHeadRef.current.rotation.x = -thrustAngle;
+                fluffyHeadRef.current.rotation.z = swingAngle;
+                
+                if (progress >= 1) {
+                    isAttacking.current = false;
+                    fluffyHeadRef.current.rotation.x = 0;
+                    fluffyHeadRef.current.rotation.z = 0;
+                }
+            } else if (!isFluffy && swordRef.current) {
+                // DeathVader: Sword swing
+                const swingAngle = Math.sin(progress * Math.PI) * 2;
+                swordRef.current.rotation.x = swingAngle;
 
-            if (progress >= 1) {
+                if (progress >= 1) {
+                    isAttacking.current = false;
+                    swordRef.current.rotation.x = 0;
+                }
+            } else if (progress >= 1) {
                 isAttacking.current = false;
-                swordRef.current.rotation.x = 0;
             }
         }
     });
@@ -233,9 +509,19 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         }
     }, [currentLevel, positionRef]);
 
+    // Render Fluffy the Unicorn
+    if (isFluffy) {
+        return (
+            <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+                <FluffyModel headRef={fluffyHeadRef} scale={2.2} />
+            </group>
+        );
+    }
+
+    // Render DeathVader
     return (
         <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
-            <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />
+            {clonedScene && <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
             
             <group position={[0.6, 1.2, 0]} ref={swordRef}>
                 <pointLight 
@@ -371,7 +657,7 @@ const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: st
 type LoadingState = 'ready' | 'loading';
 
 // --- MAIN GAME COMPONENT ---
-const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange, onLoadingChange }) => {
+const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange, onLoadingChange, selectedCharacter = 'black' }) => {
     // Level and loading state management
     const [currentLevel, setCurrentLevel] = useState<Level>('overworld');
     const [loadingState, setLoadingState] = useState<LoadingState>('ready');
@@ -574,13 +860,14 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     balloonsRef={balloonsRef}
                     footprints={footprints}
                 >
-                    <Player 
-                        controlsRef={controlsRef} 
-                        onAttack={handleAttack} 
+                    <Player
+                        controlsRef={controlsRef}
+                        onAttack={handleAttack}
                         positionRef={playerPos}
                         onFootprint={handleFootprint}
                         hasClimbedPoopRef={hasClimbedPoopRef}
                         currentLevel="overworld"
+                        characterVariant={selectedCharacter}
                     />
                     <Particles particles={particles} />
                 </OverWorld>
@@ -595,13 +882,14 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                 playerPosRef={playerPos}
                 onReturnToOverworld={() => handleEnterDoor('overworld')}
             >
-                <Player 
-                    controlsRef={controlsRef} 
-                    onAttack={handleAttack} 
+                <Player
+                    controlsRef={controlsRef}
+                    onAttack={handleAttack}
                     positionRef={playerPos}
                     onFootprint={handleFootprint}
                     hasClimbedPoopRef={hasClimbedPoopRef}
                     currentLevel="cave"
+                    characterVariant={selectedCharacter}
                 />
                 
                 <GemSystem 

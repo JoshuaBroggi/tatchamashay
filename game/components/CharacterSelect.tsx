@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, Environment, Float } from '@react-three/drei';
+import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { CharacterVariant, CharacterConfig, CHARACTER_CONFIGS } from '../types';
 
@@ -16,41 +16,44 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
     
     const config = CHARACTER_CONFIGS.find(c => c.id === variant)!;
     
-    // Clone the scene and apply cloak color
+    // Clone the scene and apply cloak color to ALL dark/black materials
     const clonedScene = useMemo(() => {
         const clone = scene.clone();
+        const cloakColorObj = new THREE.Color(config.cloakColor);
+        
         clone.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 
-                // Clone the material to avoid modifying the original
+                const applyColorToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    
+                    // Handle different material types
+                    if (clonedMat instanceof THREE.MeshStandardMaterial || 
+                        clonedMat instanceof THREE.MeshBasicMaterial ||
+                        clonedMat instanceof THREE.MeshPhongMaterial ||
+                        clonedMat instanceof THREE.MeshLambertMaterial) {
+                        
+                        const originalColor = clonedMat.color;
+                        // Check if this is a dark/black material (likely cloak/robe)
+                        const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
+                        
+                        // Apply to dark materials (cloak) - threshold 0.5 to catch more materials
+                        if (luminance < 0.5) {
+                            clonedMat.color = cloakColorObj.clone();
+                        }
+                    }
+                    return clonedMat;
+                };
+                
+                // Clone and modify materials
                 if (mesh.material) {
                     if (Array.isArray(mesh.material)) {
-                        mesh.material = mesh.material.map(mat => {
-                            const clonedMat = mat.clone();
-                            // Apply cloak color to darker materials (likely the cloak/robe)
-                            if (clonedMat instanceof THREE.MeshStandardMaterial) {
-                                const originalColor = clonedMat.color;
-                                const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
-                                // Target darker materials for cloak modification
-                                if (luminance < 0.3) {
-                                    clonedMat.color = new THREE.Color(config.cloakColor);
-                                }
-                            }
-                            return clonedMat;
-                        });
+                        mesh.material = mesh.material.map(applyColorToMaterial);
                     } else {
-                        const clonedMat = mesh.material.clone();
-                        if (clonedMat instanceof THREE.MeshStandardMaterial) {
-                            const originalColor = clonedMat.color;
-                            const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
-                            if (luminance < 0.3) {
-                                clonedMat.color = new THREE.Color(config.cloakColor);
-                            }
-                        }
-                        mesh.material = clonedMat;
+                        mesh.material = applyColorToMaterial(mesh.material);
                     }
                 }
             }
@@ -75,30 +78,6 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
                 rotation={[0, -Math.PI / 2, 0]}
                 position={[0, -1.5, 0]}
             />
-            
-            {/* Glow ring under selected character */}
-            {isSelected && (
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]}>
-                    <ringGeometry args={[1.5, 2.2, 32]} />
-                    <meshBasicMaterial 
-                        color={variant === 'purple' ? '#a855f7' : '#60a5fa'} 
-                        transparent 
-                        opacity={0.6}
-                    />
-                </mesh>
-            )}
-            
-            {/* Particle sparkles around selected character */}
-            {isSelected && (
-                <Float speed={3} rotationIntensity={0.5} floatIntensity={1}>
-                    <pointLight 
-                        position={[0, 2, 0]} 
-                        color={variant === 'purple' ? '#a855f7' : '#60a5fa'} 
-                        intensity={2} 
-                        distance={8} 
-                    />
-                </Float>
-            )}
         </group>
     );
 };
