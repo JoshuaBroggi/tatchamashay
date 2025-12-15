@@ -1,25 +1,61 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, Environment } from '@react-three/drei';
+import { useGLTF, Environment, Float } from '@react-three/drei';
 import * as THREE from 'three';
-import { CharacterVariant, CharacterConfig, CHARACTER_CONFIGS } from '../types';
+import { CharacterVariant, CHARACTER_CONFIGS } from '../types';
 
 interface CharacterPreviewProps {
     variant: CharacterVariant;
     isSelected: boolean;
 }
 
-// Individual character preview with rotation animation
-const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected }) => {
+// --- FLUFFY UNICORN PREVIEW MODEL (GLB) ---
+const FluffyPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({ scale, isSelected }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { scene } = useGLTF('/models/fluffy unicorn.glb');
+    
+    // Clone the scene and set up shadows
+    const clonedScene = useMemo(() => {
+        const clone = scene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+            }
+        });
+        return clone;
+    }, [scene]);
+    
+    // Rotate the character 360 degrees continuously
+    useFrame((state, delta) => {
+        if (groupRef.current) {
+            // Full rotation every 8 seconds
+            groupRef.current.rotation.y += delta * (Math.PI / 4);
+        }
+    });
+    
+    return (
+        <group ref={groupRef}>
+            <primitive 
+                object={clonedScene} 
+                scale={isSelected ? 2.8 : 2.2} 
+                rotation={[0, -Math.PI / 2, 0]}
+                position={[0, -1.5, 0]}
+            />
+        </group>
+    );
+};
+
+// DeathVader character preview with rotation animation
+const DeathVaderPreview: React.FC<{ isSelected: boolean; cloakColor: string }> = ({ isSelected, cloakColor }) => {
     const groupRef = useRef<THREE.Group>(null);
     const { scene } = useGLTF('/models/deathvader-optimized.glb');
-    
-    const config = CHARACTER_CONFIGS.find(c => c.id === variant)!;
     
     // Clone the scene and apply cloak color to ALL dark/black materials
     const clonedScene = useMemo(() => {
         const clone = scene.clone();
-        const cloakColorObj = new THREE.Color(config.cloakColor);
+        const cloakColorObj = new THREE.Color(cloakColor);
         
         clone.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
@@ -59,7 +95,7 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
             }
         });
         return clone;
-    }, [scene, config.cloakColor]);
+    }, [scene, cloakColor]);
     
     // Rotate the character 360 degrees continuously
     useFrame((state, delta) => {
@@ -82,6 +118,36 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
     );
 };
 
+// Individual character preview with rotation animation
+const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const config = CHARACTER_CONFIGS.find(c => c.id === variant)!;
+    
+    // Rotate the character 360 degrees continuously
+    useFrame((state, delta) => {
+        if (groupRef.current) {
+            // Full rotation every 8 seconds
+            groupRef.current.rotation.y += delta * (Math.PI / 4);
+        }
+    });
+    
+    // Render Fluffy the Unicorn (GLB model)
+    if (variant === 'fluffy') {
+        return (
+            <Float speed={2} rotationIntensity={0} floatIntensity={0.3}>
+                <FluffyPreviewModel scale={3} isSelected={isSelected} />
+            </Float>
+        );
+    }
+    
+    // Render DeathVader variants
+    return (
+        <group ref={groupRef}>
+            <DeathVaderPreview isSelected={isSelected} cloakColor={config.cloakColor} />
+        </group>
+    );
+};
+
 interface CharacterSelectSceneProps {
     selectedCharacter: CharacterVariant;
     onSelectCharacter: (variant: CharacterVariant) => void;
@@ -93,22 +159,26 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
 }) => {
     // Position the camera closer for character selection
     const { camera } = useThree();
+    const isFluffy = selectedCharacter === 'fluffy';
     
     useEffect(() => {
         // Set camera position for a good character view
         camera.position.set(0, 2, 6);
-        camera.lookAt(0, 1, 0);
+        camera.lookAt(0, 2.5, 0);
     }, [camera]);
+    
+    // Background color based on character
+    const bgColor = isFluffy ? '#1e3a5f' : '#1a1a2e';
     
     return (
         <>
-            {/* Dark atmospheric background */}
-            <color attach="background" args={['#1a1a2e']} />
-            <fog attach="fog" args={['#1a1a2e', 15, 30]} />
+            {/* Atmospheric background - lighter blue for Fluffy */}
+            <color attach="background" args={[bgColor]} />
+            <fog attach="fog" args={[bgColor, 15, 30]} />
             
             {/* Strong ambient lighting so character is visible */}
-            <ambientLight intensity={0.8} />
-            <Environment preset="night" environmentIntensity={0.5} />
+            <ambientLight intensity={isFluffy ? 1.0 : 1.2} />
+            <Environment preset={isFluffy ? "sunset" : "night"} />
             
             {/* Main front light - bright spotlight on character */}
             <spotLight
@@ -118,7 +188,7 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
                 intensity={3}
                 color="#ffffff"
                 castShadow
-                target-position={[0, 0, 0]}
+                target-position={[0, 2.5, 0]}
             />
             
             {/* Fill light from front */}
@@ -128,26 +198,34 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
                 color="#ffffff"
             />
             
-            {/* Rim lights for dramatic effect */}
-            <pointLight position={[-4, 3, -2]} color="#6366f1" intensity={2} />
-            <pointLight position={[4, 3, -2]} color="#a855f7" intensity={2} />
+            {/* Rim lights for dramatic effect - pink/rainbow for Fluffy, purple for others */}
+            <pointLight 
+                position={[-4, 3, -2]} 
+                color={isFluffy ? "#F472B6" : "#6366f1"} 
+                intensity={2} 
+            />
+            <pointLight 
+                position={[4, 3, -2]} 
+                color={isFluffy ? "#60A5FA" : "#a855f7"} 
+                intensity={2} 
+            />
             
             {/* Top light */}
             <pointLight position={[0, 6, 0]} color="#ffffff" intensity={1} />
             
-            {/* Floor platform */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]} receiveShadow>
+            {/* Floor platform - grassy green for Fluffy */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]} receiveShadow>
                 <circleGeometry args={[4, 32]} />
                 <meshStandardMaterial 
-                    color="#2d2d4a" 
-                    roughness={0.3} 
-                    metalness={0.7}
+                    color={isFluffy ? "#4ADE80" : "#2d2d4a"} 
+                    roughness={isFluffy ? 0.8 : 0.3} 
+                    metalness={isFluffy ? 0.1 : 0.7}
                 />
             </mesh>
             
-            {/* Character positioned at center, slightly forward */}
-            <group position={[0, 0, 0]}>
-                <CharacterPreview 
+            {/* Character positioned higher up in viewport, feet above name modal */}
+            <group position={[0, 2.5, 0]}>
+                <CharacterPreview
                     variant={selectedCharacter}
                     isSelected={true}
                 />
@@ -156,7 +234,8 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
     );
 };
 
-// Preload model
+// Preload models
 useGLTF.preload('/models/deathvader-optimized.glb');
+useGLTF.preload('/models/fluffy unicorn.glb');
 
 export default CharacterSelectScene;

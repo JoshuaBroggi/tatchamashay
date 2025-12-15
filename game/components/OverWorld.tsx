@@ -4,6 +4,9 @@ import { Float, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Door } from './Door';
 
+// Player radius constant - must be defined before use in generateMountainColliders
+export const PLAYER_RADIUS = 0.6;
+
 // Helper to dispose material and its textures
 const disposeMaterial = (material: THREE.Material) => {
     material.dispose();
@@ -31,32 +34,85 @@ const seededRandom = (seed: number) => {
     return x - Math.floor(x);
 };
 
-// Generate pillar collision data (deterministic)
-const generatePillarColliders = (): { x: number, z: number, radius: number }[] => {
+
+// Generate mountain collision data (deterministic)
+const generateMountainColliders = (): { x: number, z: number, radius: number, height: number }[] => {
     const colliders = [];
-    for (let i = 0; i < 20; i++) {
-        const x = (seededRandom(i * 3 + 1) - 0.5) * 80;
-        const z = (seededRandom(i * 3 + 2) - 0.5) * 80;
-        if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
-        
-        const scaleX = 1 + seededRandom(i * 3 + 4);
-        const scaleZ = 1 + seededRandom(i * 3 + 6);
-        const radius = Math.max(scaleX, scaleZ) * 0.7;
-        
-        colliders.push({ x, z, radius });
+    const ARENA_RADIUS = 80;
+    const NUM_CLUSTERS = 24;
+
+    // Generate collision data for outer mountain clusters
+    for (let i = 0; i < NUM_CLUSTERS; i++) {
+        const angle = (i / NUM_CLUSTERS) * Math.PI * 2;
+        const radiusVariation = ARENA_RADIUS + (Math.sin(i * 3.7) * 8);
+        const centerX = Math.cos(angle) * radiusVariation;
+        const centerZ = Math.sin(angle) * radiusVariation;
+        const mainHeight = 35 + Math.sin(i * 1.5) * 15 + Math.cos(i * 2.3) * 10;
+        const clusterSeed = i * 47 + 123;
+
+        // Main peak
+        colliders.push({
+            x: centerX,
+            z: centerZ,
+            radius: mainHeight * 0.5 + PLAYER_RADIUS,
+            height: mainHeight
+        });
+
+        // Secondary peaks
+        const numSecondary = 2 + Math.floor(clusterSeed % 3);
+        for (let j = 0; j < numSecondary; j++) {
+            const secondaryAngle = (j / numSecondary) * Math.PI * 2 + clusterSeed;
+            const dist = mainHeight * 0.4 + (clusterSeed * j) % 10;
+            const secondaryHeight = mainHeight * (0.5 + (clusterSeed * j * 0.1) % 0.3);
+
+            colliders.push({
+                x: centerX + Math.cos(secondaryAngle) * dist,
+                z: centerZ + Math.sin(secondaryAngle) * dist,
+                radius: secondaryHeight * 0.45 + PLAYER_RADIUS,
+                height: secondaryHeight
+            });
+        }
+
+        // Foothills
+        const numFoothills = 3 + Math.floor(clusterSeed % 4);
+        for (let j = 0; j < numFoothills; j++) {
+            const foothillAngle = (j / numFoothills) * Math.PI * 2 + clusterSeed * 0.3;
+            const dist = mainHeight * 0.7 + (clusterSeed * j * 0.5) % 15;
+            const footHillHeight = mainHeight * (0.2 + (clusterSeed * j * 0.05) % 0.15);
+
+            colliders.push({
+                x: centerX + Math.cos(foothillAngle) * dist,
+                z: centerZ + Math.sin(foothillAngle) * dist,
+                radius: footHillHeight * 0.6 + PLAYER_RADIUS,
+                height: footHillHeight
+            });
+        }
     }
-    
-    // Add archway pillars
-    colliders.push({ x: 0, z: -15, radius: 1.5 });
-    colliders.push({ x: 6, z: -15, radius: 1.5 });
-    
+
+    // Generate collision data for inner mountains
+    const INNER_RADIUS = 65;
+    const NUM_INNER = 16;
+    for (let i = 0; i < NUM_INNER; i++) {
+        const angle = (i / NUM_INNER) * Math.PI * 2 + 0.15;
+        const x = Math.cos(angle) * INNER_RADIUS;
+        const z = Math.sin(angle) * INNER_RADIUS;
+        const height = 15 + (i % 5) * 3;
+        const radius = 8 + (i % 3) * 2;
+
+        colliders.push({
+            x,
+            z,
+            radius: radius + PLAYER_RADIUS,
+            height
+        });
+    }
+
     return colliders;
 };
 
 // Static collision data
-const PILLAR_COLLIDERS = generatePillarColliders();
+const MOUNTAIN_COLLIDERS = generateMountainColliders();
 export const MOUNTAIN_BOUNDARY_RADIUS = 58;
-export const PLAYER_RADIUS = 0.6;
 
 // Poop pile dimensions
 const POOP_PILE_POSITION = { x: 0, z: 0 };
@@ -84,16 +140,16 @@ export const checkOverworldCollision = (newX: number, newZ: number): boolean => 
     if (distFromCenter > MOUNTAIN_BOUNDARY_RADIUS) {
         return true;
     }
-    
-    for (const pillar of PILLAR_COLLIDERS) {
-        const dx = newX - pillar.x;
-        const dz = newZ - pillar.z;
+
+    for (const mountain of MOUNTAIN_COLLIDERS) {
+        const dx = newX - mountain.x;
+        const dz = newZ - mountain.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist < pillar.radius + PLAYER_RADIUS) {
+        if (dist < mountain.radius) {
             return true;
         }
     }
-    
+
     return false;
 };
 
@@ -424,47 +480,6 @@ const GrassPatches = () => {
     );
 };
 
-// --- RUINS ---
-const Ruins = () => {
-    const pillars = useMemo(() => {
-        const items = [];
-        for (let i = 0; i < 20; i++) {
-            const x = (seededRandom(i * 3 + 1) - 0.5) * 80;
-            const z = (seededRandom(i * 3 + 2) - 0.5) * 80;
-            if (Math.abs(x) < 5 && Math.abs(z) < 5) continue; 
-            
-            items.push({
-                position: [x, 2, z] as [number, number, number],
-                scale: [1 + seededRandom(i * 3 + 4), 4 + seededRandom(i * 3 + 5) * 4, 1 + seededRandom(i * 3 + 6)] as [number, number, number],
-                rotation: [0, seededRandom(i * 3 + 7) * Math.PI, 0] as [number, number, number]
-            });
-        }
-        return items;
-    }, []);
-
-    return (
-        <group>
-            {pillars.map((p, i) => (
-                <mesh key={i} position={p.position} scale={p.scale} rotation={p.rotation} castShadow receiveShadow>
-                    <boxGeometry args={[1, 1, 1]} />
-                    <meshStandardMaterial color="#D2B48C" roughness={0.9} />
-                </mesh>
-            ))}
-            <mesh position={[0, 3, -15]} castShadow receiveShadow>
-                <boxGeometry args={[2, 6, 2]} />
-                <meshStandardMaterial color="#C19A6B" />
-            </mesh>
-            <mesh position={[6, 3, -15]} castShadow receiveShadow>
-                <boxGeometry args={[2, 6, 2]} />
-                <meshStandardMaterial color="#C19A6B" />
-            </mesh>
-            <mesh position={[3, 7, -15]} castShadow receiveShadow>
-                <boxGeometry args={[10, 2, 2]} />
-                <meshStandardMaterial color="#C19A6B" />
-            </mesh>
-        </group>
-    );
-};
 
 // --- MOUNTAIN SYSTEM ---
 const MountainPeak = ({ position, height, baseRadius, rotation, seed }: {
@@ -885,9 +900,9 @@ const ChristmasTree = ({ position }: { position: [number, number, number] }) => 
         
         return result;
     }, []);
-    
+
     return (
-        <group position={position}>
+        <group position={position} scale={[0.5, 0.5, 0.5]}>
             <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
                 <cylinderGeometry args={[1.5, 2, 3, 12]} />
                 <meshStandardMaterial color="#5D4037" roughness={0.9} />
@@ -1045,10 +1060,12 @@ const getNeighborKeys = (x: number, z: number): string[] => {
 
 export const BalloonSystem = ({ 
     balloonsRef,
-    playerPosRef 
+    playerPosRef,
+    remotePlayerPositions = []
 }: { 
     balloonsRef: React.MutableRefObject<BalloonPhysics[]>,
-    playerPosRef: React.MutableRefObject<THREE.Vector3>
+    playerPosRef: React.MutableRefObject<THREE.Vector3>,
+    remotePlayerPositions?: { x: number; y: number; z: number }[]
 }) => {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -1119,29 +1136,37 @@ export const BalloonSystem = ({
                 }
             }
 
-            const playerPos = playerPosRef.current;
+            // Collect all player positions (local + remote)
+            const allPlayerPositions = [
+                playerPosRef.current,
+                ...remotePlayerPositions.map(p => new THREE.Vector3(p.x, p.y, p.z))
+            ];
+            
             const playerBalloonDist = BALLOON_RADIUS + PLAYER_RADIUS;
             const playerBalloonDistSq = playerBalloonDist * playerBalloonDist;
 
-            for (const b of balloons) {
-                const dx = b.x - playerPos.x;
-                const dy = b.y - (playerPos.y + 1.5);
-                const dz = b.z - playerPos.z;
-                const distSq = dx * dx + dy * dy + dz * dz;
+            // Check collisions against all players
+            for (const playerPos of allPlayerPositions) {
+                for (const b of balloons) {
+                    const dx = b.x - playerPos.x;
+                    const dy = b.y - (playerPos.y + 1.5);
+                    const dz = b.z - playerPos.z;
+                    const distSq = dx * dx + dy * dy + dz * dz;
 
-                if (distSq < playerBalloonDistSq && distSq > 0.001) {
-                    const dist = Math.sqrt(distSq);
-                    const overlap = playerBalloonDist - dist;
-                    
-                    const nx = dx / dist;
-                    const ny = dy / dist;
-                    const nz = dz / dist;
+                    if (distSq < playerBalloonDistSq && distSq > 0.001) {
+                        const dist = Math.sqrt(distSq);
+                        const overlap = playerBalloonDist - dist;
+                        
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        const nz = dz / dist;
 
-                    const force = overlap * PLAYER_BOUNCE_STRENGTH * dt;
-                    
-                    b.vx += nx * force;
-                    b.vy += ny * force * 0.5;
-                    b.vz += nz * force;
+                        const force = overlap * PLAYER_BOUNCE_STRENGTH * dt;
+                        
+                        b.vx += nx * force;
+                        b.vy += ny * force * 0.5;
+                        b.vz += nz * force;
+                    }
                 }
             }
 
@@ -1304,6 +1329,7 @@ export interface OverWorldProps {
     balloonsRef: React.MutableRefObject<BalloonPhysics[]>;
     footprints: Footprint[];
     children?: React.ReactNode;
+    remotePlayerPositions?: { x: number; y: number; z: number }[];
 }
 
 // --- MAIN OVERWORLD COMPONENT ---
@@ -1312,7 +1338,8 @@ export const OverWorld: React.FC<OverWorldProps> = ({
     onEnterCave,
     balloonsRef,
     footprints,
-    children
+    children,
+    remotePlayerPositions = []
 }) => {
     const { gl, scene } = useThree();
     
@@ -1372,7 +1399,7 @@ export const OverWorld: React.FC<OverWorldProps> = ({
             
             <ambientLight intensity={0.6} />
             <hemisphereLight args={['#87CEEB', '#5C4033', 0.6]} />
-            <Environment preset="sunset" environmentIntensity={0.5} />
+            <Environment preset="sunset" />
             <directionalLight 
                 position={[80, 150, 80]} 
                 intensity={1.5} 
@@ -1387,12 +1414,11 @@ export const OverWorld: React.FC<OverWorldProps> = ({
 
             <Floor />
             <GrassPatches />
-            <Ruins />
             <MountainBoundary />
             <PoopPile />
             
-            {/* Christmas Tree - 500 units from the poop pile */}
-            <ChristmasTree position={[500, 0, 0]} />
+            {/* Christmas Tree - 25 units from the poop pile */}
+            <ChristmasTree position={[25, 0, 0]} />
             
             {/* Portal door to cave */}
             <Door 
@@ -1406,7 +1432,7 @@ export const OverWorld: React.FC<OverWorldProps> = ({
             <FootprintSystem footprints={footprints} />
             
             {/* Instanced balloon system - single draw call for all balloons */}
-            <BalloonSystem balloonsRef={balloonsRef} playerPosRef={playerPosRef} />
+            <BalloonSystem balloonsRef={balloonsRef} playerPosRef={playerPosRef} remotePlayerPositions={remotePlayerPositions} />
 
             {/* Children (player, particles, etc.) */}
             {children}

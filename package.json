@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:party": "partykit dev",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:party": "partykit deploy"
   },
   "dependencies": {
     "lucide-react": "0.263.1",
@@ -14,12 +16,14 @@
     "three": "0.160.0",
     "@react-three/fiber": "8.15.16",
     "@react-three/drei": "9.99.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "partysocket": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "partykit": "^0.0.111"
   }
 }

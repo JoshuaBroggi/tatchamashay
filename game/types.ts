@@ -25,13 +25,13 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
   {
     id: 'purple',
     name: 'Imperial Mystic',
-    cloakColor: '#6B21A8', // Purple-800
+    cloakColor: '#8B5CF6', // More vibrant purple
     description: 'A Sith Lord shrouded in arcane mystery'
   },
   {
     id: 'black',
     name: 'Dark Lord',
-    cloakColor: '#1a1a1a', // Near black
+    cloakColor: '#0F0F0F', // True black
     description: 'The classic fearsome Sith warrior'
   },
   {
@@ -50,4 +50,5 @@ export type GameProps = {
   onGemsChange?: (count: number) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   selectedCharacter?: CharacterVariant;
+  selectedLevel?: Level;
 };

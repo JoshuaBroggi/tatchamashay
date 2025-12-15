@@ -6,6 +6,8 @@ import { Controls, GameProps, Level, CharacterVariant, CHARACTER_CONFIGS } from 
 import { LoadingScreen } from './components/LoadingScreen';
 import { GemSystem, GemData, generateCaveGems } from './components/Gem';
 import { PotatoSystem, PotatoPhysics, generateCavePotatoes } from './components/Potato';
+import { useMultiplayer, useMultiplayerEvents } from './multiplayer';
+import { RemotePlayer } from './components/RemotePlayer';
 
 // Lazy load both world components for code splitting
 const OverWorld = lazy(() => import('./components/OverWorld'));
@@ -63,248 +65,33 @@ const playSound = (type: 'pop' | 'swing') => {
     }
 };
 
-// --- FLUFFY UNICORN MODEL (Procedural) ---
-interface FluffyModelProps {
-    headRef?: React.RefObject<THREE.Group>;
-    scale?: number;
-}
-
-const FluffyModel = React.forwardRef<THREE.Group, FluffyModelProps>(
-    ({ headRef, scale = 1 }, ref) => {
-        // Colors matching the reference image
-        const bodyColor = '#FAFAFA';
-        const maneColors = ['#E879F9', '#A855F7', '#6366F1']; // Pink, Purple, Blue
-        const hornColor = '#FCD34D';
-        const hoofColor = '#4B5563';
-        const noseColor = '#FDA4AF';
-        const eyeColor = '#1F2937';
-        
-        return (
-            <group ref={ref} scale={0.9 * scale}>
-                {/* Body - elongated ellipsoid */}
-                <mesh position={[0, 1.2, 0]} castShadow>
-                    <sphereGeometry args={[0.8, 16, 16]} />
-                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                </mesh>
-                <mesh position={[0, 1.2, 0]} scale={[0.9, 0.7, 1.3]} castShadow>
-                    <sphereGeometry args={[0.8, 16, 16]} />
-                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                </mesh>
-                
-                {/* Neck */}
-                <mesh position={[0, 1.6, 0.6]} rotation={[0.4, 0, 0]} castShadow>
-                    <cylinderGeometry args={[0.25, 0.35, 0.6, 12]} />
-                    <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                </mesh>
-                
-                {/* Head group (for attack animation) */}
-                <group ref={headRef} position={[0, 2.0, 0.9]}>
-                    {/* Head */}
-                    <mesh castShadow>
-                        <sphereGeometry args={[0.45, 16, 16]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    
-                    {/* Snout */}
-                    <mesh position={[0, -0.1, 0.35]} castShadow>
-                        <sphereGeometry args={[0.22, 12, 12]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    
-                    {/* Nose */}
-                    <mesh position={[0, -0.08, 0.52]}>
-                        <sphereGeometry args={[0.08, 8, 8]} />
-                        <meshStandardMaterial color={noseColor} roughness={0.4} />
-                    </mesh>
-                    
-                    {/* Eyes */}
-                    <group position={[0.18, 0.08, 0.28]}>
-                        <mesh>
-                            <sphereGeometry args={[0.1, 8, 8]} />
-                            <meshStandardMaterial color={eyeColor} roughness={0.3} />
-                        </mesh>
-                        <mesh position={[0.03, 0.03, 0.05]}>
-                            <sphereGeometry args={[0.03, 6, 6]} />
-                            <meshBasicMaterial color="#FFFFFF" />
-                        </mesh>
-                    </group>
-                    <group position={[-0.18, 0.08, 0.28]}>
-                        <mesh>
-                            <sphereGeometry args={[0.1, 8, 8]} />
-                            <meshStandardMaterial color={eyeColor} roughness={0.3} />
-                        </mesh>
-                        <mesh position={[-0.03, 0.03, 0.05]}>
-                            <sphereGeometry args={[0.03, 6, 6]} />
-                            <meshBasicMaterial color="#FFFFFF" />
-                        </mesh>
-                    </group>
-                    
-                    {/* Ears */}
-                    <mesh position={[0.25, 0.35, -0.05]} rotation={[0.2, 0.3, 0.4]} castShadow>
-                        <coneGeometry args={[0.1, 0.25, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[0.22, 0.32, -0.03]} rotation={[0.2, 0.3, 0.4]} scale={0.6}>
-                        <coneGeometry args={[0.08, 0.15, 8]} />
-                        <meshStandardMaterial color={noseColor} roughness={0.5} />
-                    </mesh>
-                    <mesh position={[-0.25, 0.35, -0.05]} rotation={[0.2, -0.3, -0.4]} castShadow>
-                        <coneGeometry args={[0.1, 0.25, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[-0.22, 0.32, -0.03]} rotation={[0.2, -0.3, -0.4]} scale={0.6}>
-                        <coneGeometry args={[0.08, 0.15, 8]} />
-                        <meshStandardMaterial color={noseColor} roughness={0.5} />
-                    </mesh>
-                    
-                    {/* Horn - golden spiral */}
-                    <group position={[0, 0.45, 0.1]} rotation={[-0.3, 0, 0]}>
-                        <mesh castShadow>
-                            <coneGeometry args={[0.08, 0.5, 8]} />
-                            <meshStandardMaterial 
-                                color={hornColor} 
-                                emissive={hornColor}
-                                emissiveIntensity={0.3}
-                                metalness={0.6} 
-                                roughness={0.3} 
-                            />
-                        </mesh>
-                        {/* Horn glow */}
-                        <pointLight position={[0, 0.3, 0]} color="#FCD34D" intensity={0.5} distance={2} />
-                    </group>
-                    
-                    {/* Mane on head - flowing locks */}
-                    {[0, 1, 2, 3, 4].map((i) => (
-                        <mesh 
-                            key={`head-mane-${i}`}
-                            position={[0, 0.2 - i * 0.12, -0.25 - i * 0.08]} 
-                            rotation={[0.5 + i * 0.1, 0, 0]}
-                            castShadow
-                        >
-                            <capsuleGeometry args={[0.08 - i * 0.01, 0.15, 4, 8]} />
-                            <meshStandardMaterial 
-                                color={maneColors[i % 3]} 
-                                roughness={0.5}
-                            />
-                        </mesh>
-                    ))}
-                </group>
-                
-                {/* Mane on neck - flowing down */}
-                {[0, 1, 2, 3].map((i) => (
-                    <mesh 
-                        key={`neck-mane-${i}`}
-                        position={[0, 1.7 - i * 0.15, 0.3 + i * 0.1]} 
-                        rotation={[0.8 + i * 0.15, 0, 0]}
-                        castShadow
-                    >
-                        <capsuleGeometry args={[0.1 - i * 0.015, 0.2, 4, 8]} />
-                        <meshStandardMaterial 
-                            color={maneColors[(i + 1) % 3]} 
-                            roughness={0.5}
-                        />
-                    </mesh>
-                ))}
-                
-                {/* Legs */}
-                {/* Front Right */}
-                <group position={[0.3, 0.4, 0.5]}>
-                    <mesh castShadow>
-                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[0, -0.45, 0]} castShadow>
-                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
-                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
-                    </mesh>
-                </group>
-                {/* Front Left */}
-                <group position={[-0.3, 0.4, 0.5]}>
-                    <mesh castShadow>
-                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[0, -0.45, 0]} castShadow>
-                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
-                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
-                    </mesh>
-                </group>
-                {/* Back Right */}
-                <group position={[0.3, 0.4, -0.5]}>
-                    <mesh castShadow>
-                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[0, -0.45, 0]} castShadow>
-                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
-                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
-                    </mesh>
-                </group>
-                {/* Back Left */}
-                <group position={[-0.3, 0.4, -0.5]}>
-                    <mesh castShadow>
-                        <cylinderGeometry args={[0.12, 0.1, 0.8, 8]} />
-                        <meshStandardMaterial color={bodyColor} roughness={0.6} />
-                    </mesh>
-                    <mesh position={[0, -0.45, 0]} castShadow>
-                        <cylinderGeometry args={[0.1, 0.12, 0.15, 8]} />
-                        <meshStandardMaterial color={hoofColor} roughness={0.4} />
-                    </mesh>
-                </group>
-                
-                {/* Tail */}
-                <group position={[0, 1.1, -0.9]} rotation={[-0.8, 0, 0]}>
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                        <mesh 
-                            key={`tail-${i}`}
-                            position={[
-                                Math.sin(i * 0.3) * 0.05,
-                                -i * 0.12,
-                                -i * 0.03
-                            ]} 
-                            rotation={[i * 0.15, 0, Math.sin(i * 0.5) * 0.2]}
-                            castShadow
-                        >
-                            <capsuleGeometry args={[0.1 - i * 0.012, 0.15, 4, 8]} />
-                            <meshStandardMaterial 
-                                color={maneColors[i % 3]} 
-                                roughness={0.5}
-                            />
-                        </mesh>
-                    ))}
-                </group>
-            </group>
-        );
-    }
-);
-
-// --- CAVE WORLD OFFSET ---
-const CAVE_OFFSET = { x: 0, z: 1000 };
-const CHAMBER_CENTER = { x: CAVE_OFFSET.x + 0, z: CAVE_OFFSET.z + 75 };
-const CAVE_SPAWN = { x: CAVE_OFFSET.x, z: CAVE_OFFSET.z + 10 };
+// --- CAVE WORLD SPAWN ---
+const CHAMBER_CENTER = { x: 0, z: 75 };
+const CAVE_SPAWN = { x: 0, z: 10 };
 
 // Cave collision check
 const checkCaveCollision = (newX: number, newZ: number): boolean => {
-    const minZ = CAVE_OFFSET.z - 5;
-    const maxZ = CAVE_OFFSET.z + 100;
-    const minX = CAVE_OFFSET.x - 30;
-    const maxX = CAVE_OFFSET.x + 30;
-    
+    const minZ = -5;
+    const maxZ = 100;
+    const minX = -30;
+    const maxX = 30;
+
     if (newZ < minZ || newZ > maxZ) return true;
     if (newX < minX || newX > maxX) return true;
-    
+
     return false;
 };
 
 // --- PLAYER COMPONENT ---
-const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld', characterVariant = 'black' }: {
+const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld', characterVariant = 'black', onPositionUpdate }: {
     controlsRef: React.MutableRefObject<Controls>,
     onAttack: () => void,
     positionRef: React.MutableRefObject<THREE.Vector3>,
     onFootprint: (x: number, z: number, rotation: number) => void,
     hasClimbedPoopRef: React.MutableRefObject<boolean>,
     currentLevel?: Level,
-    characterVariant?: CharacterVariant
+    characterVariant?: CharacterVariant,
+    onPositionUpdate?: (x: number, y: number, z: number, rotation: number) => void
 }) => {
     const group = useRef<THREE.Group>(null);
     const swordRef = useRef<THREE.Group>(null);
@@ -317,7 +104,9 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     
     const isFluffy = characterVariant === 'fluffy';
 
-    const { scene } = useGLTF('/models/deathvader-optimized.glb');
+    // Load both character models
+    const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
+    const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
     
     // Get cloak color from character config
     const cloakColor = useMemo(() => {
@@ -325,10 +114,11 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         return config?.cloakColor || '#1a1a1a';
     }, [characterVariant]);
 
-    const clonedScene = useMemo(() => {
-        if (isFluffy) return null; // Don't need GLB for Fluffy
+    // Clone DeathVader scene with cloak color
+    const clonedDeathvaderScene = useMemo(() => {
+        if (isFluffy) return null;
         
-        const clone = scene.clone();
+        const clone = deathvaderScene.clone();
         const cloakColorObj = new THREE.Color(cloakColor);
         
         clone.traverse((child) => {
@@ -366,7 +156,22 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             }
         });
         return clone;
-    }, [scene, cloakColor, isFluffy]);
+    }, [deathvaderScene, cloakColor, isFluffy]);
+
+    // Clone Fluffy unicorn scene
+    const clonedFluffyScene = useMemo(() => {
+        if (!isFluffy) return null;
+        
+        const clone = fluffyScene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+            }
+        });
+        return clone;
+    }, [fluffyScene, isFluffy]);
 
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
@@ -452,6 +257,14 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 
         positionRef.current.copy(group.current.position);
 
+        // Broadcast position to multiplayer (throttled in the context)
+        onPositionUpdate?.(
+            group.current.position.x,
+            group.current.position.y,
+            group.current.position.z,
+            group.current.rotation.y
+        );
+
         const dist = 12;
         const height = 5.5;
         
@@ -509,11 +322,11 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         }
     }, [currentLevel, positionRef]);
 
-    // Render Fluffy the Unicorn
+    // Render Fluffy the Unicorn (GLB model)
     if (isFluffy) {
         return (
             <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
-                <FluffyModel headRef={fluffyHeadRef} scale={2.2} />
+                {clonedFluffyScene && <primitive object={clonedFluffyScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}
             </group>
         );
     }
@@ -521,7 +334,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     // Render DeathVader
     return (
         <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
-            {clonedScene && <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
+            {clonedDeathvaderScene && <primitive object={clonedDeathvaderScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
             
             <group position={[0.6, 1.2, 0]} ref={swordRef}>
                 <pointLight 
@@ -570,6 +383,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 };
 
 useGLTF.preload('/models/deathvader-optimized.glb');
+useGLTF.preload('/models/fluffy unicorn.glb');
 
 // --- PARTICLES SYSTEM ---
 const Particles = ({ particles }: { particles: { pos: THREE.Vector3, color: string, id: string }[] }) => {
@@ -657,12 +471,44 @@ const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: st
 type LoadingState = 'ready' | 'loading';
 
 // --- MAIN GAME COMPONENT ---
-const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange, onLoadingChange, selectedCharacter = 'black' }) => {
+const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange, onLoadingChange, selectedCharacter = 'black', selectedLevel = 'overworld' }) => {
     // Level and loading state management
     const [currentLevel, setCurrentLevel] = useState<Level>('overworld');
     const [loadingState, setLoadingState] = useState<LoadingState>('ready');
     const [targetLevel, setTargetLevel] = useState<Level>('overworld');
     const [gemsCollected, setGemsCollected] = useState(0);
+    
+    // Multiplayer context
+    const {
+        isConnected,
+        isHost,
+        remotePlayers,
+        broadcastPosition,
+        broadcastAttack,
+        broadcastBalloonPop,
+        broadcastGemCollect,
+        broadcastLevelChange,
+    } = useMultiplayer();
+    
+    // Handle multiplayer events
+    useMultiplayerEvents({
+        onBalloonPop: useCallback((event) => {
+            // Remote player popped balloons - remove them locally
+            const poppedIds = new Set(event.balloonIds);
+            balloonsRef.current = balloonsRef.current.filter(b => !poppedIds.has(b.id));
+        }, []),
+        onGemCollect: useCallback((event) => {
+            // Remote player collected a gem
+            setCaveGems(prev => prev.map(g => g.id === event.gemId ? { ...g, collected: true } : g));
+            setGemsCollected(prev => prev + 1);
+        }, []),
+        onLevelChange: useCallback((event) => {
+            // Host changed level - follow them
+            if (!isHost) {
+                handleEnterDoor(event.level);
+            }
+        }, []),
+    });
     
     // Notify parent of level changes
     useEffect(() => {
@@ -702,6 +548,11 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         setLoadingState('loading');
         setTargetLevel(newTargetLevel);
         
+        // Broadcast level change if host
+        if (isConnected && isHost) {
+            broadcastLevelChange(newTargetLevel);
+        }
+        
         // Small delay to allow current level to unmount
         setTimeout(() => {
             // Reset player position for new level
@@ -725,50 +576,76 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
             setCurrentLevel(newTargetLevel);
             setLoadingState('ready');
         }, 100);
-    }, []);
+    }, [isConnected, isHost, broadcastLevelChange]);
     
     // Gem collection handler
     const handleCollectGem = useCallback((gemId: string) => {
         setCaveGems(prev => prev.map(g => g.id === gemId ? { ...g, collected: true } : g));
         setGemsCollected(prev => prev + 1);
         onScoreUpdate(prev => prev + 10);
-    }, [onScoreUpdate]);
+        
+        // Broadcast gem collection to other players
+        if (isConnected) {
+            broadcastGemCollect(gemId);
+        }
+    }, [onScoreUpdate, isConnected, broadcastGemCollect]);
 
     // Initialize balloons and reset game state
     useEffect(() => {
         if (isPlaying) {
             setFootprints([]);
             hasClimbedPoopRef.current = false;
-            setCurrentLevel('overworld');
+            setCurrentLevel(selectedLevel);
             setGemsCollected(0);
             setLoadingState('ready');
-            setTargetLevel('overworld');
-            playerPos.current.set(0, 0, 8);
-            
-            const newBalloons: BalloonPhysics[] = [];
-            const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            for(let i=0; i<750; i++) {
-                let x = (Math.random()-0.5)*120;
-                let z = (Math.random()-0.5)*120;
-                if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
+            setTargetLevel(selectedLevel);
 
-                const baseY = 1.5 + Math.random() * 2;
-                newBalloons.push({
-                    id: Math.random().toString(),
-                    x,
-                    y: baseY,
-                    z,
-                    vx: 0,
-                    vy: 0,
-                    vz: 0,
-                    baseY,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    offset: Math.random() * 100
-                });
+            // Set initial player position based on selected level
+            if (selectedLevel === 'cave') {
+                playerPos.current.set(CAVE_SPAWN.x, 0, CAVE_SPAWN.z);
+                // Initialize cave gems and potatoes for starting level
+                const chamberCenter = new THREE.Vector3(CHAMBER_CENTER.x, 0, CHAMBER_CENTER.z);
+                const gems = generateCaveGems(chamberCenter, 12);
+                setCaveGems(gems);
+                caveGemsRef.current = gems;
+                cavePotatoesRef.current = generateCavePotatoes(chamberCenter, 10);
+            } else {
+                playerPos.current.set(0, 0, 8);
+                // Clear cave data
+                setCaveGems([]);
+                caveGemsRef.current = [];
+                cavePotatoesRef.current = [];
             }
-            balloonsRef.current = newBalloons;
+
+            // Initialize balloons only for overworld
+            if (selectedLevel === 'overworld') {
+                const newBalloons: BalloonPhysics[] = [];
+                const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+                for(let i=0; i<750; i++) {
+                    let x = (Math.random()-0.5)*120;
+                    let z = (Math.random()-0.5)*120;
+                    if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
+
+                    const baseY = 1.5 + Math.random() * 2;
+                    newBalloons.push({
+                        id: Math.random().toString(),
+                        x,
+                        y: baseY,
+                        z,
+                        vx: 0,
+                        vy: 0,
+                        vz: 0,
+                        baseY,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        offset: Math.random() * 100
+                    });
+                }
+                balloonsRef.current = newBalloons;
+            } else {
+                balloonsRef.current = [];
+            }
         }
-    }, [isPlaying]);
+    }, [isPlaying, selectedLevel]);
 
     const handlePopEffect = (pos: THREE.Vector3, color: string) => {
         const id = Math.random().toString();
@@ -796,12 +673,20 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         });
     };
 
-    const handleAttack = () => {
+    const handleAttack = useCallback(() => {
+        // Broadcast attack to other players
+        if (isConnected) {
+            broadcastAttack(true);
+            // Reset attack state after animation
+            setTimeout(() => broadcastAttack(false), 250);
+        }
+        
         const swordPos = playerPos.current.clone();
         swordPos.y += 1;
         
         const RANGE = 4.0;
         let hits = 0;
+        const poppedIds: string[] = [];
 
         const surviving: BalloonPhysics[] = [];
         for (const b of balloonsRef.current) {
@@ -810,9 +695,15 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                 playSound('pop');
                 handlePopEffect(bPos, b.color);
                 hits++;
+                poppedIds.push(b.id);
             } else {
                 surviving.push(b);
             }
+        }
+
+        // Broadcast balloon pops to other players
+        if (isConnected && poppedIds.length > 0) {
+            broadcastBalloonPop(poppedIds);
         }
 
         if (surviving.length < 700) {
@@ -843,12 +734,21 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         if (hits > 0) {
             onScoreUpdate(prev => prev + hits);
         }
-    };
+    }, [isConnected, broadcastAttack, broadcastBalloonPop, onScoreUpdate]);
 
     // Show loading screen during transitions
     if (loadingState === 'loading') {
         return <LoadingScreen targetLevel={targetLevel} />;
     }
+
+    // Convert remote players map to array for rendering
+    const remotePlayerArray = useMemo(() => Array.from(remotePlayers.values()), [remotePlayers]);
+    
+    // Extract remote player positions for balloon collision
+    const remotePlayerPositions = useMemo(() => 
+        remotePlayerArray.map(p => p.currentPosition), 
+        [remotePlayerArray]
+    );
 
     // Render overworld with lazy loading
     if (currentLevel === 'overworld') {
@@ -859,6 +759,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     onEnterCave={() => handleEnterDoor('cave')}
                     balloonsRef={balloonsRef}
                     footprints={footprints}
+                    remotePlayerPositions={remotePlayerPositions}
                 >
                     <Player
                         controlsRef={controlsRef}
@@ -868,7 +769,14 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                         hasClimbedPoopRef={hasClimbedPoopRef}
                         currentLevel="overworld"
                         characterVariant={selectedCharacter}
+                        onPositionUpdate={isConnected ? broadcastPosition : undefined}
                     />
+                    
+                    {/* Render remote players */}
+                    {remotePlayerArray.map(player => (
+                        <RemotePlayer key={player.id} player={player} />
+                    ))}
+                    
                     <Particles particles={particles} />
                 </OverWorld>
             </Suspense>
@@ -878,9 +786,10 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     // Render cave world with lazy loading
     return (
         <Suspense fallback={<LoadingScreen targetLevel="cave" />}>
-            <CaveWorld 
+            <CaveWorld
                 playerPosRef={playerPos}
                 onReturnToOverworld={() => handleEnterDoor('overworld')}
+                offset={[0, 0, 0]}
             >
                 <Player
                     controlsRef={controlsRef}
@@ -890,7 +799,13 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     hasClimbedPoopRef={hasClimbedPoopRef}
                     currentLevel="cave"
                     characterVariant={selectedCharacter}
+                    onPositionUpdate={isConnected ? broadcastPosition : undefined}
                 />
+                
+                {/* Render remote players */}
+                {remotePlayerArray.map(player => (
+                    <RemotePlayer key={player.id} player={player} />
+                ))}
                 
                 <GemSystem 
                     gems={caveGems}
