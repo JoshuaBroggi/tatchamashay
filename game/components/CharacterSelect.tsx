@@ -177,41 +177,41 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
             <fog attach="fog" args={[bgColor, 15, 30]} />
             
             {/* Strong ambient lighting so character is visible */}
-            <ambientLight intensity={isFluffy ? 1.0 : 1.2} />
-            <Environment preset={isFluffy ? "sunset" : "night"} />
-            
+            <ambientLight intensity={isFluffy ? 1.0 : 2.5} />
+            <Environment preset={isFluffy ? "sunset" : "sunset"} />
+
             {/* Main front light - bright spotlight on character */}
             <spotLight
                 position={[0, 8, 8]}
                 angle={0.5}
                 penumbra={0.5}
-                intensity={3}
+                intensity={isFluffy ? 3 : 6}
                 color="#ffffff"
                 castShadow
                 target-position={[0, 2.5, 0]}
             />
-            
+
             {/* Fill light from front */}
-            <directionalLight 
-                position={[0, 5, 5]} 
-                intensity={1.5} 
+            <directionalLight
+                position={[0, 5, 5]}
+                intensity={isFluffy ? 1.5 : 3.5}
                 color="#ffffff"
             />
-            
+
             {/* Rim lights for dramatic effect - pink/rainbow for Fluffy, purple for others */}
-            <pointLight 
-                position={[-4, 3, -2]} 
-                color={isFluffy ? "#F472B6" : "#6366f1"} 
-                intensity={2} 
+            <pointLight
+                position={[-4, 3, -2]}
+                color={isFluffy ? "#F472B6" : "#6366f1"}
+                intensity={isFluffy ? 2 : 4}
             />
-            <pointLight 
-                position={[4, 3, -2]} 
-                color={isFluffy ? "#60A5FA" : "#a855f7"} 
-                intensity={2} 
+            <pointLight
+                position={[4, 3, -2]}
+                color={isFluffy ? "#60A5FA" : "#a855f7"}
+                intensity={isFluffy ? 2 : 4}
             />
-            
+
             {/* Top light */}
-            <pointLight position={[0, 6, 0]} color="#ffffff" intensity={1} />
+            <pointLight position={[0, 6, 0]} color="#ffffff" intensity={isFluffy ? 1 : 2.5} />
             
             {/* Floor platform - grassy green for Fluffy */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]} receiveShadow>

@@ -72,59 +72,6 @@ const OverworldPreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => 
     );
 };
 
-// --- CAVE PREVIEW COMPONENTS ---
-
-// Simple stalactite for preview
-const PreviewStalactite: React.FC<{ position: [number, number, number], height: number }> = ({
-    position,
-    height
-}) => {
-    return (
-        <mesh position={position} rotation={[Math.PI, 0, 0]} castShadow>
-            <coneGeometry args={[0.15, height, 6]} />
-            <meshStandardMaterial color="#8B7355" roughness={0.9} />
-        </mesh>
-    );
-};
-
-// Cave preview with stalactites and dark atmosphere
-const CavePreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-    const stalactites = useMemo(() => [
-        { position: [-1.5, 3, -1] as [number, number, number], height: 1.2 },
-        { position: [1, 3.5, 0] as [number, number, number], height: 0.8 },
-        { position: [0, 3.2, -1.5] as [number, number, number], height: 1.5 },
-        { position: [-2, 3.8, 0.5] as [number, number, number], height: 0.9 },
-    ], []);
-
-    return (
-        <group>
-            {/* Cave floor */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-                <planeGeometry args={[8, 6]} />
-                <meshStandardMaterial color="#4a4a4a" roughness={0.95} />
-            </mesh>
-
-            {/* Cave walls (simplified) */}
-            <mesh position={[-3, 2, 0]} rotation={[0, 0, 0]}>
-                <boxGeometry args={[0.5, 4, 6]} />
-                <meshStandardMaterial color="#2a2a2a" roughness={0.9} />
-            </mesh>
-            <mesh position={[3, 2, 0]} rotation={[0, 0, 0]}>
-                <boxGeometry args={[0.5, 4, 6]} />
-                <meshStandardMaterial color="#2a2a2a" roughness={0.9} />
-            </mesh>
-
-            {/* Stalactites */}
-            {stalactites.map((stalactite, i) => (
-                <PreviewStalactite key={i} {...stalactite} />
-            ))}
-
-            {/* Cave entrance glow */}
-            <pointLight position={[0, 2, 3]} color="#4a90e2" intensity={2} />
-        </group>
-    );
-};
-
 // Level preview wrapper with rotation
 const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, isSelected }) => {
     const groupRef = useRef<THREE.Group>(null);
@@ -138,11 +85,7 @@ const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, 
 
     return (
         <group ref={groupRef}>
-            {level === 'overworld' ? (
-                <OverworldPreview isSelected={isSelected} />
-            ) : (
-                <CavePreview isSelected={isSelected} />
-            )}
+            <OverworldPreview isSelected={isSelected} />
         </group>
     );
 };
@@ -164,8 +107,8 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
         camera.lookAt(0, 1.5, 0);
     }, [camera]);
 
-    // Background color based on selected level
-    const bgColor = selectedLevel === 'overworld' ? '#87CEEB' : '#1a1a2e';
+    // Background color for overworld
+    const bgColor = '#87CEEB';
 
     return (
         <>
@@ -173,28 +116,15 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
             <color attach="background" args={[bgColor]} />
             <fog attach="fog" args={[bgColor, 15, 30]} />
 
-            {/* Lighting based on level */}
-            {selectedLevel === 'overworld' ? (
-                <>
-                    {/* Bright lighting for overworld */}
-                    <ambientLight intensity={1.0} />
-                    <directionalLight
-                        position={[5, 8, 5]}
-                        intensity={2}
-                        color="#ffffff"
-                        castShadow
-                    />
-                    <pointLight position={[-3, 5, -3]} color="#FFE4B5" intensity={1} />
-                </>
-            ) : (
-                <>
-                    {/* Dim lighting for cave */}
-                    <ambientLight intensity={0.3} />
-                    <pointLight position={[0, 5, 0]} color="#4a90e2" intensity={1} />
-                    <pointLight position={[-2, 3, -2]} color="#9370DB" intensity={0.5} />
-                    <pointLight position={[2, 3, 2]} color="#FF6347" intensity={0.5} />
-                </>
-            )}
+            {/* Lighting for overworld */}
+            <ambientLight intensity={1.0} />
+            <directionalLight
+                position={[5, 8, 5]}
+                intensity={2}
+                color="#ffffff"
+                castShadow
+            />
+            <pointLight position={[-3, 5, -3]} color="#FFE4B5" intensity={1} />
 
             {/* Level preview positioned in center */}
             <group position={[0, 1, 0]}>

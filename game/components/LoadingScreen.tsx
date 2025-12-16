@@ -1,44 +1,26 @@
 import React from 'react';
 import { Html, useProgress } from '@react-three/drei';
-import { Level } from '../types';
-
-interface LoadingScreenProps {
-    targetLevel: Level;
-}
 
 // Tips shown during loading
-const CAVE_TIPS = [
-    "Tip: Walk into gems to collect them!",
-    "Tip: Press SPACE to kick potatoes at gems!",
-    "Tip: Explore the central chamber for treasures!",
-    "Tip: Look for the return door to go back!",
-];
-
 const OVERWORLD_TIPS = [
     "Tip: Pop balloons with SPACE to score points!",
     "Tip: Climb the poop pile for a surprise!",
-    "Tip: Look for the magical door near the poop pile!",
     "Tip: Use WASD to move around!",
+    "Tip: Look for colorful balloons to pop!",
 ];
 
-export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => {
+export const LoadingScreen: React.FC = () => {
     const { progress } = useProgress();
-    
-    const isCave = targetLevel === 'cave';
-    const tips = isCave ? CAVE_TIPS : OVERWORLD_TIPS;
-    const randomTip = tips[Math.floor(Math.random() * tips.length)];
-    
-    const bgColor = isCave ? '#1a1a2e' : '#87CEEB';
-    const textColor = isCave ? '#a78bfa' : '#3b82f6';
-    const progressBarBg = isCave ? '#4c1d95' : '#bfdbfe';
-    const progressBarFill = isCave 
-        ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)' 
-        : 'linear-gradient(90deg, #3b82f6, #60a5fa)';
-    
-    const levelName = isCave ? 'The Cave' : 'Overworld';
-    const levelDesc = isCave 
-        ? 'Entering the mysterious cave...' 
-        : 'Returning to the surface...';
+
+    const randomTip = OVERWORLD_TIPS[Math.floor(Math.random() * OVERWORLD_TIPS.length)];
+
+    const bgColor = '#87CEEB';
+    const textColor = '#3b82f6';
+    const progressBarBg = '#bfdbfe';
+    const progressBarFill = 'linear-gradient(90deg, #3b82f6, #60a5fa)';
+
+    const levelName = 'Overworld';
+    const levelDesc = 'Loading the sunny world...';
     
     return (
         <>
@@ -54,7 +36,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => 
                         alignItems: 'center',
                         justifyContent: 'center',
                         padding: '48px',
-                        backgroundColor: isCave ? 'rgba(30, 27, 75, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
                         borderRadius: '24px',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                         border: `4px solid ${textColor}`,
@@ -63,13 +45,13 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => 
                     }}
                 >
                     {/* Level Icon */}
-                    <div 
+                    <div
                         style={{
                             fontSize: '64px',
                             marginBottom: '16px',
                         }}
                     >
-                        {isCave ? '🦇' : '🌅'}
+                        🌅
                     </div>
                     
                     {/* Level Name */}
@@ -89,7 +71,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => 
                     <p 
                         style={{
                             fontSize: '18px',
-                            color: isCave ? '#c4b5fd' : '#64748b',
+                            color: '#64748b',
                             margin: '0 0 32px 0',
                         }}
                     >
@@ -124,7 +106,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => 
                         style={{
                             fontSize: '20px',
                             fontWeight: 'bold',
-                            color: isCave ? '#e9d5ff' : '#1e40af',
+                            color: '#1e40af',
                             margin: '0 0 24px 0',
                         }}
                     >
@@ -135,7 +117,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ targetLevel }) => 
                     <p 
                         style={{
                             fontSize: '14px',
-                            color: isCave ? '#a78bfa' : '#6b7280',
+                            color: '#6b7280',
                             margin: 0,
                             fontStyle: 'italic',
                             maxWidth: '300px',

@@ -9,10 +9,10 @@ export type Controls = {
   attack: boolean;
 };
 
-export type Level = 'overworld' | 'cave';
+export type Level = 'overworld';
 
 // Character variants - different characters and cloak colors
-export type CharacterVariant = 'purple' | 'black' | 'fluffy';
+export type CharacterVariant = 'black' | 'fluffy';
 
 export interface CharacterConfig {
   id: CharacterVariant;
@@ -23,14 +23,8 @@ export interface CharacterConfig {
 
 export const CHARACTER_CONFIGS: CharacterConfig[] = [
   {
-    id: 'purple',
-    name: 'Imperial Mystic',
-    cloakColor: '#8B5CF6', // More vibrant purple
-    description: 'A Sith Lord shrouded in arcane mystery'
-  },
-  {
     id: 'black',
-    name: 'Dark Lord',
+    name: 'Death Vader',
     cloakColor: '#0F0F0F', // True black
     description: 'The classic fearsome Sith warrior'
   },
@@ -46,8 +40,6 @@ export type GameProps = {
   isPlaying: boolean;
   controlsRef: React.MutableRefObject<Controls>;
   onScoreUpdate: (cb: (prev: number) => number) => void;
-  onLevelChange?: (level: Level) => void;
-  onGemsChange?: (count: number) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   selectedCharacter?: CharacterVariant;
   selectedLevel?: Level;

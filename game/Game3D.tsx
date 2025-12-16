@@ -4,14 +4,11 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { Controls, GameProps, Level, CharacterVariant, CHARACTER_CONFIGS } from './types';
 import { LoadingScreen } from './components/LoadingScreen';
-import { GemSystem, GemData, generateCaveGems } from './components/Gem';
-import { PotatoSystem, PotatoPhysics, generateCavePotatoes } from './components/Potato';
 import { useMultiplayer, useMultiplayerEvents } from './multiplayer';
 import { RemotePlayer } from './components/RemotePlayer';
 
-// Lazy load both world components for code splitting
+// Lazy load the world component
 const OverWorld = lazy(() => import('./components/OverWorld'));
-const CaveWorld = lazy(() => import('./components/CaveWorld'));
 
 // Import types from OverWorld for balloon and footprint systems
 import type { BalloonPhysics, Footprint } from './components/OverWorld';
@@ -65,31 +62,14 @@ const playSound = (type: 'pop' | 'swing') => {
     }
 };
 
-// --- CAVE WORLD SPAWN ---
-const CHAMBER_CENTER = { x: 0, z: 75 };
-const CAVE_SPAWN = { x: 0, z: 10 };
-
-// Cave collision check
-const checkCaveCollision = (newX: number, newZ: number): boolean => {
-    const minZ = -5;
-    const maxZ = 100;
-    const minX = -30;
-    const maxX = 30;
-
-    if (newZ < minZ || newZ > maxZ) return true;
-    if (newX < minX || newX > maxX) return true;
-
-    return false;
-};
 
 // --- PLAYER COMPONENT ---
-const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, currentLevel = 'overworld', characterVariant = 'black', onPositionUpdate }: {
+const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoopRef, characterVariant = 'black', onPositionUpdate }: {
     controlsRef: React.MutableRefObject<Controls>,
     onAttack: () => void,
     positionRef: React.MutableRefObject<THREE.Vector3>,
     onFootprint: (x: number, z: number, rotation: number) => void,
     hasClimbedPoopRef: React.MutableRefObject<boolean>,
-    currentLevel?: Level,
     characterVariant?: CharacterVariant,
     onPositionUpdate?: (x: number, y: number, z: number, rotation: number) => void
 }) => {
@@ -193,20 +173,18 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         const currentPos = group.current.position.clone();
         const isMoving = up || down;
         
-        const collisionCheck = currentLevel === 'cave' ? checkCaveCollision : checkOverworldCollision;
-        
         if (up) {
             const movement = forward.clone().multiplyScalar(speed);
             const newX = currentPos.x + movement.x;
             const newZ = currentPos.z + movement.z;
-            
-            if (!collisionCheck(newX, newZ)) {
+
+            if (!checkOverworldCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!collisionCheck(newX, currentPos.z)) {
+                if (!checkOverworldCollision(newX, currentPos.z)) {
                     group.current.position.x = newX;
-                } else if (!collisionCheck(currentPos.x, newZ)) {
+                } else if (!checkOverworldCollision(currentPos.x, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
@@ -216,31 +194,28 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             const movement = forward.clone().multiplyScalar(-speed * 0.6);
             const newX = currentPos.x + movement.x;
             const newZ = currentPos.z + movement.z;
-            
-            if (!collisionCheck(newX, newZ)) {
+
+            if (!checkOverworldCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!collisionCheck(newX, currentPos.z)) {
+                if (!checkOverworldCollision(newX, currentPos.z)) {
                     group.current.position.x = newX;
-                } else if (!collisionCheck(currentPos.x, newZ)) {
+                } else if (!checkOverworldCollision(currentPos.x, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
         }
 
-        let groundHeight = 0;
-        if (currentLevel === 'overworld') {
-            groundHeight = getPoopPileHeight(group.current.position.x, group.current.position.z);
-        }
+        let groundHeight = getPoopPileHeight(group.current.position.x, group.current.position.z);
         group.current.position.y = groundHeight;
-        
-        if (currentLevel === 'overworld' && groundHeight >= POOP_TOP_THRESHOLD) {
+
+        if (groundHeight >= POOP_TOP_THRESHOLD) {
             hasClimbedPoopRef.current = true;
         }
         
         const isOnGround = groundHeight < 0.5;
-        if (hasClimbedPoopRef.current && isOnGround && isMoving && currentLevel === 'overworld') {
+        if (hasClimbedPoopRef.current && isOnGround && isMoving) {
             const currentTime = state.clock.elapsedTime;
             if (currentTime - lastFootprintTime.current > FOOTPRINT_INTERVAL) {
                 lastFootprintTime.current = currentTime;
@@ -320,7 +295,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         if (group.current) {
             group.current.position.copy(positionRef.current);
         }
-    }, [currentLevel, positionRef]);
+    }, [positionRef]);
 
     // Render Fluffy the Unicorn (GLB model)
     if (isFluffy) {
@@ -471,12 +446,9 @@ const ParticleBurst = ({ position, color }: { position: THREE.Vector3, color: st
 type LoadingState = 'ready' | 'loading';
 
 // --- MAIN GAME COMPONENT ---
-const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLevelChange, onGemsChange, onLoadingChange, selectedCharacter = 'black', selectedLevel = 'overworld' }) => {
-    // Level and loading state management
-    const [currentLevel, setCurrentLevel] = useState<Level>('overworld');
+const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, onLoadingChange, selectedCharacter = 'black', selectedLevel = 'overworld' }) => {
+    // Loading state management
     const [loadingState, setLoadingState] = useState<LoadingState>('ready');
-    const [targetLevel, setTargetLevel] = useState<Level>('overworld');
-    const [gemsCollected, setGemsCollected] = useState(0);
     
     // Multiplayer context
     const {
@@ -486,8 +458,6 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         broadcastPosition,
         broadcastAttack,
         broadcastBalloonPop,
-        broadcastGemCollect,
-        broadcastLevelChange,
     } = useMultiplayer();
     
     // Handle multiplayer events
@@ -497,29 +467,8 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
             const poppedIds = new Set(event.balloonIds);
             balloonsRef.current = balloonsRef.current.filter(b => !poppedIds.has(b.id));
         }, []),
-        onGemCollect: useCallback((event) => {
-            // Remote player collected a gem
-            setCaveGems(prev => prev.map(g => g.id === event.gemId ? { ...g, collected: true } : g));
-            setGemsCollected(prev => prev + 1);
-        }, []),
-        onLevelChange: useCallback((event) => {
-            // Host changed level - follow them
-            if (!isHost) {
-                handleEnterDoor(event.level);
-            }
-        }, []),
     });
-    
-    // Notify parent of level changes
-    useEffect(() => {
-        onLevelChange?.(currentLevel);
-    }, [currentLevel, onLevelChange]);
-    
-    // Notify parent of gem count changes
-    useEffect(() => {
-        onGemsChange?.(gemsCollected);
-    }, [gemsCollected, onGemsChange]);
-    
+
     // Notify parent of loading state changes
     useEffect(() => {
         onLoadingChange?.(loadingState === 'loading');
@@ -530,122 +479,43 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     const [particles, setParticles] = useState<{ id: string, pos: THREE.Vector3, color: string }[]>([]);
     const [footprints, setFootprints] = useState<Footprint[]>([]);
     const hasClimbedPoopRef = useRef(false);
-    
+
     const playerPos = useRef(new THREE.Vector3(0, 0, 8));
     
-    // Cave gems and potatoes
-    const [caveGems, setCaveGems] = useState<GemData[]>([]);
-    const caveGemsRef = useRef<GemData[]>([]);
-    const cavePotatoesRef = useRef<PotatoPhysics[]>([]);
-    
-    useEffect(() => {
-        caveGemsRef.current = caveGems;
-    }, [caveGems]);
-    
-    // Level transition handler - triggers loading state
-    const handleEnterDoor = useCallback((newTargetLevel: Level) => {
-        // Start loading transition
-        setLoadingState('loading');
-        setTargetLevel(newTargetLevel);
-        
-        // Broadcast level change if host
-        if (isConnected && isHost) {
-            broadcastLevelChange(newTargetLevel);
-        }
-        
-        // Small delay to allow current level to unmount
-        setTimeout(() => {
-            // Reset player position for new level
-            if (newTargetLevel === 'cave') {
-                playerPos.current.set(CAVE_SPAWN.x, 0, CAVE_SPAWN.z);
-                // Initialize cave gems and potatoes
-                const chamberCenter = new THREE.Vector3(CHAMBER_CENTER.x, 0, CHAMBER_CENTER.z);
-                const gems = generateCaveGems(chamberCenter, 12);
-                setCaveGems(gems);
-                caveGemsRef.current = gems;
-                cavePotatoesRef.current = generateCavePotatoes(chamberCenter, 10);
-            } else {
-                playerPos.current.set(0, 0, 8);
-                // Clear cave data
-                setCaveGems([]);
-                caveGemsRef.current = [];
-                cavePotatoesRef.current = [];
-            }
-            
-            // Switch level
-            setCurrentLevel(newTargetLevel);
-            setLoadingState('ready');
-        }, 100);
-    }, [isConnected, isHost, broadcastLevelChange]);
-    
-    // Gem collection handler
-    const handleCollectGem = useCallback((gemId: string) => {
-        setCaveGems(prev => prev.map(g => g.id === gemId ? { ...g, collected: true } : g));
-        setGemsCollected(prev => prev + 1);
-        onScoreUpdate(prev => prev + 10);
-        
-        // Broadcast gem collection to other players
-        if (isConnected) {
-            broadcastGemCollect(gemId);
-        }
-    }, [onScoreUpdate, isConnected, broadcastGemCollect]);
 
     // Initialize balloons and reset game state
     useEffect(() => {
         if (isPlaying) {
             setFootprints([]);
             hasClimbedPoopRef.current = false;
-            setCurrentLevel(selectedLevel);
-            setGemsCollected(0);
             setLoadingState('ready');
-            setTargetLevel(selectedLevel);
+            playerPos.current.set(0, 0, 8);
 
-            // Set initial player position based on selected level
-            if (selectedLevel === 'cave') {
-                playerPos.current.set(CAVE_SPAWN.x, 0, CAVE_SPAWN.z);
-                // Initialize cave gems and potatoes for starting level
-                const chamberCenter = new THREE.Vector3(CHAMBER_CENTER.x, 0, CHAMBER_CENTER.z);
-                const gems = generateCaveGems(chamberCenter, 12);
-                setCaveGems(gems);
-                caveGemsRef.current = gems;
-                cavePotatoesRef.current = generateCavePotatoes(chamberCenter, 10);
-            } else {
-                playerPos.current.set(0, 0, 8);
-                // Clear cave data
-                setCaveGems([]);
-                caveGemsRef.current = [];
-                cavePotatoesRef.current = [];
+            // Initialize balloons for overworld
+            const newBalloons: BalloonPhysics[] = [];
+            const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+            for(let i=0; i<750; i++) {
+                let x = (Math.random()-0.5)*120;
+                let z = (Math.random()-0.5)*120;
+                if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
+
+                const baseY = 1.5 + Math.random() * 2;
+                newBalloons.push({
+                    id: Math.random().toString(),
+                    x,
+                    y: baseY,
+                    z,
+                    vx: 0,
+                    vy: 0,
+                    vz: 0,
+                    baseY,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    offset: Math.random() * 100
+                });
             }
-
-            // Initialize balloons only for overworld
-            if (selectedLevel === 'overworld') {
-                const newBalloons: BalloonPhysics[] = [];
-                const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-                for(let i=0; i<750; i++) {
-                    let x = (Math.random()-0.5)*120;
-                    let z = (Math.random()-0.5)*120;
-                    if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
-
-                    const baseY = 1.5 + Math.random() * 2;
-                    newBalloons.push({
-                        id: Math.random().toString(),
-                        x,
-                        y: baseY,
-                        z,
-                        vx: 0,
-                        vy: 0,
-                        vz: 0,
-                        baseY,
-                        color: colors[Math.floor(Math.random() * colors.length)],
-                        offset: Math.random() * 100
-                    });
-                }
-                balloonsRef.current = newBalloons;
-            } else {
-                balloonsRef.current = [];
-            }
+            balloonsRef.current = newBalloons;
         }
-    }, [isPlaying, selectedLevel]);
+    }, [isPlaying]);
 
     const handlePopEffect = (pos: THREE.Vector3, color: string) => {
         const id = Math.random().toString();
@@ -738,7 +608,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
 
     // Show loading screen during transitions
     if (loadingState === 'loading') {
-        return <LoadingScreen targetLevel={targetLevel} />;
+        return <LoadingScreen />;
     }
 
     // Convert remote players map to array for rendering
@@ -751,45 +621,14 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     );
 
     // Render overworld with lazy loading
-    if (currentLevel === 'overworld') {
-        return (
-            <Suspense fallback={<LoadingScreen targetLevel="overworld" />}>
-                <OverWorld
-                    playerPosRef={playerPos}
-                    onEnterCave={() => handleEnterDoor('cave')}
-                    balloonsRef={balloonsRef}
-                    footprints={footprints}
-                    remotePlayerPositions={remotePlayerPositions}
-                >
-                    <Player
-                        controlsRef={controlsRef}
-                        onAttack={handleAttack}
-                        positionRef={playerPos}
-                        onFootprint={handleFootprint}
-                        hasClimbedPoopRef={hasClimbedPoopRef}
-                        currentLevel="overworld"
-                        characterVariant={selectedCharacter}
-                        onPositionUpdate={isConnected ? broadcastPosition : undefined}
-                    />
-                    
-                    {/* Render remote players */}
-                    {remotePlayerArray.map(player => (
-                        <RemotePlayer key={player.id} player={player} />
-                    ))}
-                    
-                    <Particles particles={particles} />
-                </OverWorld>
-            </Suspense>
-        );
-    }
-    
-    // Render cave world with lazy loading
     return (
-        <Suspense fallback={<LoadingScreen targetLevel="cave" />}>
-            <CaveWorld
+        <Suspense fallback={<LoadingScreen />}>
+            <OverWorld
                 playerPosRef={playerPos}
-                onReturnToOverworld={() => handleEnterDoor('overworld')}
-                offset={[0, 0, 0]}
+                balloonsRef={balloonsRef}
+                footprints={footprints}
+                remotePlayerPositions={remotePlayerPositions}
+                onEnterCave={() => {}} // No-op since there's no cave
             >
                 <Player
                     controlsRef={controlsRef}
@@ -797,32 +636,17 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     positionRef={playerPos}
                     onFootprint={handleFootprint}
                     hasClimbedPoopRef={hasClimbedPoopRef}
-                    currentLevel="cave"
                     characterVariant={selectedCharacter}
                     onPositionUpdate={isConnected ? broadcastPosition : undefined}
                 />
-                
+
                 {/* Render remote players */}
                 {remotePlayerArray.map(player => (
                     <RemotePlayer key={player.id} player={player} />
                 ))}
-                
-                <GemSystem 
-                    gems={caveGems}
-                    onCollectGem={handleCollectGem}
-                    playerPosRef={playerPos}
-                />
-                
-                <PotatoSystem 
-                    potatoesRef={cavePotatoesRef}
-                    playerPosRef={playerPos}
-                    gemsRef={caveGemsRef}
-                    onAttack={controlsRef.current.attack}
-                    onGemCollect={handleCollectGem}
-                />
-                
+
                 <Particles particles={particles} />
-            </CaveWorld>
+            </OverWorld>
         </Suspense>
     );
 };
