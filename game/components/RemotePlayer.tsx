@@ -218,3 +218,4 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
 useGLTF.preload('/models/deathvader-optimized.glb');
 
 export default RemotePlayer;
+
