@@ -47,6 +47,82 @@ const FluffyPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({ 
     );
 };
 
+// --- SUPER LOBSTER PREVIEW MODEL (GLB) with glowing effect ---
+const LobsterPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({ scale, isSelected }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { scene } = useGLTF('/models/super lobster.glb');
+    
+    // Clone the scene and set up shadows with glowing emissive materials
+    const clonedScene = useMemo(() => {
+        const clone = scene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Apply glowing emissive material to the lobster
+                const applyGlowToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    
+                    if (clonedMat instanceof THREE.MeshStandardMaterial) {
+                        // Make the lobster glow with a warm orange-red emanation
+                        clonedMat.emissive = new THREE.Color('#ff4500');
+                        clonedMat.emissiveIntensity = 0.4;
+                    } else if (clonedMat instanceof THREE.MeshBasicMaterial ||
+                               clonedMat instanceof THREE.MeshPhongMaterial ||
+                               clonedMat instanceof THREE.MeshLambertMaterial) {
+                        // Convert to MeshStandardMaterial for emissive support
+                        const stdMat = new THREE.MeshStandardMaterial({
+                            color: clonedMat.color,
+                            emissive: new THREE.Color('#ff4500'),
+                            emissiveIntensity: 0.4,
+                        });
+                        return stdMat;
+                    }
+                    return clonedMat;
+                };
+                
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material = mesh.material.map(applyGlowToMaterial);
+                    } else {
+                        mesh.material = applyGlowToMaterial(mesh.material);
+                    }
+                }
+            }
+        });
+        return clone;
+    }, [scene]);
+    
+    // Rotate the character 360 degrees continuously
+    useFrame((state, delta) => {
+        if (groupRef.current) {
+            // Full rotation every 8 seconds
+            groupRef.current.rotation.y += delta * (Math.PI / 4);
+        }
+    });
+    
+    return (
+        <group ref={groupRef}>
+            <primitive 
+                object={clonedScene} 
+                scale={isSelected ? 2.8 : 2.2} 
+                rotation={[0, -Math.PI / 2, 0]}
+                position={[0, -1.5, 0]}
+            />
+            {/* Glowing light emanating from the lobster */}
+            <pointLight
+                position={[0, 0, 0]}
+                color="#ff6b35"
+                intensity={2}
+                distance={10}
+                decay={2}
+            />
+        </group>
+    );
+};
+
 // DeathVader character preview with rotation animation
 const DeathVaderPreview: React.FC<{ isSelected: boolean; cloakColor: string }> = ({ isSelected, cloakColor }) => {
     const groupRef = useRef<THREE.Group>(null);
@@ -136,6 +212,15 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
         return (
             <Float speed={2} rotationIntensity={0} floatIntensity={0.3}>
                 <FluffyPreviewModel scale={3} isSelected={isSelected} />
+            </Float>
+        );
+    }
+    
+    // Render Super Lobster (GLB model)
+    if (variant === 'lobster') {
+        return (
+            <Float speed={2} rotationIntensity={0} floatIntensity={0.3}>
+                <LobsterPreviewModel scale={3} isSelected={isSelected} />
             </Float>
         );
     }
@@ -237,5 +322,6 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
 // Preload models
 useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
+useGLTF.preload('/models/super lobster.glb');
 
 export default CharacterSelectScene;

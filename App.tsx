@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, Play, RotateCcw, Gem, ChevronLeft, ChevronRight, Users, Copy, Check, Loader2, Crown } from 'lucide-react';
 import { Canvas, ThreeElements } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { Controls, Level, CharacterVariant, CHARACTER_CONFIGS } from './game/types';
+import { Controls, Level, CharacterVariant, CHARACTER_CONFIGS, LEVEL_CONFIGS } from './game/types';
 import { CharacterSelectScene } from './game/components/CharacterSelect';
 import { LevelSelectScene } from './game/components/LevelSelect';
 import Game3D from './game/Game3D';
@@ -129,7 +129,7 @@ const LobbyOverlay: React.FC<{
             <div className="text-center mt-4 p-3 bg-gray-800/50 rounded-lg">
               <p className="text-gray-300 text-sm">
                 Level: <span className="text-purple-300 font-bold">
-                  Sunny Balloon World
+                  {LEVEL_CONFIGS.find(l => l.id === selectedLevel)?.name || 'Unknown'}
                 </span>
               </p>
             </div>
@@ -363,7 +363,13 @@ const AppContent: React.FC = () => {
     const handleKeyDown = (e: any) => {
       switch (e.code) {
         case 'ArrowLeft':
+          e.preventDefault();
+          handlePrevLevel();
+          break;
         case 'ArrowRight':
+          e.preventDefault();
+          handleNextLevel();
+          break;
         case 'Enter':
         case 'Space':
           e.preventDefault();
@@ -376,7 +382,7 @@ const AppContent: React.FC = () => {
     return () => {
       (window as any).removeEventListener('keydown', handleKeyDown);
     };
-  }, [gameState]);
+  }, [gameState, selectedLevel]);
 
 
   useEffect(() => {
@@ -435,13 +441,15 @@ const AppContent: React.FC = () => {
   };
 
   const handleNextLevel = () => {
-    // Only one level available for now
-    setSelectedLevel('overworld');
+    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
+    const nextIndex = (currentIndex + 1) % LEVEL_CONFIGS.length;
+    setSelectedLevel(LEVEL_CONFIGS[nextIndex].id);
   };
 
   const handlePrevLevel = () => {
-    // Only one level available for now
-    setSelectedLevel('overworld');
+    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
+    const prevIndex = (currentIndex - 1 + LEVEL_CONFIGS.length) % LEVEL_CONFIGS.length;
+    setSelectedLevel(LEVEL_CONFIGS[prevIndex].id);
   };
 
   const handleConfirmLevel = () => {
@@ -459,10 +467,6 @@ const AppContent: React.FC = () => {
   if (gameState === 'menu') {
     return (
       <div className="bg-[#87CEEB] w-full h-screen flex items-center justify-center">
-        {/* Debug overlay for menu */}
-        <div className="absolute top-0 left-0 bg-blue-500 text-white p-2 z-50">
-          Menu - Game State: {gameState}
-        </div>
         <div className="bg-white/90 p-8 rounded-2xl shadow-2xl text-center border-2 border-yellow-400 max-w-sm w-full mx-4">
           <h1 className="text-3xl font-black text-blue-600 leading-tight tracking-tight mb-2">
             TATCHAMASHAY
@@ -500,10 +504,6 @@ const AppContent: React.FC = () => {
 
         {/* UI Overlay */}
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-between py-8 pointer-events-none">
-          {/* Debug overlay for character select */}
-          <div className="absolute top-0 left-0 bg-green-500 text-white p-2 z-50">
-            Character Select - Game State: {gameState} | Character: {selectedCharacter}
-          </div>
           <div className="text-center pointer-events-auto">
             <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
               SELECT YOUR CHARACTER
@@ -577,8 +577,11 @@ const AppContent: React.FC = () => {
 
   // Level select with 3D scene
   if (gameState === 'level-select') {
+    const currentLevelConfig = LEVEL_CONFIGS.find(l => l.id === selectedLevel);
+    const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
+
     return (
-      <div className="relative w-full h-screen bg-[#87CEEB]">
+      <div className="relative w-full h-screen" style={{ backgroundColor: bgColor }}>
         {/* 3D Level Scene */}
         <Canvas
           shadows
@@ -604,18 +607,46 @@ const AppContent: React.FC = () => {
             </p>
           </div>
 
+          {/* Navigation Arrows */}
+          <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+            <button
+              onClick={handlePrevLevel}
+              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+            >
+              <ChevronLeft size={32} />
+            </button>
+          </div>
+
+          <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+            <button
+              onClick={handleNextLevel}
+              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+            >
+              <ChevronRight size={32} />
+            </button>
+          </div>
+
           <div className="flex-1" />
 
           <div className="pointer-events-auto flex flex-col items-center gap-4">
             <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
               <h2 className="text-2xl font-bold text-white mb-1">
-                Sunny Balloon World
+                {currentLevelConfig?.name || 'Unknown Level'}
               </h2>
               <p className="text-purple-200 text-sm mb-3">
-                Pop colorful balloons in a bright, sunny world!
+                {currentLevelConfig?.description || 'No description'}
               </p>
               <div className="flex justify-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-purple-400 scale-125" />
+                {LEVEL_CONFIGS.map((l) => (
+                  <div
+                    key={l.id}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      l.id === selectedLevel
+                        ? 'bg-purple-400 scale-125'
+                        : 'bg-gray-600'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
 
@@ -737,6 +768,7 @@ const AppContent: React.FC = () => {
           <p className="font-bold text-lg mb-1">Controls</p>
           <div className="flex items-center gap-2 text-sm"><span className="bg-white/20 px-2 py-1 rounded">WASD</span> Move</div>
           <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Pop Balloon</div>
+          <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">DRAG</span> Rotate Camera</div>
         </div>
       </div>
     );

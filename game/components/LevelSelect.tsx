@@ -72,6 +72,110 @@ const OverworldPreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => 
     );
 };
 
+// --- CAVE PREVIEW COMPONENTS ---
+
+// Glowing jewel for cave preview
+const PreviewJewel: React.FC<{ position: [number, number, number], color: string, seed: number }> = ({
+    position,
+    color,
+    seed
+}) => {
+    const meshRef = useRef<THREE.Mesh>(null);
+
+    useFrame((state) => {
+        if (meshRef.current) {
+            meshRef.current.rotation.y = state.clock.elapsedTime * 0.5 + seed;
+            meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2 + seed) * 0.2;
+        }
+    });
+
+    return (
+        <group position={position}>
+            <mesh ref={meshRef} castShadow>
+                <octahedronGeometry args={[0.3, 0]} />
+                <meshStandardMaterial 
+                    color={color}
+                    emissive={color}
+                    emissiveIntensity={0.8}
+                    metalness={0.3}
+                    roughness={0.1}
+                    transparent
+                    opacity={0.9}
+                />
+            </mesh>
+            <pointLight color={color} intensity={0.5} distance={3} decay={2} />
+        </group>
+    );
+};
+
+// Cave preview with stalactites, jewels and dark atmosphere
+const CavePreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
+    const jewels = useMemo(() => [
+        { position: [0, 0.5, 0] as [number, number, number], color: '#50C878', seed: 1 },
+        { position: [-1.5, 2, -0.5] as [number, number, number], color: '#E0115F', seed: 2 },
+        { position: [1.5, 2.5, 0.5] as [number, number, number], color: '#0F52BA', seed: 3 },
+        { position: [-0.5, 3, 1] as [number, number, number], color: '#9966CC', seed: 4 },
+        { position: [0.8, 1.8, -1] as [number, number, number], color: '#FFBF00', seed: 5 },
+        { position: [0, 2.2, 0.8] as [number, number, number], color: '#50C878', seed: 6 },
+    ], []);
+
+    return (
+        <group>
+            {/* Cave floor - dark stone */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+                <circleGeometry args={[4, 32]} />
+                <meshStandardMaterial color="#1a1815" roughness={0.95} />
+            </mesh>
+
+            {/* Cave dome ceiling */}
+            <mesh position={[0, 5, 0]} scale={[4, 2, 4]}>
+                <sphereGeometry args={[1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                <meshStandardMaterial color="#2D2A26" roughness={0.95} side={THREE.BackSide} />
+            </mesh>
+
+            {/* Stalactites */}
+            <mesh position={[-1.5, 4, -1]} rotation={[0, 0, 0.1]}>
+                <coneGeometry args={[0.15, 1.2, 6]} />
+                <meshStandardMaterial color="#3D3A36" roughness={0.9} />
+            </mesh>
+            <mesh position={[1.2, 4.2, 0.8]} rotation={[0, 0, -0.15]}>
+                <coneGeometry args={[0.12, 0.9, 6]} />
+                <meshStandardMaterial color="#3D3A36" roughness={0.9} />
+            </mesh>
+            <mesh position={[0.3, 4.5, -0.5]} rotation={[0.05, 0, 0.08]}>
+                <coneGeometry args={[0.18, 1.4, 6]} />
+                <meshStandardMaterial color="#3D3A36" roughness={0.9} />
+            </mesh>
+            <mesh position={[-0.8, 4.3, 1]} rotation={[-0.1, 0, 0]}>
+                <coneGeometry args={[0.1, 0.7, 6]} />
+                <meshStandardMaterial color="#3D3A36" roughness={0.9} />
+            </mesh>
+
+            {/* Treasure pile base */}
+            <mesh position={[0, 0.15, 0]}>
+                <cylinderGeometry args={[1, 1.2, 0.3, 16]} />
+                <meshStandardMaterial 
+                    color="#B8860B" 
+                    emissive="#B8860B"
+                    emissiveIntensity={0.2}
+                    metalness={0.8}
+                    roughness={0.3}
+                />
+            </mesh>
+
+            {/* Floating jewels */}
+            {jewels.map((jewel, i) => (
+                <Float key={i} speed={1.5} rotationIntensity={0.3} floatIntensity={0.3}>
+                    <PreviewJewel {...jewel} />
+                </Float>
+            ))}
+
+            {/* Central glow */}
+            <pointLight position={[0, 1, 0]} color="#FFBF00" intensity={2} distance={8} decay={2} />
+        </group>
+    );
+};
+
 // Level preview wrapper with rotation
 const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, isSelected }) => {
     const groupRef = useRef<THREE.Group>(null);
@@ -85,7 +189,11 @@ const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, 
 
     return (
         <group ref={groupRef}>
-            <OverworldPreview isSelected={isSelected} />
+            {level === 'cave' ? (
+                <CavePreview isSelected={isSelected} />
+            ) : (
+                <OverworldPreview isSelected={isSelected} />
+            )}
         </group>
     );
 };
@@ -107,8 +215,8 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
         camera.lookAt(0, 1.5, 0);
     }, [camera]);
 
-    // Background color for overworld
-    const bgColor = '#87CEEB';
+    // Background color based on level
+    const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
 
     return (
         <>
@@ -116,15 +224,29 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
             <color attach="background" args={[bgColor]} />
             <fog attach="fog" args={[bgColor, 15, 30]} />
 
-            {/* Lighting for overworld */}
-            <ambientLight intensity={1.0} />
-            <directionalLight
-                position={[5, 8, 5]}
-                intensity={2}
-                color="#ffffff"
-                castShadow
-            />
-            <pointLight position={[-3, 5, -3]} color="#FFE4B5" intensity={1} />
+            {/* Lighting based on level */}
+            {selectedLevel === 'cave' ? (
+                <>
+                    <ambientLight intensity={0.3} color="#6b5b4f" />
+                    <directionalLight
+                        position={[0, 8, 5]}
+                        intensity={0.5}
+                        color="#8b7355"
+                    />
+                    <pointLight position={[0, 3, 0]} color="#FFBF00" intensity={1.5} distance={15} />
+                </>
+            ) : (
+                <>
+                    <ambientLight intensity={1.0} />
+                    <directionalLight
+                        position={[5, 8, 5]}
+                        intensity={2}
+                        color="#ffffff"
+                        castShadow
+                    />
+                    <pointLight position={[-3, 5, -3]} color="#FFE4B5" intensity={1} />
+                </>
+            )}
 
             {/* Level preview positioned in center */}
             <group position={[0, 1, 0]}>

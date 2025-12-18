@@ -9,10 +9,30 @@ export type Controls = {
   attack: boolean;
 };
 
-export type Level = 'overworld';
+export type Level = 'overworld' | 'cave';
+
+// Level configuration
+export interface LevelConfig {
+  id: Level;
+  name: string;
+  description: string;
+}
+
+export const LEVEL_CONFIGS: LevelConfig[] = [
+  {
+    id: 'overworld',
+    name: 'Sunny Balloon World',
+    description: 'Pop colorful balloons in a bright, sunny world!'
+  },
+  {
+    id: 'cave',
+    name: 'Crystal Caverns',
+    description: 'Explore underground caves filled with glowing jewels!'
+  }
+];
 
 // Character variants - different characters and cloak colors
-export type CharacterVariant = 'black' | 'fluffy';
+export type CharacterVariant = 'black' | 'fluffy' | 'lobster';
 
 export interface CharacterConfig {
   id: CharacterVariant;
@@ -33,6 +53,12 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
     name: 'Fluffy',
     cloakColor: '#FFFFFF', // Not used for Fluffy
     description: 'A magical unicorn with a pointy horn'
+  },
+  {
+    id: 'lobster',
+    name: 'Super Lobster',
+    cloakColor: '#DC2626', // Not used for Lobster
+    description: 'A fearsome pirate lobster from the deep seas'
   }
 ];
 
