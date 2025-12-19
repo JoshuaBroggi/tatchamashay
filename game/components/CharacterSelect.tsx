@@ -66,9 +66,9 @@ const LobsterPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({
                     const clonedMat = mat.clone();
                     
                     if (clonedMat instanceof THREE.MeshStandardMaterial) {
-                        // Make the lobster glow with a warm orange-red emanation
+                        // Make the lobster glow with a subtle warm orange-red emanation
                         clonedMat.emissive = new THREE.Color('#ff4500');
-                        clonedMat.emissiveIntensity = 0.4;
+                        clonedMat.emissiveIntensity = 0.04;
                     } else if (clonedMat instanceof THREE.MeshBasicMaterial ||
                                clonedMat instanceof THREE.MeshPhongMaterial ||
                                clonedMat instanceof THREE.MeshLambertMaterial) {
@@ -76,7 +76,7 @@ const LobsterPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({
                         const stdMat = new THREE.MeshStandardMaterial({
                             color: clonedMat.color,
                             emissive: new THREE.Color('#ff4500'),
-                            emissiveIntensity: 0.4,
+                            emissiveIntensity: 0.04,
                         });
                         return stdMat;
                     }
@@ -111,11 +111,11 @@ const LobsterPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({
                 rotation={[0, -Math.PI / 2, 0]}
                 position={[0, -1.5, 0]}
             />
-            {/* Glowing light emanating from the lobster */}
+            {/* Subtle glowing light emanating from the lobster */}
             <pointLight
                 position={[0, 0, 0]}
                 color="#ff6b35"
-                intensity={2}
+                intensity={0.2}
                 distance={10}
                 decay={2}
             />

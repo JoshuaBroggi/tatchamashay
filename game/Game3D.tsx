@@ -10,11 +10,13 @@ import { RemotePlayer } from './components/RemotePlayer';
 // Lazy load the world components
 const OverWorld = lazy(() => import('./components/OverWorld'));
 const CaveLevel = lazy(() => import('./components/CaveLevel'));
+const ForestLevel = lazy(() => import('./components/ForestLevel'));
 
 // Import types from OverWorld for balloon and footprint systems
 import type { BalloonPhysics, Footprint } from './components/OverWorld';
 import { checkOverworldCollision, getPoopPileHeight, PLAYER_RADIUS } from './components/OverWorld';
 import { checkCaveCollision, MAIN_CAVERN_RADIUS } from './components/CaveLevel';
+import { checkForestCollision } from './components/ForestLevel';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -228,14 +230,14 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 
-                // Apply glowing emissive material to the lobster
+                // Apply subtle glowing emissive material to the lobster
                 const applyGlowToMaterial = (mat: THREE.Material): THREE.Material => {
                     const clonedMat = mat.clone();
                     
                     if (clonedMat instanceof THREE.MeshStandardMaterial) {
-                        // Make the lobster glow with a warm orange-red emanation
+                        // Make the lobster glow with a subtle warm orange-red emanation
                         clonedMat.emissive = new THREE.Color('#ff4500');
-                        clonedMat.emissiveIntensity = 0.4;
+                        clonedMat.emissiveIntensity = 0.04;
                     } else if (clonedMat instanceof THREE.MeshBasicMaterial ||
                                clonedMat instanceof THREE.MeshPhongMaterial ||
                                clonedMat instanceof THREE.MeshLambertMaterial) {
@@ -243,7 +245,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                         const stdMat = new THREE.MeshStandardMaterial({
                             color: clonedMat.color,
                             emissive: new THREE.Color('#ff4500'),
-                            emissiveIntensity: 0.4,
+                            emissiveIntensity: 0.04,
                         });
                         return stdMat;
                     }
@@ -434,11 +436,11 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
                 {clonedLobsterScene && <primitive object={clonedLobsterScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}
                 
-                {/* Glowing light emanating from the lobster */}
+                {/* Subtle glowing light emanating from the lobster */}
                 <pointLight
                     position={[0, 1.5, 0]}
                     color="#ff6b35"
-                    intensity={3}
+                    intensity={0.3}
                     distance={15}
                     decay={2}
                 />
@@ -446,7 +448,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                 <pointLight
                     position={[0, 0.5, 0]}
                     color="#ff4500"
-                    intensity={1.5}
+                    intensity={0.15}
                     distance={8}
                     decay={2}
                 />
@@ -508,6 +510,241 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
 useGLTF.preload('/models/super lobster.glb');
+
+// --- FOREST PLAYER COMPONENT ---
+const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'black', onPositionUpdate }: {
+    controlsRef: React.MutableRefObject<Controls>,
+    onAttack: () => void,
+    positionRef: React.MutableRefObject<THREE.Vector3>,
+    characterVariant?: CharacterVariant,
+    onPositionUpdate?: (x: number, y: number, z: number, rotation: number) => void
+}) => {
+    // Reuse logic from CavePlayer but use checkForestCollision
+    const group = useRef<THREE.Group>(null);
+    const swordRef = useRef<THREE.Group>(null);
+    const fluffyHeadRef = useRef<THREE.Group>(null);
+    const isAttacking = useRef(false);
+    const attackTime = useRef(0);
+    const { camera, gl } = useThree();
+    
+    // Camera orbit controls
+    const cameraOrbitRef = useRef(0);
+    const cameraVerticalRef = useRef(0);
+    const isDraggingRef = useRef(false);
+    const lastMousePos = useRef({ x: 0, y: 0 });
+    
+    useEffect(() => {
+        const canvas = gl.domElement;
+        const handleMouseDown = (e: MouseEvent) => {
+            isDraggingRef.current = true;
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+            canvas.style.cursor = 'grabbing';
+        };
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDraggingRef.current) return;
+            const deltaX = e.clientX - lastMousePos.current.x;
+            const deltaY = e.clientY - lastMousePos.current.y;
+            const sensitivity = 0.005;
+            cameraOrbitRef.current -= deltaX * sensitivity;
+            cameraVerticalRef.current += deltaY * sensitivity;
+            cameraVerticalRef.current = Math.max(-0.5, Math.min(0.8, cameraVerticalRef.current));
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+        };
+        const handleMouseUp = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
+        const handleMouseLeave = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
+        
+        canvas.style.cursor = 'grab';
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseLeave);
+        return () => {
+            canvas.removeEventListener('mousedown', handleMouseDown);
+            canvas.removeEventListener('mousemove', handleMouseMove);
+            canvas.removeEventListener('mouseup', handleMouseUp);
+            canvas.removeEventListener('mouseleave', handleMouseLeave);
+            canvas.style.cursor = 'default';
+        };
+    }, [gl]);
+    
+    const isFluffy = characterVariant === 'fluffy';
+    const isLobster = characterVariant === 'lobster';
+
+    const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
+    const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
+    const { scene: lobsterScene } = useGLTF('/models/super lobster.glb');
+    
+    const cloakColor = useMemo(() => {
+        const config = CHARACTER_CONFIGS.find(c => c.id === characterVariant);
+        return config?.cloakColor || '#1a1a1a';
+    }, [characterVariant]);
+
+    const clonedDeathvaderScene = useMemo(() => {
+        if (isFluffy || isLobster) return null;
+        const clone = deathvaderScene.clone();
+        const cloakColorObj = new THREE.Color(cloakColor);
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                const applyColorToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    if (clonedMat instanceof THREE.MeshStandardMaterial || 
+                        clonedMat instanceof THREE.MeshBasicMaterial ||
+                        clonedMat instanceof THREE.MeshPhongMaterial ||
+                        clonedMat instanceof THREE.MeshLambertMaterial) {
+                        const originalColor = clonedMat.color;
+                        const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
+                        if (luminance < 0.5) clonedMat.color = cloakColorObj.clone();
+                    }
+                    return clonedMat;
+                };
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(applyColorToMaterial);
+                    else mesh.material = applyColorToMaterial(mesh.material);
+                }
+            }
+        });
+        return clone;
+    }, [deathvaderScene, cloakColor, isFluffy, isLobster]);
+
+    const clonedFluffyScene = useMemo(() => {
+        if (!isFluffy) return null;
+        const clone = fluffyScene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+            }
+        });
+        return clone;
+    }, [fluffyScene, isFluffy]);
+
+    const clonedLobsterScene = useMemo(() => {
+        if (!isLobster) return null;
+        const clone = lobsterScene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                const applyGlowToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    if (clonedMat instanceof THREE.MeshStandardMaterial) {
+                        clonedMat.emissive = new THREE.Color('#ff4500');
+                        clonedMat.emissiveIntensity = 0.04;
+                    }
+                    return clonedMat;
+                };
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(applyGlowToMaterial);
+                    else mesh.material = applyGlowToMaterial(mesh.material);
+                }
+            }
+        });
+        return clone;
+    }, [lobsterScene, isLobster]);
+
+    const SPEED = 10;
+    const ROTATION_SPEED = 2.5;
+    const ATTACK_DURATION = 0.25;
+
+    useFrame((state, delta) => {
+        if (!group.current) return;
+        const { up, down, left, right, attack } = controlsRef.current;
+        
+        if (left) group.current.rotation.y += ROTATION_SPEED * delta;
+        if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
+
+        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), group.current.rotation.y);
+        const speed = SPEED * delta;
+        const currentPos = group.current.position.clone();
+        
+        if (up) {
+            const movement = forward.clone().multiplyScalar(speed);
+            const newX = currentPos.x + movement.x;
+            const newZ = currentPos.z + movement.z;
+            // FOREST COLLISION CHECK
+            if (!checkForestCollision(newX, newZ)) {
+                group.current.position.x = newX;
+                group.current.position.z = newZ;
+            } else {
+                if (!checkForestCollision(newX, currentPos.z)) group.current.position.x = newX;
+                else if (!checkForestCollision(currentPos.x, newZ)) group.current.position.z = newZ;
+            }
+        }
+        
+        if (down) {
+            const movement = forward.clone().multiplyScalar(-speed * 0.6);
+            const newX = currentPos.x + movement.x;
+            const newZ = currentPos.z + movement.z;
+            // FOREST COLLISION CHECK
+            if (!checkForestCollision(newX, newZ)) {
+                group.current.position.x = newX;
+                group.current.position.z = newZ;
+            } else {
+                if (!checkForestCollision(newX, currentPos.z)) group.current.position.x = newX;
+                else if (!checkForestCollision(currentPos.x, newZ)) group.current.position.z = newZ;
+            }
+        }
+
+        group.current.position.y = 0;
+        positionRef.current.copy(group.current.position);
+        onPositionUpdate?.(group.current.position.x, group.current.position.y, group.current.position.z, group.current.rotation.y);
+
+        // Camera follow
+        const dist = 12;
+        const baseHeight = 5.5;
+        const orbitAngle = group.current.rotation.y + cameraOrbitRef.current;
+        const verticalAngle = cameraVerticalRef.current;
+        const height = baseHeight + Math.sin(verticalAngle) * 8;
+        const horizontalDist = dist * Math.cos(verticalAngle * 0.5);
+        const camOffset = new THREE.Vector3(-Math.sin(orbitAngle) * horizontalDist, height, -Math.cos(orbitAngle) * horizontalDist);
+        const targetCamPos = group.current.position.clone().add(camOffset);
+        camera.position.lerp(targetCamPos, 0.1);
+        const lookTarget = group.current.position.clone().add(new THREE.Vector3(0, 2, 0));
+        camera.lookAt(lookTarget);
+
+        if (attack && !isAttacking.current) {
+            isAttacking.current = true;
+            attackTime.current = 0;
+            playSound('swing');
+            onAttack();
+        }
+
+        if (isAttacking.current) {
+            attackTime.current += delta;
+            const progress = Math.min(attackTime.current / ATTACK_DURATION, 1);
+            if (isFluffy && fluffyHeadRef.current) {
+                const thrustAngle = Math.sin(progress * Math.PI) * 0.8;
+                const swingAngle = Math.sin(progress * Math.PI * 2) * 0.4;
+                fluffyHeadRef.current.rotation.x = -thrustAngle;
+                fluffyHeadRef.current.rotation.z = swingAngle;
+                if (progress >= 1) { isAttacking.current = false; fluffyHeadRef.current.rotation.x = 0; fluffyHeadRef.current.rotation.z = 0; }
+            } else if (!isFluffy && swordRef.current) {
+                const swingAngle = Math.sin(progress * Math.PI) * 2;
+                swordRef.current.rotation.x = swingAngle;
+                if (progress >= 1) { isAttacking.current = false; swordRef.current.rotation.x = 0; }
+            } else if (progress >= 1) { isAttacking.current = false; }
+        }
+    });
+
+    useEffect(() => { if (group.current) group.current.position.copy(positionRef.current); }, [positionRef]);
+
+    if (isFluffy) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedFluffyScene && <primitive object={clonedFluffyScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}</group>;
+    if (isLobster) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedLobsterScene && <primitive object={clonedLobsterScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}<pointLight position={[0, 1.5, 0]} color="#ff6b35" intensity={3} distance={15} decay={2} /></group>;
+    return (
+        <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+            {clonedDeathvaderScene && <primitive object={clonedDeathvaderScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
+            <group position={[0.6, 1.2, 0]} ref={swordRef}>
+                <pointLight position={[0, 0.7, 0.3]} color="#60A5FA" intensity={1.5} distance={6} decay={2} />
+                <mesh position={[0, 0.7, 0.3]} rotation={[0, Math.PI/4, 0]} castShadow><coneGeometry args={[0.12, 1.6, 4]} /><meshStandardMaterial color="#a5d8ff" emissive="#60A5FA" emissiveIntensity={0.6} metalness={0.9} roughness={0.1} /></mesh>
+            </group>
+        </group>
+    );
+};
 
 // --- CAVE PLAYER COMPONENT (uses cave collision) ---
 const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'black', onPositionUpdate }: {
@@ -663,14 +900,14 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 
-                // Apply glowing emissive material to the lobster
+                // Apply subtle glowing emissive material to the lobster
                 const applyGlowToMaterial = (mat: THREE.Material): THREE.Material => {
                     const clonedMat = mat.clone();
                     
                     if (clonedMat instanceof THREE.MeshStandardMaterial) {
-                        // Make the lobster glow with a warm orange-red emanation
+                        // Make the lobster glow with a subtle warm orange-red emanation
                         clonedMat.emissive = new THREE.Color('#ff4500');
-                        clonedMat.emissiveIntensity = 0.4;
+                        clonedMat.emissiveIntensity = 0.04;
                     } else if (clonedMat instanceof THREE.MeshBasicMaterial ||
                                clonedMat instanceof THREE.MeshPhongMaterial ||
                                clonedMat instanceof THREE.MeshLambertMaterial) {
@@ -678,7 +915,7 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
                         const stdMat = new THREE.MeshStandardMaterial({
                             color: clonedMat.color,
                             emissive: new THREE.Color('#ff4500'),
-                            emissiveIntensity: 0.4,
+                            emissiveIntensity: 0.04,
                         });
                         return stdMat;
                     }
@@ -1252,6 +1489,32 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     );
 
     // Render level based on selectedLevel prop
+    if (selectedLevel === 'forest') {
+        return (
+            <Suspense fallback={<LoadingScreen />}>
+                <ForestLevel
+                    playerPosRef={playerPos}
+                    onScoreUpdate={onScoreUpdate}
+                >
+                    <ForestPlayer
+                        controlsRef={controlsRef}
+                        onAttack={handleAttack}
+                        positionRef={playerPos}
+                        characterVariant={selectedCharacter}
+                        onPositionUpdate={isConnected ? broadcastPosition : undefined}
+                    />
+
+                    {/* Render remote players */}
+                    {remotePlayerArray.map(player => (
+                        <RemotePlayer key={player.id} player={player} />
+                    ))}
+
+                    <Particles particles={particles} />
+                </ForestLevel>
+            </Suspense>
+        );
+    }
+
     if (selectedLevel === 'cave') {
         return (
             <Suspense fallback={<LoadingScreen />}>

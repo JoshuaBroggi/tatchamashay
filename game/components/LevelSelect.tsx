@@ -176,6 +176,75 @@ const CavePreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
     );
 };
 
+// --- FOREST PREVIEW COMPONENTS ---
+
+const ForestPreview: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
+    return (
+        <group>
+            {/* Forest ground */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+                <circleGeometry args={[4, 32]} />
+                <meshStandardMaterial color="#3a5f0b" roughness={0.8} />
+            </mesh>
+
+            {/* River strip */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.5, 0.01, 0]}>
+                <planeGeometry args={[1, 6]} />
+                <meshStandardMaterial color="#4fa4b8" />
+            </mesh>
+
+            {/* Mini Tower */}
+            <group position={[-1.5, 0, -1]}>
+                <mesh position={[0, 0.6, 0]}>
+                    <cylinderGeometry args={[0.3, 0.4, 1.2, 8]} />
+                    <meshStandardMaterial color="#5c5c5c" />
+                </mesh>
+                <mesh position={[0, 1.3, 0]}>
+                     <coneGeometry args={[0.45, 0.5, 5]} />
+                     <meshStandardMaterial color="#2c2c2c" />
+                </mesh>
+            </group>
+
+            {/* Mini Trees */}
+            <group position={[0.5, 0, 1]}>
+                <mesh position={[0, 0.2, 0]}>
+                    <cylinderGeometry args={[0.05, 0.08, 0.4, 6]} />
+                    <meshStandardMaterial color="#4a3c31" />
+                </mesh>
+                <mesh position={[0, 0.6, 0]}>
+                    <coneGeometry args={[0.3, 0.6, 6]} />
+                    <meshStandardMaterial color="#2d5a27" />
+                </mesh>
+            </group>
+            
+            <group position={[-0.5, 0, 1.5]}>
+                <mesh position={[0, 0.2, 0]}>
+                    <cylinderGeometry args={[0.05, 0.08, 0.4, 6]} />
+                    <meshStandardMaterial color="#4a3c31" />
+                </mesh>
+                <mesh position={[0, 0.6, 0]}>
+                    <coneGeometry args={[0.3, 0.6, 6]} />
+                    <meshStandardMaterial color="#2d5a27" />
+                </mesh>
+            </group>
+
+            {/* Fireflies/Spirits */}
+            <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
+                <mesh position={[-1, 1, 1]}>
+                    <sphereGeometry args={[0.05]} />
+                    <meshStandardMaterial color="#ccff00" emissive="#ccff00" />
+                </mesh>
+            </Float>
+             <Float speed={1.5} rotationIntensity={0.5} floatIntensity={0.5}>
+                <mesh position={[0, 1.2, -0.5]}>
+                    <sphereGeometry args={[0.05]} />
+                    <meshStandardMaterial color="#ccff00" emissive="#ccff00" />
+                </mesh>
+            </Float>
+        </group>
+    );
+};
+
 // Level preview wrapper with rotation
 const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, isSelected }) => {
     const groupRef = useRef<THREE.Group>(null);
@@ -191,6 +260,8 @@ const LevelPreview: React.FC<{ level: Level, isSelected: boolean }> = ({ level, 
         <group ref={groupRef}>
             {level === 'cave' ? (
                 <CavePreview isSelected={isSelected} />
+            ) : level === 'forest' ? (
+                <ForestPreview isSelected={isSelected} />
             ) : (
                 <OverworldPreview isSelected={isSelected} />
             )}
@@ -216,7 +287,7 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
     }, [camera]);
 
     // Background color based on level
-    const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
+    const bgColor = selectedLevel === 'cave' ? '#0a0908' : selectedLevel === 'forest' ? '#1a2e1a' : '#87CEEB';
 
     return (
         <>
@@ -234,6 +305,16 @@ export const LevelSelectScene: React.FC<LevelSelectSceneProps> = ({
                         color="#8b7355"
                     />
                     <pointLight position={[0, 3, 0]} color="#FFBF00" intensity={1.5} distance={15} />
+                </>
+            ) : selectedLevel === 'forest' ? (
+                <>
+                    <ambientLight intensity={0.4} color="#d4e8ff" />
+                    <directionalLight
+                        position={[-5, 8, 5]}
+                        intensity={1.0}
+                        color="#ffeebb"
+                    />
+                    <pointLight position={[-1.5, 2, -1]} color="#00ffcc" intensity={0.8} />
                 </>
             ) : (
                 <>

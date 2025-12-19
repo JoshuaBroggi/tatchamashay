@@ -9,7 +9,7 @@ export type Controls = {
   attack: boolean;
 };
 
-export type Level = 'overworld' | 'cave';
+export type Level = 'overworld' | 'cave' | 'forest';
 
 // Level configuration
 export interface LevelConfig {
@@ -28,6 +28,11 @@ export const LEVEL_CONFIGS: LevelConfig[] = [
     id: 'cave',
     name: 'Crystal Caverns',
     description: 'Explore underground caves filled with glowing jewels!'
+  },
+  {
+    id: 'forest',
+    name: 'Ancient Forest',
+    description: 'A mysterious Japanese cartoonish forest with a stone tower.'
   }
 ];
 
