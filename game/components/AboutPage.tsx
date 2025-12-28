@@ -1,28 +1,46 @@
 import React from 'react';
-import { ArrowLeft, ExternalLink, Download, Github, Mic, Gamepad2, Sparkles } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, Download, Github, Mic, Gamepad2, Sparkles, Monitor, Map } from 'lucide-react';
 
-interface AboutPageProps {
-  onBack: () => void;
-}
+export const AboutPage: React.FC = () => {
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
 
-export const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
   return (
     <div className="w-full h-screen bg-slate-900 text-white overflow-y-auto">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-20">
-            <button 
-              onClick={() => {
-                onBack();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
-            >
-              <h1 className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-                TATCHAMASHAY
-              </h1>
-            </button>
+          <div className="flex items-center justify-between h-20">
+            <div className="flex-shrink-0 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <Link to="/">
+                <h1 className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
+                  TATCHAMASHAY
+                </h1>
+              </Link>
+            </div>
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-8">
+                <Link
+                  to="/#learn"
+                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  What Kids Learn
+                </Link>
+                <Link
+                  to="/build"
+                  className={`${isActive('/build') ? 'text-emerald-400' : 'text-gray-300 hover:text-white'} px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                >
+                  Build
+                </Link>
+                <Link
+                  to="/character-select"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30"
+                >
+                  Play Now
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
@@ -65,16 +83,25 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
           />
 
           {/* Step 3: AI Models */}
-          <StepCard 
+          <StepCard
             number={3}
             title="Choose Your AI Assistant"
             description="Use Opus 4.5 ($) or Grok (free) for the best coding experience. These models are fast, intelligent, and great at understanding game logic."
             icon={<Sparkles className="text-amber-400" size={24} />}
           />
 
-          {/* Step 4: Voice Dictation */}
-          <StepCard 
+          {/* Step 4: Starting Up on Local Host */}
+          <StepCard
             number={4}
+            title="Starting Up on Local Host"
+            description="Run the development server locally to test your changes. Contributors should make their changes on localhost and ensure they work before committing."
+            code="npm install && npm run dev"
+            icon={<Monitor className="text-blue-400" size={24} />}
+          />
+
+          {/* Step 5: Voice Dictation */}
+          <StepCard
+            number={5}
             title="Voice Dictation"
             description="We use Wispr Flow for kid's voice dictation. It's an amazing tool that makes coding accessible for younger creators!"
             link="https://wisprflow.ai"
@@ -82,14 +109,24 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
             icon={<Mic className="text-emerald-400" size={24} />}
           />
 
-          {/* Step 5: 3D Characters */}
-          <StepCard 
-            number={5}
+          {/* Step 6: 3D Characters */}
+          <StepCard
+            number={6}
             title="Create Characters"
             description="Use Tripo3D to generate custom 3D characters for free. If you want them to walk or move with animation, you'll need to 'rig' them (paid feature)."
             link="https://studio.tripo3d.ai"
             linkText="Visit Tripo3D Studio"
             icon={<Gamepad2 className="text-indigo-400" size={24} />}
+          />
+
+          {/* Step 7: Create Your Level */}
+          <StepCard
+            number={7}
+            title="Create Your Level"
+            description="Design your own game levels! Create custom worlds, from sunny balloon lands to crystal caverns. The only limit is your imagination."
+            link="/level-select"
+            linkText="Try Level Editor"
+            icon={<Map className="text-purple-400" size={24} />}
           />
         </div>
 

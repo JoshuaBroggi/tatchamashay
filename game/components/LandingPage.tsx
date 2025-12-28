@@ -1,12 +1,11 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Play, Heart, Hammer, Users, Github, Code2, Sparkles, MessageSquare } from 'lucide-react';
 
-interface LandingPageProps {
-  onPlay: () => void;
-  onAbout: () => void;
-}
+export const LandingPage: React.FC = () => {
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onPlay, onAbout }) => {
   return (
     <div className="w-full h-screen bg-slate-900 text-white overflow-y-auto scroll-smooth">
       {/* Navigation */}
@@ -26,18 +25,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onPlay, onAbout }) => 
                 >
                   What Kids Learn
                 </button>
-                <button 
-                  onClick={onAbout}
-                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                <Link
+                  to="/build"
+                  className={`${isActive('/build') ? 'text-emerald-400' : 'text-gray-300 hover:text-white'} px-3 py-2 rounded-md text-sm font-medium transition-colors`}
                 >
                   Build
-                </button>
-                <button
-                  onClick={onPlay}
+                </Link>
+                <Link
+                  to="/character-select"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30"
                 >
                   Play Now
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -75,19 +74,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onPlay, onAbout }) => 
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
-              onClick={onPlay}
+            <Link
+              to="/character-select"
               className="group relative inline-flex items-center gap-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xl font-bold py-4 px-10 rounded-2xl shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/40"
             >
               <Play fill="currentColor" size={24} />
               Start Adventure
-            </button>
-            <button
-              onClick={onAbout}
+            </Link>
+            <Link
+              to="/build"
               className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-lg font-semibold py-4 px-8 rounded-2xl backdrop-blur-md transition-all border border-white/10"
             >
               Learn More
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -211,7 +210,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onPlay, onAbout }) => 
             <h3 className="text-xl font-bold text-white">TATCHAMASHAY</h3>
           </div>
           <div className="flex gap-6">
-            <a href="https://github.com/joshuabroggi/tatchamashay" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">GitHub</a>
+            <a href="https://github.com/joshuabroggi/tatchamashay" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors flex items-center gap-2">
+              <Github size={16} />
+              GitHub
+            </a>
             <a href="https://chat.whatsapp.com/CsvnPZmVz1eGAlXRwTuDOW" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors flex items-center gap-1">
               <MessageSquare size={16} />
               Community

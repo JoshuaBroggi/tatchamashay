@@ -11,20 +11,21 @@
     "deploy:party": "partykit deploy"
   },
   "dependencies": {
-    "lucide-react": "0.263.1",
-    "react": "^18.2.0",
-    "three": "0.160.0",
-    "@react-three/fiber": "8.15.16",
     "@react-three/drei": "9.99.0",
+    "@react-three/fiber": "8.15.16",
+    "lucide-react": "0.263.1",
+    "partysocket": "^1.0.1",
+    "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "partysocket": "^1.0.1"
+    "react-router-dom": "^7.11.0",
+    "three": "0.160.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "partykit": "^0.0.111",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "partykit": "^0.0.111"
+    "vite": "^6.2.0"
   },
   "license": "GPL-3.0-or-later"
 }

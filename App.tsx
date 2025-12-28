@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, Play, RotateCcw, Gem, ChevronLeft, ChevronRight, Users, Copy, Check, Loader2, Crown } from 'lucide-react';
 import { Canvas, ThreeElements } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -28,6 +29,542 @@ const LoadingFallback = () => (
   </Html>
 );
 
+// Shared state context for the game
+interface GameContextType {
+  selectedCharacter: CharacterVariant;
+  setSelectedCharacter: (character: CharacterVariant) => void;
+  selectedLevel: Level;
+  setSelectedLevel: (level: Level) => void;
+  playerName: string;
+  setPlayerName: (name: string) => void;
+  score: number;
+  setScore: (score: number) => void;
+  controlsRef: React.MutableRefObject<Controls>;
+}
+
+const GameContext = React.createContext<GameContextType | null>(null);
+
+const useGameContext = () => {
+  const context = React.useContext(GameContext);
+  if (!context) {
+    throw new Error('useGameContext must be used within a GameProvider');
+  }
+  return context;
+};
+
+// Route Components
+const LandingPageRoute: React.FC = () => {
+  return <LandingPage />;
+};
+
+const BuildPageRoute: React.FC = () => {
+  return <AboutPage />;
+};
+
+const CharacterSelectRoute: React.FC = () => {
+  const { selectedCharacter, setSelectedCharacter } = useGameContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      switch (e.code) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrevCharacter();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNextCharacter();
+          break;
+        case 'Enter':
+          e.preventDefault();
+          handleConfirmCharacter();
+          break;
+      }
+    };
+
+    (window as any).addEventListener('keydown', handleKeyDown);
+    return () => {
+      (window as any).removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedCharacter]);
+
+  const handleNextCharacter = () => {
+    const currentIndex = CHARACTER_CONFIGS.findIndex(c => c.id === selectedCharacter);
+    const nextIndex = (currentIndex + 1) % CHARACTER_CONFIGS.length;
+    setSelectedCharacter(CHARACTER_CONFIGS[nextIndex].id);
+  };
+
+  const handlePrevCharacter = () => {
+    const currentIndex = CHARACTER_CONFIGS.findIndex(c => c.id === selectedCharacter);
+    const prevIndex = (currentIndex - 1 + CHARACTER_CONFIGS.length) % CHARACTER_CONFIGS.length;
+    setSelectedCharacter(CHARACTER_CONFIGS[prevIndex].id);
+  };
+
+  const handleConfirmCharacter = () => {
+    navigate('/level-select');
+  };
+
+  const handleReturnToMenu = () => {
+    navigate('/');
+  };
+
+  const currentConfig = CHARACTER_CONFIGS.find(c => c.id === selectedCharacter);
+
+  return (
+    <div className={`relative w-full h-screen bg-[#1a1a2e]`}>
+      {/* 3D Character Scene */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 2, 5], fov: 50 }}
+        className="absolute inset-0"
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <CharacterSelectScene
+            selectedCharacter={selectedCharacter}
+            onSelectCharacter={setSelectedCharacter}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* UI Overlay */}
+      <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none">
+        {/* Navbar */}
+        <nav className="w-full pointer-events-auto bg-slate-900/80 backdrop-blur-md border-b border-white/10 h-20 flex-none z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+            <div className="cursor-pointer" onClick={handleReturnToMenu}>
+              <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                TATCHAMASHAY
+              </h1>
+            </div>
+            <button
+              onClick={handleReturnToMenu}
+              className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Home
+            </button>
+          </div>
+        </nav>
+
+        <div className="flex-1 w-full flex flex-col items-center justify-between py-8 relative">
+          <div className="text-center pointer-events-auto">
+            <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
+              SELECT YOUR CHARACTER
+            </h1>
+            <p className="text-purple-300 mt-2 text-lg">
+              Choose your warrior
+            </p>
+          </div>
+
+          {/* Navigation Arrows */}
+          <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+            <button
+              onClick={handlePrevCharacter}
+              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+            >
+              <ChevronLeft size={32} />
+            </button>
+          </div>
+
+          <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+            <button
+              onClick={handleNextCharacter}
+              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+            >
+              <ChevronRight size={32} />
+            </button>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="pointer-events-auto flex flex-col items-center gap-4">
+            <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
+              <h2 className="text-2xl font-bold text-white mb-1">
+                {currentConfig?.name || 'Unknown'}
+              </h2>
+              <p className="text-purple-200 text-sm mb-3">
+                {currentConfig?.description || 'No description'}
+              </p>
+              <div className="flex justify-center gap-2">
+                {CHARACTER_CONFIGS.map((c, i) => (
+                  <div
+                    key={c.id}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      c.id === selectedCharacter
+                        ? 'bg-purple-400 scale-125'
+                        : 'bg-gray-600'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleConfirmCharacter}
+              className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-lg font-bold py-4 px-16 rounded-xl shadow-lg flex items-center justify-center gap-3"
+            >
+              <Play fill="currentColor" size={28} /> CHOOSE CHARACTER
+            </button>
+
+            <button
+              onClick={handleReturnToMenu}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              ← Back to Menu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LevelSelectRoute: React.FC = () => {
+  const { selectedLevel, setSelectedLevel } = useGameContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      switch (e.code) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrevLevel();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNextLevel();
+          break;
+        case 'Enter':
+        case 'Space':
+          e.preventDefault();
+          handleConfirmLevel();
+          break;
+      }
+    };
+
+    (window as any).addEventListener('keydown', handleKeyDown);
+    return () => {
+      (window as any).removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedLevel]);
+
+  const handleNextLevel = () => {
+    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
+    const nextIndex = (currentIndex + 1) % LEVEL_CONFIGS.length;
+    setSelectedLevel(LEVEL_CONFIGS[nextIndex].id);
+  };
+
+  const handlePrevLevel = () => {
+    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
+    const prevIndex = (currentIndex - 1 + LEVEL_CONFIGS.length) % LEVEL_CONFIGS.length;
+    setSelectedLevel(LEVEL_CONFIGS[prevIndex].id);
+  };
+
+  const handleConfirmLevel = () => {
+    navigate('/lobby');
+  };
+
+  const handleReturnToCharacterSelect = () => {
+    navigate('/character-select');
+  };
+
+  const currentLevelConfig = LEVEL_CONFIGS.find(l => l.id === selectedLevel);
+  const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
+
+  return (
+    <div className="relative w-full h-screen" style={{ backgroundColor: bgColor }}>
+      {/* 3D Level Scene */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
+        className="absolute inset-0"
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <LevelSelectScene
+            selectedLevel={selectedLevel}
+            onSelectLevel={setSelectedLevel}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* UI Overlay */}
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between py-8 pointer-events-none">
+        <div className="text-center pointer-events-auto">
+          <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
+            SELECT YOUR LEVEL
+          </h1>
+          <p className="text-purple-300 mt-2 text-lg">
+            Choose your adventure world
+          </p>
+        </div>
+
+        {/* Navigation Arrows */}
+        <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+          <button
+            onClick={handlePrevLevel}
+            className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+          >
+            <ChevronLeft size={32} />
+          </button>
+        </div>
+
+        <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+          <button
+            onClick={handleNextLevel}
+            className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+          >
+            <ChevronRight size={32} />
+          </button>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="pointer-events-auto flex flex-col items-center gap-4">
+          <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
+            <h2 className="text-2xl font-bold text-white mb-1">
+              {currentLevelConfig?.name || 'Unknown Level'}
+            </h2>
+            <p className="text-purple-200 text-sm mb-3">
+              {currentLevelConfig?.description || 'No description'}
+            </p>
+            <div className="flex justify-center gap-2">
+              {LEVEL_CONFIGS.map((l) => (
+                <div
+                  key={l.id}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    l.id === selectedLevel
+                      ? 'bg-purple-400 scale-125'
+                      : 'bg-gray-600'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleConfirmLevel}
+            className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-2xl font-bold py-4 px-12 rounded-xl shadow-lg transform transition-all duration-150 active:scale-95 flex items-center justify-center gap-3 border-b-4 border-green-700 active:border-b-0 active:translate-y-1"
+          >
+            <Play fill="currentColor" size={28} /> START GAME
+          </button>
+
+          <button
+            onClick={handleReturnToCharacterSelect}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            ← Back to Character Select
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LobbyRoute: React.FC = () => {
+  const { selectedCharacter, selectedLevel, playerName, setPlayerName } = useGameContext();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    navigate('/level-select');
+  };
+
+  const handleStartGame = () => {
+    navigate('/game');
+  };
+
+  return (
+    <div className="relative w-full h-screen bg-[#87CEEB]">
+      {/* 3D Character Scene */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 2, 6], fov: 50, near: 0.1, far: 2000 }}
+        className="absolute inset-0"
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <CharacterSelectScene
+            selectedCharacter={selectedCharacter}
+            onSelectCharacter={() => {}}
+          />
+        </Suspense>
+      </Canvas>
+
+      <LobbyOverlay
+        playerName={playerName}
+        setPlayerName={setPlayerName}
+        selectedCharacter={selectedCharacter}
+        selectedLevel={selectedLevel}
+        onBack={handleBack}
+        onStartGame={handleStartGame}
+      />
+    </div>
+  );
+};
+
+const GameRoute: React.FC = () => {
+  const { selectedCharacter, selectedLevel, score, setScore, controlsRef } = useGameContext();
+  const [isLevelLoading, setIsLevelLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLoadingChange = useCallback((isLoading: boolean) => {
+    setIsLevelLoading(isLoading);
+  }, []);
+
+  const handleReturnToMenu = () => {
+    navigate('/');
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      switch (e.code) {
+        case 'KeyW': case 'ArrowUp': controlsRef.current.up = true; break;
+        case 'KeyS': case 'ArrowDown': controlsRef.current.down = true; break;
+        case 'KeyA': case 'ArrowLeft': controlsRef.current.left = true; break;
+        case 'KeyD': case 'ArrowRight': controlsRef.current.right = true; break;
+        case 'Space': controlsRef.current.attack = true; break;
+      }
+    };
+
+    const handleKeyUp = (e: any) => {
+      switch (e.code) {
+        case 'KeyW': case 'ArrowUp': controlsRef.current.up = false; break;
+        case 'KeyS': case 'ArrowDown': controlsRef.current.down = false; break;
+        case 'KeyA': case 'ArrowLeft': controlsRef.current.left = false; break;
+        case 'KeyD': case 'ArrowRight': controlsRef.current.right = false; break;
+        case 'Space': controlsRef.current.attack = false; break;
+      }
+    };
+
+    (window as any).addEventListener('keydown', handleKeyDown);
+    (window as any).addEventListener('keyup', handleKeyUp);
+    return () => {
+      (window as any).removeEventListener('keydown', handleKeyDown);
+      (window as any).removeEventListener('keyup', handleKeyUp);
+    };
+  }, [controlsRef]);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden select-none font-sans bg-[#87CEEB]">
+      {/* 3D Game Scene */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
+        dpr={[1, 2]}
+        className="absolute inset-0 z-0"
+        onError={(e) => console.error("Canvas Error:", e)}
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <Game3D
+            isPlaying={true}
+            controlsRef={controlsRef}
+            onScoreUpdate={setScore}
+            onLoadingChange={handleLoadingChange}
+            selectedCharacter={selectedCharacter}
+            selectedLevel={selectedLevel}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* HUD (Heads Up Display) */}
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
+        <div className="flex gap-3">
+          {/* Score display */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 px-6 shadow-xl border-4 border-yellow-400 transform transition-transform">
+            <span className="text-yellow-600 font-bold text-xl uppercase tracking-wider block text-xs">Score</span>
+            <span className="text-4xl font-black text-gray-800">{score}</span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleReturnToMenu}
+          className="pointer-events-auto bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl shadow-lg border-b-4 border-red-700 active:border-b-0 active:translate-y-1"
+          title="Return to Menu"
+        >
+          <span className="text-sm">MENU</span>
+        </button>
+      </div>
+
+      {/* Level Loading Overlay */}
+      {isLevelLoading && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="p-8 rounded-2xl shadow-2xl text-center bg-gradient-to-b from-white to-gray-100 border-4 border-yellow-400">
+            <div className="text-5xl mb-4">
+              🦇
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-blue-600">
+              Loading Game...
+            </h2>
+            <div className="w-48 h-3 rounded-full overflow-hidden bg-gray-200">
+              <div
+                className="h-full animate-pulse bg-gradient-to-r from-blue-500 to-green-500"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Helper */}
+      <div className="hidden sm:block absolute bottom-6 left-6 backdrop-blur p-4 rounded-xl border pointer-events-none bg-white/20 text-white border-white/30">
+        <p className="font-bold text-lg mb-1">Controls</p>
+        <div className="flex items-center gap-2 text-sm"><span className="bg-white/20 px-2 py-1 rounded">WASD</span> Move</div>
+        <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Pop Balloon</div>
+        <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">DRAG</span> Rotate Camera</div>
+      </div>
+    </div>
+  );
+};
+
+// Game Provider Component
+const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterVariant>('black');
+  const [selectedLevel, setSelectedLevel] = useState<Level>('overworld');
+  const [playerName, setPlayerName] = useState('');
+  const [score, setScore] = useState(0);
+
+  const controlsRef = useRef<Controls>({
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    attack: false,
+  });
+
+  const contextValue: GameContextType = {
+    selectedCharacter,
+    setSelectedCharacter,
+    selectedLevel,
+    setSelectedLevel,
+    playerName,
+    setPlayerName,
+    score,
+    setScore,
+    controlsRef,
+  };
+
+  return (
+    <GameContext.Provider value={contextValue}>
+      {children}
+    </GameContext.Provider>
+  );
+};
+
+// Main App Component with Routing
+const AppContent: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPageRoute />} />
+        <Route path="/build" element={<BuildPageRoute />} />
+        <Route path="/character-select" element={<CharacterSelectRoute />} />
+        <Route path="/level-select" element={<LevelSelectRoute />} />
+        <Route path="/lobby" element={<LobbyRoute />} />
+        <Route path="/game" element={<GameRoute />} />
+        {/* Redirect any unknown routes to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+};
 
 // Lobby component for multiplayer room management
 const LobbyOverlay: React.FC<{
@@ -319,505 +856,18 @@ const LobbyOverlay: React.FC<{
   );
 };
 
-
-// Simple app with basic navigation
-const AppContent: React.FC = () => {
-  const [gameState, setGameState] = useState<'menu' | 'about' | 'character-select' | 'level-select' | 'lobby' | 'playing'>('menu');
-  const [selectedCharacter, setSelectedCharacter] = useState<CharacterVariant>('black');
-  const [selectedLevel, setSelectedLevel] = useState<Level>('overworld');
-  const [playerName, setPlayerName] = useState('');
-  const [score, setScore] = useState(0);
-  const [isLevelLoading, setIsLevelLoading] = useState(false);
-
-  // Control state ref to pass to the 3D loop without re-renders
-  const controlsRef = useRef<Controls>({
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    attack: false,
-  });
-
-  // Callbacks for level and gem updates (moved to top level)
-
-  const handleLoadingChange = useCallback((isLoading: boolean) => {
-    setIsLevelLoading(isLoading);
-  }, []);
-
-  // Keyboard listeners for game controls (moved to top level)
-  // Handle keyboard input for character select
-  useEffect(() => {
-    if (gameState !== 'character-select') return;
-
-    const handleKeyDown = (e: any) => {
-      switch (e.code) {
-        case 'ArrowLeft':
-          e.preventDefault();
-          handlePrevCharacter();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          handleNextCharacter();
-          break;
-        case 'Enter':
-          e.preventDefault();
-          handleConfirmCharacter();
-          break;
-      }
-    };
-
-    (window as any).addEventListener('keydown', handleKeyDown);
-    return () => {
-      (window as any).removeEventListener('keydown', handleKeyDown);
-    };
-  }, [gameState, selectedCharacter]);
-
-  // Handle keyboard input for level select
-  useEffect(() => {
-    if (gameState !== 'level-select') return;
-
-    const handleKeyDown = (e: any) => {
-      switch (e.code) {
-        case 'ArrowLeft':
-          e.preventDefault();
-          handlePrevLevel();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          handleNextLevel();
-          break;
-        case 'Enter':
-        case 'Space':
-          e.preventDefault();
-          handleConfirmLevel();
-          break;
-      }
-    };
-
-    (window as any).addEventListener('keydown', handleKeyDown);
-    return () => {
-      (window as any).removeEventListener('keydown', handleKeyDown);
-    };
-  }, [gameState, selectedLevel]);
-
-
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-
-    const handleKeyDown = (e: any) => {
-      switch (e.code) {
-        case 'KeyW': case 'ArrowUp': controlsRef.current.up = true; break;
-        case 'KeyS': case 'ArrowDown': controlsRef.current.down = true; break;
-        case 'KeyA': case 'ArrowLeft': controlsRef.current.left = true; break;
-        case 'KeyD': case 'ArrowRight': controlsRef.current.right = true; break;
-        case 'Space': controlsRef.current.attack = true; break;
-      }
-    };
-
-    const handleKeyUp = (e: any) => {
-      switch (e.code) {
-        case 'KeyW': case 'ArrowUp': controlsRef.current.up = false; break;
-        case 'KeyS': case 'ArrowDown': controlsRef.current.down = false; break;
-        case 'KeyA': case 'ArrowLeft': controlsRef.current.left = false; break;
-        case 'KeyD': case 'ArrowRight': controlsRef.current.right = false; break;
-        case 'Space': controlsRef.current.attack = false; break;
-      }
-    };
-
-    (window as any).addEventListener('keydown', handleKeyDown);
-    (window as any).addEventListener('keyup', handleKeyUp);
-    return () => {
-      (window as any).removeEventListener('keydown', handleKeyDown);
-      (window as any).removeEventListener('keyup', handleKeyUp);
-    };
-  }, [gameState]);
-
-  const startGame = () => {
-    console.log('startGame called, setting gameState to character-select');
-    setGameState('character-select');
-    console.log('gameState should now be character-select');
-  };
-
-  const handleNextCharacter = () => {
-    const currentIndex = CHARACTER_CONFIGS.findIndex(c => c.id === selectedCharacter);
-    const nextIndex = (currentIndex + 1) % CHARACTER_CONFIGS.length;
-    setSelectedCharacter(CHARACTER_CONFIGS[nextIndex].id);
-  };
-
-  const handlePrevCharacter = () => {
-    const currentIndex = CHARACTER_CONFIGS.findIndex(c => c.id === selectedCharacter);
-    const prevIndex = (currentIndex - 1 + CHARACTER_CONFIGS.length) % CHARACTER_CONFIGS.length;
-    setSelectedCharacter(CHARACTER_CONFIGS[prevIndex].id);
-  };
-
-  const handleConfirmCharacter = () => {
-    console.log('handleConfirmCharacter called, setting gameState to level-select');
-    setGameState('level-select');
-    console.log('gameState should now be level-select');
-  };
-
-  const handleNextLevel = () => {
-    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
-    const nextIndex = (currentIndex + 1) % LEVEL_CONFIGS.length;
-    setSelectedLevel(LEVEL_CONFIGS[nextIndex].id);
-  };
-
-  const handlePrevLevel = () => {
-    const currentIndex = LEVEL_CONFIGS.findIndex(l => l.id === selectedLevel);
-    const prevIndex = (currentIndex - 1 + LEVEL_CONFIGS.length) % LEVEL_CONFIGS.length;
-    setSelectedLevel(LEVEL_CONFIGS[prevIndex].id);
-  };
-
-  const handleConfirmLevel = () => {
-    console.log('handleConfirmLevel called, setting gameState to lobby');
-    setGameState('lobby');
-    console.log('gameState should now be lobby');
-  };
-
-
-  const handleReturnToMenu = () => {
-    setGameState('menu');
-  };
-
-  const handleAbout = () => {
-    setGameState('about');
-  };
-
-  // Main menu
-  if (gameState === 'menu') {
-    return <LandingPage onPlay={startGame} onAbout={handleAbout} />;
-  }
-
-  // About page
-  if (gameState === 'about') {
-    return <AboutPage onBack={handleReturnToMenu} />;
-  }
-
-  // Character select with 3D scene
-  if (gameState === 'character-select') {
-    const currentConfig = CHARACTER_CONFIGS.find(c => c.id === selectedCharacter);
-
-    return (
-      <div className={`relative w-full h-screen bg-[#1a1a2e]`}>
-        {/* 3D Character Scene */}
-        <Canvas
-          shadows
-          camera={{ position: [0, 2, 5], fov: 50 }}
-          className="absolute inset-0"
-        >
-          <Suspense fallback={<LoadingFallback />}>
-            <CharacterSelectScene
-              selectedCharacter={selectedCharacter}
-              onSelectCharacter={setSelectedCharacter}
-            />
-          </Suspense>
-        </Canvas>
-
-        {/* UI Overlay */}
-        <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none">
-          {/* Navbar */}
-          <nav className="w-full pointer-events-auto bg-slate-900/80 backdrop-blur-md border-b border-white/10 h-20 flex-none z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
-              <div className="cursor-pointer" onClick={() => { handleReturnToMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                  TATCHAMASHAY
-                </h1>
-              </div>
-              <button 
-                onClick={handleReturnToMenu}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Home
-              </button>
-            </div>
-          </nav>
-          
-          <div className="flex-1 w-full flex flex-col items-center justify-between py-8 relative">
-            <div className="text-center pointer-events-auto">
-              <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
-                SELECT YOUR CHARACTER
-              </h1>
-              <p className="text-purple-300 mt-2 text-lg">
-                Choose your warrior
-              </p>
-            </div>
-
-            {/* Navigation Arrows */}
-            <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-              <button
-                onClick={handlePrevCharacter}
-                className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-              >
-                <ChevronLeft size={32} />
-              </button>
-            </div>
-
-            <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-              <button
-                onClick={handleNextCharacter}
-                className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-              >
-                <ChevronRight size={32} />
-              </button>
-            </div>
-
-            <div className="flex-1" />
-
-            <div className="pointer-events-auto flex flex-col items-center gap-4">
-              <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
-                <h2 className="text-2xl font-bold text-white mb-1">
-                  {currentConfig?.name || 'Unknown'}
-                </h2>
-                <p className="text-purple-200 text-sm mb-3">
-                  {currentConfig?.description || 'No description'}
-                </p>
-                <div className="flex justify-center gap-2">
-                  {CHARACTER_CONFIGS.map((c, i) => (
-                    <div
-                      key={c.id}
-                      className={`w-3 h-3 rounded-full transition-all ${
-                        c.id === selectedCharacter
-                          ? 'bg-purple-400 scale-125'
-                          : 'bg-gray-600'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleConfirmCharacter}
-                className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-lg font-bold py-4 px-16 rounded-xl shadow-lg flex items-center justify-center gap-3"
-              >
-                <Play fill="currentColor" size={28} /> CHOOSE CHARACTER
-              </button>
-
-              <button
-                onClick={handleReturnToMenu}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                ← Back to Menu
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Level select with 3D scene
-  if (gameState === 'level-select') {
-    const currentLevelConfig = LEVEL_CONFIGS.find(l => l.id === selectedLevel);
-    const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
-
-    return (
-      <div className="relative w-full h-screen" style={{ backgroundColor: bgColor }}>
-        {/* 3D Level Scene */}
-        <Canvas
-          shadows
-          camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
-          className="absolute inset-0"
-        >
-          <Suspense fallback={<LoadingFallback />}>
-            <LevelSelectScene
-              selectedLevel={selectedLevel}
-              onSelectLevel={setSelectedLevel}
-            />
-          </Suspense>
-        </Canvas>
-
-        {/* UI Overlay */}
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-between py-8 pointer-events-none">
-          <div className="text-center pointer-events-auto">
-            <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
-              SELECT YOUR LEVEL
-            </h1>
-            <p className="text-purple-300 mt-2 text-lg">
-              Choose your adventure world
-            </p>
-          </div>
-
-          {/* Navigation Arrows */}
-          <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-            <button
-              onClick={handlePrevLevel}
-              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-            >
-              <ChevronLeft size={32} />
-            </button>
-          </div>
-
-          <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-            <button
-              onClick={handleNextLevel}
-              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-            >
-              <ChevronRight size={32} />
-            </button>
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="pointer-events-auto flex flex-col items-center gap-4">
-            <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
-              <h2 className="text-2xl font-bold text-white mb-1">
-                {currentLevelConfig?.name || 'Unknown Level'}
-              </h2>
-              <p className="text-purple-200 text-sm mb-3">
-                {currentLevelConfig?.description || 'No description'}
-              </p>
-              <div className="flex justify-center gap-2">
-                {LEVEL_CONFIGS.map((l) => (
-                  <div
-                    key={l.id}
-                    className={`w-3 h-3 rounded-full transition-all ${
-                      l.id === selectedLevel
-                        ? 'bg-purple-400 scale-125'
-                        : 'bg-gray-600'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={handleConfirmLevel}
-              className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-2xl font-bold py-4 px-12 rounded-xl shadow-lg transform transition-all duration-150 active:scale-95 flex items-center justify-center gap-3 border-b-4 border-green-700 active:border-b-0 active:translate-y-1"
-            >
-              <Play fill="currentColor" size={28} /> START GAME
-            </button>
-
-            <button
-              onClick={() => setGameState('character-select')}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back to Character Select
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Lobby for multiplayer setup
-  if (gameState === 'lobby') {
-    return (
-      <div className="relative w-full h-screen bg-[#87CEEB]">
-        {/* 3D Character Scene */}
-        <Canvas
-          shadows
-          camera={{ position: [0, 2, 6], fov: 50, near: 0.1, far: 2000 }}
-          className="absolute inset-0"
-        >
-          <Suspense fallback={<LoadingFallback />}>
-            <CharacterSelectScene
-              selectedCharacter={selectedCharacter}
-              onSelectCharacter={setSelectedCharacter}
-            />
-          </Suspense>
-        </Canvas>
-
-        <LobbyOverlay
-          playerName={playerName}
-          setPlayerName={setPlayerName}
-          selectedCharacter={selectedCharacter}
-          selectedLevel={selectedLevel}
-          onBack={() => setGameState('level-select')}
-          onStartGame={() => setGameState('playing')}
-        />
-      </div>
-    );
-  }
-
-  // Game playing with full 3D scene
-  if (gameState === 'playing') {
-    return (
-      <div className="relative w-full h-full overflow-hidden select-none font-sans bg-[#87CEEB]">
-        {/* 3D Game Scene */}
-        <Canvas
-          shadows
-          camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
-          dpr={[1, 2]}
-          className="absolute inset-0 z-0"
-          onError={(e) => console.error("Canvas Error:", e)}
-        >
-          <Suspense fallback={<LoadingFallback />}>
-            <Game3D
-              isPlaying={true}
-              controlsRef={controlsRef}
-              onScoreUpdate={setScore}
-              onLoadingChange={handleLoadingChange}
-              selectedCharacter={selectedCharacter}
-              selectedLevel={selectedLevel}
-            />
-          </Suspense>
-        </Canvas>
-
-        {/* HUD (Heads Up Display) */}
-        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
-          <div className="flex gap-3">
-            {/* Score display */}
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 px-6 shadow-xl border-4 border-yellow-400 transform transition-transform">
-              <span className="text-yellow-600 font-bold text-xl uppercase tracking-wider block text-xs">Score</span>
-              <span className="text-4xl font-black text-gray-800">{score}</span>
-            </div>
-
-          </div>
-
-          <button
-            onClick={handleReturnToMenu}
-            className="pointer-events-auto bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl shadow-lg border-b-4 border-red-700 active:border-b-0 active:translate-y-1"
-            title="Return to Menu"
-          >
-            <span className="text-sm">MENU</span>
-          </button>
-        </div>
-
-        {/* Level Loading Overlay */}
-        {isLevelLoading && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="p-8 rounded-2xl shadow-2xl text-center bg-gradient-to-b from-white to-gray-100 border-4 border-yellow-400">
-              <div className="text-5xl mb-4">
-                🦇
-              </div>
-              <h2 className="text-2xl font-bold mb-2 text-blue-600">
-                Loading Game...
-              </h2>
-              <div className="w-48 h-3 rounded-full overflow-hidden bg-gray-200">
-                <div
-                  className="h-full animate-pulse bg-gradient-to-r from-blue-500 to-green-500"
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Desktop Helper */}
-        <div className="hidden sm:block absolute bottom-6 left-6 backdrop-blur p-4 rounded-xl border pointer-events-none bg-white/20 text-white border-white/30">
-          <p className="font-bold text-lg mb-1">Controls</p>
-          <div className="flex items-center gap-2 text-sm"><span className="bg-white/20 px-2 py-1 rounded">WASD</span> Move</div>
-          <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">SPACE</span> Pop Balloon</div>
-          <div className="flex items-center gap-2 text-sm mt-1"><span className="bg-white/20 px-2 py-1 rounded">DRAG</span> Rotate Camera</div>
-        </div>
-      </div>
-    );
-  }
-
-  // This should never be reached
-  return null;
-};
-
 // Simple MultiplayerProvider stub
 const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-// Main App component with simple MultiplayerProvider
+// Main App component with routing and providers
 const App: React.FC = () => {
   return (
     <MultiplayerProvider>
-      <AppContent />
+      <GameProvider>
+        <AppContent />
+      </GameProvider>
     </MultiplayerProvider>
   );
 };
