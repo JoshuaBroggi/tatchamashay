@@ -156,12 +156,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onPlay, onAbout }) => 
 
           <div className="max-w-4xl mx-auto mb-16 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-slate-800">
             <video 
-              controls 
+              controls
+              preload="metadata"
               className="w-full aspect-video object-cover"
               poster="/textures/forest_panorama.png"
+              onError={(e) => {
+                console.error('Video load error:', e);
+              }}
             >
-              <source src="/videos/learn.mov" type="video/quicktime" />
               <source src="/videos/learn.mp4" type="video/mp4" />
+              <source src="/videos/learn.mov" type="video/quicktime" />
               Your browser does not support the video tag.
             </video>
           </div>
