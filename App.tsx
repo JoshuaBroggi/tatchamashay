@@ -518,7 +518,7 @@ const AppContent: React.FC = () => {
           {/* Navbar */}
           <nav className="w-full pointer-events-auto bg-slate-900/80 backdrop-blur-md border-b border-white/10 h-20 flex-none z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
-              <div className="cursor-pointer" onClick={handleReturnToMenu}>
+              <div className="cursor-pointer" onClick={() => { handleReturnToMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                 <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                   TATCHAMASHAY
                 </h1>
