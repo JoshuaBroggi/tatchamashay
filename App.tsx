@@ -7,6 +7,8 @@ import { CharacterSelectScene } from './game/components/CharacterSelect';
 import { LevelSelectScene } from './game/components/LevelSelect';
 import Game3D from './game/Game3D';
 import { useMultiplayer } from './game/multiplayer';
+import { LandingPage } from './game/components/LandingPage';
+import { AboutPage } from './game/components/AboutPage';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -320,7 +322,7 @@ const LobbyOverlay: React.FC<{
 
 // Simple app with basic navigation
 const AppContent: React.FC = () => {
-  const [gameState, setGameState] = useState<'menu' | 'character-select' | 'level-select' | 'lobby' | 'playing'>('menu');
+  const [gameState, setGameState] = useState<'menu' | 'about' | 'character-select' | 'level-select' | 'lobby' | 'playing'>('menu');
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterVariant>('black');
   const [selectedLevel, setSelectedLevel] = useState<Level>('overworld');
   const [playerName, setPlayerName] = useState('');
@@ -477,23 +479,18 @@ const AppContent: React.FC = () => {
     setGameState('menu');
   };
 
+  const handleAbout = () => {
+    setGameState('about');
+  };
+
   // Main menu
   if (gameState === 'menu') {
-    return (
-      <div className="bg-[#87CEEB] w-full h-screen flex items-center justify-center">
-        <div className="bg-white/90 p-8 rounded-2xl shadow-2xl text-center border-2 border-yellow-400 max-w-sm w-full mx-4">
-          <h1 className="text-3xl font-black text-blue-600 leading-tight tracking-tight mb-2">
-            TATCHAMASHAY
-          </h1>
-          <button
-            onClick={startGame}
-            className="bg-green-500 hover:bg-green-600 text-white text-2xl font-bold py-4 px-10 rounded-xl shadow-lg whitespace-nowrap"
-          >
-            PLAY
-          </button>
-        </div>
-      </div>
-    );
+    return <LandingPage onPlay={startGame} onAbout={handleAbout} />;
+  }
+
+  // About page
+  if (gameState === 'about') {
+    return <AboutPage onBack={handleReturnToMenu} />;
   }
 
   // Character select with 3D scene
@@ -517,72 +514,91 @@ const AppContent: React.FC = () => {
         </Canvas>
 
         {/* UI Overlay */}
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-between py-8 pointer-events-none">
-          <div className="text-center pointer-events-auto">
-            <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
-              SELECT YOUR CHARACTER
-            </h1>
-            <p className="text-purple-300 mt-2 text-lg">
-              Choose your warrior
-            </p>
-          </div>
-
-          {/* Navigation Arrows */}
-          <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-            <button
-              onClick={handlePrevCharacter}
-              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-            >
-              <ChevronLeft size={32} />
-            </button>
-          </div>
-
-          <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
-            <button
-              onClick={handleNextCharacter}
-              className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
-            >
-              <ChevronRight size={32} />
-            </button>
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="pointer-events-auto flex flex-col items-center gap-4">
-            <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
-              <h2 className="text-2xl font-bold text-white mb-1">
-                {currentConfig?.name || 'Unknown'}
-              </h2>
-              <p className="text-purple-200 text-sm mb-3">
-                {currentConfig?.description || 'No description'}
-              </p>
-              <div className="flex justify-center gap-2">
-                {CHARACTER_CONFIGS.map((c, i) => (
-                  <div
-                    key={c.id}
-                    className={`w-3 h-3 rounded-full transition-all ${
-                      c.id === selectedCharacter
-                        ? 'bg-purple-400 scale-125'
-                        : 'bg-gray-600'
-                    }`}
-                  />
-                ))}
+        <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none">
+          {/* Navbar */}
+          <nav className="w-full pointer-events-auto bg-slate-900/80 backdrop-blur-md border-b border-white/10 h-20 flex-none z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+              <div className="cursor-pointer" onClick={handleReturnToMenu}>
+                <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                  TATCHAMASHAY
+                </h1>
               </div>
+              <button 
+                onClick={handleReturnToMenu}
+                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Home
+              </button>
+            </div>
+          </nav>
+          
+          <div className="flex-1 w-full flex flex-col items-center justify-between py-8 relative">
+            <div className="text-center pointer-events-auto">
+              <h1 className="text-4xl font-black text-white drop-shadow-lg tracking-wide">
+                SELECT YOUR CHARACTER
+              </h1>
+              <p className="text-purple-300 mt-2 text-lg">
+                Choose your warrior
+              </p>
             </div>
 
-            <button
-              onClick={handleConfirmCharacter}
-              className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-lg font-bold py-4 px-16 rounded-xl shadow-lg flex items-center justify-center gap-3"
-            >
-              <Play fill="currentColor" size={28} /> CHOOSE CHARACTER
-            </button>
+            {/* Navigation Arrows */}
+            <div className="absolute left-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+              <button
+                onClick={handlePrevCharacter}
+                className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+              >
+                <ChevronLeft size={32} />
+              </button>
+            </div>
 
-            <button
-              onClick={handleReturnToMenu}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back to Menu
-            </button>
+            <div className="absolute right-8 top-[60%] -translate-y-1/2 pointer-events-auto">
+              <button
+                onClick={handleNextCharacter}
+                className="w-16 h-16 bg-purple-600/80 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-purple-400 transition-all hover:scale-110"
+              >
+                <ChevronRight size={32} />
+              </button>
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="pointer-events-auto flex flex-col items-center gap-4">
+              <div className="bg-gradient-to-b from-gray-900/90 to-purple-900/90 backdrop-blur-md p-4 px-8 rounded-2xl shadow-2xl border-2 border-purple-500/50 text-center min-w-[280px]">
+                <h2 className="text-2xl font-bold text-white mb-1">
+                  {currentConfig?.name || 'Unknown'}
+                </h2>
+                <p className="text-purple-200 text-sm mb-3">
+                  {currentConfig?.description || 'No description'}
+                </p>
+                <div className="flex justify-center gap-2">
+                  {CHARACTER_CONFIGS.map((c, i) => (
+                    <div
+                      key={c.id}
+                      className={`w-3 h-3 rounded-full transition-all ${
+                        c.id === selectedCharacter
+                          ? 'bg-purple-400 scale-125'
+                          : 'bg-gray-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handleConfirmCharacter}
+                className="bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-lg font-bold py-4 px-16 rounded-xl shadow-lg flex items-center justify-center gap-3"
+              >
+                <Play fill="currentColor" size={28} /> CHOOSE CHARACTER
+              </button>
+
+              <button
+                onClick={handleReturnToMenu}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ← Back to Menu
+              </button>
+            </div>
           </div>
         </div>
       </div>
