@@ -53,6 +53,7 @@ const LobbyOverlay: React.FC<{
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMultiplayer, setShowMultiplayer] = useState(false);
 
   // When game starts from server, trigger the game start
   useEffect(() => {
@@ -206,90 +207,103 @@ const LobbyOverlay: React.FC<{
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-gradient-to-b from-gray-900 to-purple-900 p-8 rounded-2xl shadow-2xl border-2 border-purple-500 max-w-md w-full mx-4">
-        <h2 className="text-3xl font-black text-white text-center mb-2">Multiplayer</h2>
-        <p className="text-purple-300 text-center mb-6">Play with up to 4 friends!</p>
+        <h2 className="text-3xl font-black text-white text-center mb-2">Choose Your Game Mode</h2>
+        <p className="text-purple-300 text-center mb-6">Play alone or with friends!</p>
 
-        {/* Player Name Input */}
-        <div className="mb-6">
-          <label className="text-purple-300 text-sm block mb-2">Your Name</label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value.slice(0, 16))}
-            placeholder="Enter your name"
-            className="w-full px-4 py-3 bg-gray-800 border border-purple-500 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            maxLength={16}
-          />
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-300 text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        {/* Create Room Button */}
-        <button
-          onClick={handleCreateRoom}
-          disabled={isConnecting}
-          className="w-full bg-gradient-to-b from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg mb-4 transition-all disabled:cursor-not-allowed flex items-center justify-center gap-3"
-        >
-          {isConnecting ? (
-            <Loader2 className="animate-spin" size={24} />
-          ) : (
-            <>
-              <Users size={24} /> Create Room
-            </>
-          )}
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
-          <div className="flex-1 h-px bg-purple-700" />
-          <span className="text-purple-400 text-sm">OR</span>
-          <div className="flex-1 h-px bg-purple-700" />
-        </div>
-
-        {/* Join Room */}
-        <div className="mb-4">
-          <label className="text-purple-300 text-sm block mb-2">Room Code</label>
-          <input
-            type="text"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
-            placeholder="XXXX"
-            className="w-full px-4 py-3 bg-gray-800 border border-purple-500 rounded-xl text-white text-center text-2xl tracking-[0.3em] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400 uppercase"
-            maxLength={4}
-          />
-        </div>
-
-        <button
-          onClick={handleJoinRoom}
-          disabled={isConnecting || joinCode.length !== 4}
-          className="w-full bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 disabled:from-gray-500 disabled:to-gray-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-3"
-        >
-          {isConnecting ? (
-            <Loader2 className="animate-spin" size={24} />
-          ) : (
-            'Join Room'
-          )}
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
-          <div className="flex-1 h-px bg-purple-700" />
-          <span className="text-purple-400 text-sm">OR</span>
-          <div className="flex-1 h-px bg-purple-700" />
-        </div>
-
-        {/* Solo Play Button */}
+        {/* Play Solo Button - Primary Action */}
         <button
           onClick={onStartGame}
-          className="w-full bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+          className="w-full bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 mb-6"
         >
           <Play fill="currentColor" size={24} /> Play Solo
         </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-px bg-purple-700" />
+          <span className="text-purple-400 text-sm">OR</span>
+          <div className="flex-1 h-px bg-purple-700" />
+        </div>
+
+        {/* Multiplayer Button */}
+        <button
+          onClick={() => setShowMultiplayer(!showMultiplayer)}
+          className="w-full bg-gradient-to-b from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 mb-4"
+        >
+          <Users size={24} /> Play with Friends
+        </button>
+
+        {/* Multiplayer Section - Expandable */}
+        {showMultiplayer && (
+          <>
+            {/* Player Name Input */}
+            <div className="mb-6">
+              <label className="text-purple-300 text-sm block mb-2">Your Name</label>
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value.slice(0, 16))}
+                placeholder="Enter your name"
+                className="w-full px-4 py-3 bg-gray-800 border border-purple-500 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                maxLength={16}
+              />
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-300 text-sm text-center">
+                {error}
+              </div>
+            )}
+
+            {/* Create Room Button */}
+            <button
+              onClick={handleCreateRoom}
+              disabled={isConnecting}
+              className="w-full bg-gradient-to-b from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 text-white text-lg font-bold py-3 rounded-xl shadow-lg mb-4 transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isConnecting ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <>
+                  <Users size={20} /> Create Room
+                </>
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-4">
+              <div className="flex-1 h-px bg-purple-700" />
+              <span className="text-purple-400 text-sm">OR</span>
+              <div className="flex-1 h-px bg-purple-700" />
+            </div>
+
+            {/* Join Room */}
+            <div className="mb-4">
+              <label className="text-purple-300 text-sm block mb-2">Room Code</label>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
+                placeholder="XXXX"
+                className="w-full px-4 py-3 bg-gray-800 border border-purple-500 rounded-xl text-white text-center text-2xl tracking-[0.3em] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400 uppercase"
+                maxLength={4}
+              />
+            </div>
+
+            <button
+              onClick={handleJoinRoom}
+              disabled={isConnecting || joinCode.length !== 4}
+              className="w-full bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 disabled:from-gray-500 disabled:to-gray-600 text-white text-lg font-bold py-3 rounded-xl shadow-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+            >
+              {isConnecting ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                'Join Room'
+              )}
+            </button>
+          </>
+        )}
 
         {/* Back Button */}
         <button
