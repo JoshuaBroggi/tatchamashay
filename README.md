@@ -32,13 +32,7 @@ A real-time multiplayer 3D adventure game built with React, Three.js, and PartyK
    npm install
    ```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your API keys if needed
-   ```
-
-4. **Start development servers**
+3. **Start development servers**
    ```bash
    # Terminal 1: Start the PartyKit multiplayer server
    npm run dev:party
@@ -48,7 +42,7 @@ A real-time multiplayer 3D adventure game built with React, Three.js, and PartyK
    ```
 
 5. **Open your browser**
-   Navigate to `http://localhost:5173` (or the port shown in terminal)
+   Navigate to `http://localhost:3000` (or the port shown in terminal)
 
 ## 🏗️ Project Structure
 
@@ -58,8 +52,10 @@ tatchamashay/
 │   ├── components/                # React components
 │   │   ├── CaveLevel.tsx         # Cave level component
 │   │   ├── CharacterSelect.tsx   # Character selection UI
+│   │   ├── Door.tsx              # Door component
 │   │   ├── ForestLevel.tsx       # Forest level component
 │   │   ├── LevelSelect.tsx       # Level selection UI
+│   │   ├── LoadingScreen.tsx     # Loading screen component
 │   │   ├── OverWorld.tsx         # Main overworld component
 │   │   └── RemotePlayer.tsx      # Remote player rendering
 │   ├── multiplayer/              # Multiplayer functionality
