@@ -1,12 +1,8 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+
 
 # Tatchamashay - Multiplayer 3D Adventure Game
 
 A real-time multiplayer 3D adventure game built with React, Three.js, and PartyKit. Players can explore different levels, collect gems, pop balloons, and battle in a shared world with up to 4 concurrent players.
-
-View your app in AI Studio: https://ai.studio/apps/drive/16utlZ-oewBuiyddXcsIuF1KXY670meVI
 
 ## 🎮 Game Features
 
