@@ -53,7 +53,6 @@ tatchamashay/
 │   │   ├── CaveLevel.tsx         # Cave level component
 │   │   ├── CharacterSelect.tsx   # Character selection UI
 │   │   ├── Door.tsx              # Door component
-│   │   ├── ForestLevel.tsx       # Forest level component
 │   │   ├── LevelSelect.tsx       # Level selection UI
 │   │   ├── LoadingScreen.tsx     # Loading screen component
 │   │   ├── OverWorld.tsx         # Main overworld component

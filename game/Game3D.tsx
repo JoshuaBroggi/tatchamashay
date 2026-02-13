@@ -2,21 +2,24 @@ import React, { useRef, useState, useMemo, useEffect, useCallback, Suspense, laz
 import { useFrame, useThree, ThreeElements } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { Controls, GameProps, Level, CharacterVariant, CHARACTER_CONFIGS } from './types';
 import { LoadingScreen } from './components/LoadingScreen';
 import { useMultiplayer, useMultiplayerEvents } from './multiplayer';
 import { RemotePlayer } from './components/RemotePlayer';
+import { PerfMonitor } from './world/PerfMonitor';
+import { getQualitySettings } from './world/quality';
 
 // Lazy load the world components
 const OverWorld = lazy(() => import('./components/OverWorld'));
 const CaveLevel = lazy(() => import('./components/CaveLevel'));
-const ForestLevel = lazy(() => import('./components/ForestLevel'));
+const DesertLevel = lazy(() => import('./components/DesertLevel'));
 
 // Import types from OverWorld for balloon and footprint systems
 import type { BalloonPhysics, Footprint } from './components/OverWorld';
 import { checkOverworldCollision, getPoopPileHeight, PLAYER_RADIUS } from './components/OverWorld';
 import { checkCaveCollision, MAIN_CAVERN_RADIUS } from './components/CaveLevel';
-import { checkForestCollision } from './components/ForestLevel';
+import { checkDesertCollision } from './components/DesertLevel';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -25,6 +28,248 @@ declare global {
       interface IntrinsicElements extends ThreeElements {}
     }
   }
+}
+
+// --- DESATURATION HELPER ---
+
+/** Apply a grayscale desaturation shader to a mesh's materials (preserves texture & PBR lighting). */
+function desaturateMesh(mesh: THREE.Mesh) {
+    const desat = (mat: THREE.Material): THREE.Material => {
+        const m = mat.clone();
+        if (m instanceof THREE.MeshStandardMaterial) {
+            m.onBeforeCompile = (shader) => {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <map_fragment>',
+                    `#include <map_fragment>
+                    float _dGray = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                    diffuseColor.rgb = vec3(_dGray);`
+                );
+            };
+            m.customProgramCacheKey = () => 'blackScorpion_desaturated';
+        }
+        return m;
+    };
+    if (mesh.material) {
+        if (Array.isArray(mesh.material)) {
+            mesh.material = mesh.material.map(desat);
+        } else {
+            mesh.material = desat(mesh.material);
+        }
+    }
+}
+
+// --- TARANTULA ANIMATION HELPERS ---
+
+/**
+ * Custom hook that manages tarantula locomotion animation.
+ * Call inside a component that has access to `controlsRef` and the cloned scene.
+ */
+function useTarantulaAnimation(
+    isTarantula: boolean,
+    animations: THREE.AnimationClip[],
+    clonedScene: THREE.Group | null,
+    controlsRef: React.MutableRefObject<Controls>
+) {
+    const actionsRef = useRef<Record<string, THREE.AnimationAction | null>>({});
+    const currentClipRef = useRef<THREE.AnimationAction | null>(null);
+    const prevMovingRef = useRef(false);
+
+    // Setup useAnimations – drei's hook needs a ref-like object; pass the cloned scene directly.
+    const mixer = useMemo(() => {
+        if (!isTarantula || !clonedScene || animations.length === 0) return null;
+        return new THREE.AnimationMixer(clonedScene);
+    }, [isTarantula, clonedScene, animations]);
+
+    // Build actions map
+    useEffect(() => {
+        if (!mixer || animations.length === 0) return;
+        const map: Record<string, THREE.AnimationAction> = {};
+        for (const clip of animations) {
+            map[clip.name] = mixer.clipAction(clip);
+        }
+        actionsRef.current = map;
+
+        // Start playing immediately in a paused-ready state
+        const action = Object.values(map).find(Boolean);
+        if (action) {
+            action.reset();
+            action.setLoop(THREE.LoopRepeat, Infinity);
+            action.clampWhenFinished = false;
+            action.timeScale = 1;
+            action.play();
+            action.paused = true; // paused until movement
+            currentClipRef.current = action;
+        }
+
+        return () => {
+            mixer.stopAllAction();
+            actionsRef.current = {};
+            currentClipRef.current = null;
+        };
+    }, [mixer, animations]);
+
+    // Per-frame update: drive mixer and toggle play/pause based on movement
+    const updateAnimation = useCallback((delta: number) => {
+        if (!mixer) return;
+        const { up, down, left, right } = controlsRef.current;
+        const isMoving = up || down || left || right;
+
+        if (isMoving && !prevMovingRef.current) {
+            // Resume animation
+            if (currentClipRef.current) {
+                currentClipRef.current.paused = false;
+            }
+        } else if (!isMoving && prevMovingRef.current) {
+            // Pause animation
+            if (currentClipRef.current) {
+                currentClipRef.current.paused = true;
+            }
+        }
+        prevMovingRef.current = isMoving;
+
+        mixer.update(delta);
+    }, [mixer, controlsRef]);
+
+    return updateAnimation;
+}
+
+// --- SCORPION ANIMATION HELPERS ---
+
+/**
+ * Custom hook that manages scorpion animation with proper Idle / Walk / Area Attack
+ * state transitions and crossfading.
+ */
+function useScorpionAnimation(
+    isScorpion: boolean,
+    animations: THREE.AnimationClip[],
+    clonedScene: THREE.Group | null,
+    controlsRef: React.MutableRefObject<Controls>
+) {
+    const actionsRef = useRef<Record<string, THREE.AnimationAction>>({});
+    const currentStateRef = useRef<'idle' | 'walk' | 'attack'>('idle');
+    const prevAttackRef = useRef(false);
+    const attackingRef = useRef(false);
+
+    const mixer = useMemo(() => {
+        if (!isScorpion || !clonedScene || animations.length === 0) return null;
+        return new THREE.AnimationMixer(clonedScene);
+    }, [isScorpion, clonedScene, animations]);
+
+    // Build actions map and start with Idle
+    useEffect(() => {
+        if (!mixer || animations.length === 0) return;
+        const map: Record<string, THREE.AnimationAction> = {};
+        for (const clip of animations) {
+            map[clip.name] = mixer.clipAction(clip);
+        }
+        actionsRef.current = map;
+
+        // Configure looping clips
+        for (const name of ['Idle', 'Walk']) {
+            const action = map[name];
+            if (action) {
+                action.setLoop(THREE.LoopRepeat, Infinity);
+                action.clampWhenFinished = false;
+            }
+        }
+
+        // Configure one-shot attack clip
+        const attackAction = map['Area Attack'];
+        if (attackAction) {
+            attackAction.setLoop(THREE.LoopOnce, 1);
+            attackAction.clampWhenFinished = true;
+        }
+
+        // Start with Idle playing
+        const idleAction = map['Idle'];
+        if (idleAction) {
+            idleAction.reset().play();
+            currentStateRef.current = 'idle';
+        }
+
+        // When the attack animation finishes, crossfade back to Idle or Walk
+        const onFinished = (e: { action: THREE.AnimationAction }) => {
+            if (e.action === map['Area Attack']) {
+                attackingRef.current = false;
+                const { up, down } = controlsRef.current;
+                const isMoving = up || down;
+                const targetName = isMoving ? 'Walk' : 'Idle';
+                const targetAction = map[targetName];
+                if (targetAction) {
+                    e.action.fadeOut(0.2);
+                    targetAction.reset().fadeIn(0.2).play();
+                    currentStateRef.current = isMoving ? 'walk' : 'idle';
+                }
+            }
+        };
+        mixer.addEventListener('finished', onFinished);
+
+        return () => {
+            mixer.removeEventListener('finished', onFinished);
+            mixer.stopAllAction();
+            actionsRef.current = {};
+            currentStateRef.current = 'idle';
+            attackingRef.current = false;
+        };
+    }, [mixer, animations, controlsRef]);
+
+    // Per-frame update: drive state transitions and mixer.
+    // Uses state-mismatch detection instead of edge-detection so the Walk
+    // transition is never missed even if useFrame fires before the useEffect
+    // that populates the actions map.
+    const updateAnimation = useCallback((delta: number) => {
+        if (!mixer) return;
+        const actions = actionsRef.current;
+        const { up, down, attack } = controlsRef.current;
+        const isMoving = up || down;
+
+        // Detect attack rising edge (key just pressed)
+        const attackJustPressed = attack && !prevAttackRef.current;
+        prevAttackRef.current = attack;
+
+        // Handle attack trigger
+        if (attackJustPressed) {
+            attackingRef.current = true;
+            const attackAction = actions['Area Attack'];
+            if (attackAction) {
+                // Fade out whatever is currently playing
+                const currentName = currentStateRef.current === 'walk' ? 'Walk' : 'Idle';
+                const currentAction = actions[currentName];
+                if (currentAction) currentAction.fadeOut(0.15);
+                attackAction.stop().reset().fadeIn(0.15).play();
+                currentStateRef.current = 'attack';
+            }
+        }
+
+        // Handle Walk / Idle transitions (only when not in the middle of an attack).
+        // Compare desired state against current state so we never miss a transition.
+        if (!attackingRef.current) {
+            const desiredState = isMoving ? 'walk' : 'idle';
+            if (desiredState !== currentStateRef.current) {
+                if (desiredState === 'walk') {
+                    const idleAction = actions['Idle'];
+                    const walkAction = actions['Walk'];
+                    if (idleAction && walkAction) {
+                        idleAction.fadeOut(0.2);
+                        walkAction.reset().fadeIn(0.2).play();
+                        currentStateRef.current = 'walk';
+                    }
+                } else {
+                    const walkAction = actions['Walk'];
+                    const idleAction = actions['Idle'];
+                    if (walkAction && idleAction) {
+                        walkAction.fadeOut(0.2);
+                        idleAction.reset().fadeIn(0.2).play();
+                        currentStateRef.current = 'idle';
+                    }
+                }
+            }
+        }
+
+        mixer.update(delta);
+    }, [mixer, controlsRef]);
+
+    return updateAnimation;
 }
 
 // --- AUDIO SYSTEM (Singleton AudioContext for performance) ---
@@ -148,11 +393,23 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     
     const isFluffy = characterVariant === 'fluffy';
     const isLobster = characterVariant === 'lobster';
+    const isTarantula = characterVariant === 'tarantula';
+    const isScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
+    const specialModelPath = useMemo(() => {
+        if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
+        if (characterVariant === 'warDino') return '/models/war_dinosaur_-_rigged.glb';
+        if (characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
+        if (characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
+        if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
+        if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        return null;
+    }, [characterVariant]);
 
     // Load all character models
     const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
     const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
     const { scene: lobsterScene } = useGLTF('/models/super lobster.glb');
+    const { scene: specialScene, animations: specialAnimations } = useGLTF(specialModelPath ?? '/models/deathvader-optimized.glb');
     
     // Get cloak color from character config
     const cloakColor = useMemo(() => {
@@ -162,7 +419,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 
     // Clone DeathVader scene with cloak color
     const clonedDeathvaderScene = useMemo(() => {
-        if (isFluffy || isLobster) return null;
+        if (isFluffy || isLobster || specialModelPath) return null;
         
         const clone = deathvaderScene.clone();
         const cloakColorObj = new THREE.Color(cloakColor);
@@ -202,7 +459,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             }
         });
         return clone;
-    }, [deathvaderScene, cloakColor, isFluffy, isLobster]);
+    }, [deathvaderScene, cloakColor, isFluffy, isLobster, specialModelPath]);
 
     // Clone Fluffy unicorn scene
     const clonedFluffyScene = useMemo(() => {
@@ -264,55 +521,132 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         return clone;
     }, [lobsterScene, isLobster]);
 
+    // Use SkeletonUtils.clone to preserve skin/bone bindings for rigged models
+    const clonedSpecialScene = useMemo(() => {
+        if (!specialModelPath) return null;
+        const clone = skeletonClone(specialScene) as THREE.Group;
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (characterVariant === 'blackScorpion') desaturateMesh(mesh);
+            }
+        });
+        return clone;
+    }, [specialScene, specialModelPath, characterVariant]);
+
+    const specialTransform = useMemo(() => {
+        if (!clonedSpecialScene) return null;
+        // Force-update world matrices so SkinnedMesh bone transforms are correct
+        // before computing bounding box (stale after skeletonClone).
+        clonedSpecialScene.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(clonedSpecialScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+        let scale: number;
+        if (characterVariant === 'trex') {
+            // Normalize T-Rex Y-height to match Fluffy's rendered height (0.774 * 7.5)
+            const fluffyGameHeight = 0.774 * 7.5;
+            scale = fluffyGameHeight / size.y;
+        } else {
+            scale = 7.5 / maxDimension;
+        }
+        const x = -center.x * scale;
+        const z = -center.z * scale;
+        // Per-character facing correction
+        let rotationY = -Math.PI / 2;
+        if (characterVariant === 'legoMosasaurus') rotationY = 0;
+        if (characterVariant === 'tarantula') rotationY = 0;
+        if (isScorpion) rotationY = 0;
+        // Vertical offset: scorpion's Idle animation lifts the mesh above
+        // the rest-pose bounding box. Empirically tuned so feet touch ground.
+        let yOffset = -box.min.y * scale;
+        if (isScorpion) yOffset -= 3.0;
+        return {
+            scale,
+            x,
+            y: yOffset,
+            z,
+            rotationY
+        };
+    }, [clonedSpecialScene, characterVariant]);
+
+    // Ref for procedural swim animation on Lego Mosasaurus
+    const swimRef = useRef<THREE.Group>(null);
+
+    // Tarantula locomotion animation
+    const updateTarantulaAnim = useTarantulaAnimation(
+        isTarantula, specialAnimations, clonedSpecialScene, controlsRef
+    );
+
+    // Scorpion multi-state animation (Idle / Walk / Area Attack)
+    const updateScorpionAnim = useScorpionAnimation(
+        isScorpion, specialAnimations, clonedSpecialScene, controlsRef
+    );
+
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
     const ATTACK_DURATION = 0.25;
     const FOOTPRINT_INTERVAL = 0.25;
     const POOP_TOP_THRESHOLD = 6.0;
 
+    // Reusable vectors to avoid per-frame allocations
+    const _forward = useRef(new THREE.Vector3());
+    const _camOffset = useRef(new THREE.Vector3());
+    const _targetCamPos = useRef(new THREE.Vector3());
+    const _lookTarget = useRef(new THREE.Vector3());
+
     useFrame((state, delta) => {
         if (!group.current) return;
+
+        // Drive creature animation mixers each frame
+        updateTarantulaAnim(delta);
+        updateScorpionAnim(delta);
 
         const { up, down, left, right, attack } = controlsRef.current;
         
         if (left) group.current.rotation.y += ROTATION_SPEED * delta;
         if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
 
-        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), group.current.rotation.y);
+        const forward = _forward.current.set(0, 0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, group.current.rotation.y);
 
         const speed = SPEED * delta;
-        const currentPos = group.current.position.clone();
+        const curX = group.current.position.x;
+        const curZ = group.current.position.z;
         const isMoving = up || down;
         
         if (up) {
-            const movement = forward.clone().multiplyScalar(speed);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
+            const newX = curX + forward.x * speed;
+            const newZ = curZ + forward.z * speed;
 
             if (!checkOverworldCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkOverworldCollision(newX, currentPos.z)) {
+                if (!checkOverworldCollision(newX, curZ)) {
                     group.current.position.x = newX;
-                } else if (!checkOverworldCollision(currentPos.x, newZ)) {
+                } else if (!checkOverworldCollision(curX, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
         }
         
         if (down) {
-            const movement = forward.clone().multiplyScalar(-speed * 0.6);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
+            const backSpeed = -speed * 0.6;
+            const newX = curX + forward.x * backSpeed;
+            const newZ = curZ + forward.z * backSpeed;
 
             if (!checkOverworldCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkOverworldCollision(newX, currentPos.z)) {
+                if (!checkOverworldCollision(newX, curZ)) {
                     group.current.position.x = newX;
-                } else if (!checkOverworldCollision(currentPos.x, newZ)) {
+                } else if (!checkOverworldCollision(curX, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
@@ -332,9 +666,8 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                 lastFootprintTime.current = currentTime;
                 
                 const sideOffset = (footprintSide.current === 0 ? -0.3 : 0.3);
-                const perpendicular = new THREE.Vector3(-forward.z, 0, forward.x);
-                const footX = group.current.position.x + perpendicular.x * sideOffset;
-                const footZ = group.current.position.z + perpendicular.z * sideOffset;
+                const footX = group.current.position.x + (-forward.z) * sideOffset;
+                const footZ = group.current.position.z + forward.x * sideOffset;
                 
                 onFootprint(footX, footZ, group.current.rotation.y);
                 footprintSide.current = 1 - footprintSide.current;
@@ -343,7 +676,6 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 
         positionRef.current.copy(group.current.position);
 
-        // Broadcast position to multiplayer (throttled in the context)
         onPositionUpdate?.(
             group.current.position.x,
             group.current.position.y,
@@ -351,29 +683,38 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             group.current.rotation.y
         );
 
+        // Procedural swim sway for Lego Mosasaurus
+        if (characterVariant === 'legoMosasaurus' && swimRef.current) {
+            if (isMoving) {
+                const t = state.clock.elapsedTime;
+                swimRef.current.rotation.z = Math.sin(t * 4) * 0.15;
+                swimRef.current.rotation.x = Math.sin(t * 3) * 0.08;
+            } else {
+                swimRef.current.rotation.z *= 0.9;
+                swimRef.current.rotation.x *= 0.9;
+            }
+        }
+
         const dist = 12;
         const baseHeight = 5.5;
         
-        // Apply camera orbit offset to the camera position
-        // Rotate the camera offset around the player based on mouse drag
         const orbitAngle = group.current.rotation.y + cameraOrbitRef.current;
         const verticalAngle = cameraVerticalRef.current;
         
-        // Calculate camera position with orbit
         const height = baseHeight + Math.sin(verticalAngle) * 8;
         const horizontalDist = dist * Math.cos(verticalAngle * 0.5);
         
-        const camOffset = new THREE.Vector3(
+        _camOffset.current.set(
             -Math.sin(orbitAngle) * horizontalDist,
             height,
             -Math.cos(orbitAngle) * horizontalDist
         );
-        const targetCamPos = group.current.position.clone().add(camOffset);
+        _targetCamPos.current.copy(group.current.position).add(_camOffset.current);
         
-        camera.position.lerp(targetCamPos, 0.1);
+        camera.position.lerp(_targetCamPos.current, 0.1);
         
-        const lookTarget = group.current.position.clone().add(new THREE.Vector3(0, 2, 0));
-        camera.lookAt(lookTarget);
+        _lookTarget.current.set(group.current.position.x, group.current.position.y + 2, group.current.position.z);
+        camera.lookAt(_lookTarget.current);
 
         if (attack && !isAttacking.current) {
             isAttacking.current = true;
@@ -400,7 +741,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                     fluffyHeadRef.current.rotation.x = 0;
                     fluffyHeadRef.current.rotation.z = 0;
                 }
-            } else if (!isFluffy && swordRef.current) {
+            } else if (!isFluffy && !specialModelPath && swordRef.current) {
                 // DeathVader: Sword swing
                 const swingAngle = Math.sin(progress * Math.PI) * 2;
                 swordRef.current.rotation.x = swingAngle;
@@ -452,6 +793,21 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
                     distance={8}
                     decay={2}
                 />
+            </group>
+        );
+    }
+
+    if (specialModelPath && clonedSpecialScene && specialTransform) {
+        return (
+            <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+                <group ref={swimRef}>
+                    <primitive
+                        object={clonedSpecialScene}
+                        scale={specialTransform.scale}
+                        rotation={[0, specialTransform.rotationY, 0]}
+                        position={[specialTransform.x, specialTransform.y, specialTransform.z]}
+                    />
+                </group>
             </group>
         );
     }
@@ -510,29 +866,33 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
 useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
 useGLTF.preload('/models/super lobster.glb');
+useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
+useGLTF.preload('/models/war_dinosaur_-_rigged.glb');
+useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
+useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
+useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
+useGLTF.preload('/models/scorpion.glb');
 
-// --- FOREST PLAYER COMPONENT ---
-const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'black', onPositionUpdate }: {
+// --- DESERT PLAYER COMPONENT (uses desert collision) ---
+const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'black', onPositionUpdate }: {
     controlsRef: React.MutableRefObject<Controls>,
     onAttack: () => void,
     positionRef: React.MutableRefObject<THREE.Vector3>,
     characterVariant?: CharacterVariant,
     onPositionUpdate?: (x: number, y: number, z: number, rotation: number) => void
 }) => {
-    // Reuse logic from CavePlayer but use checkForestCollision
     const group = useRef<THREE.Group>(null);
     const swordRef = useRef<THREE.Group>(null);
     const fluffyHeadRef = useRef<THREE.Group>(null);
     const isAttacking = useRef(false);
     const attackTime = useRef(0);
     const { camera, gl } = useThree();
-    
-    // Camera orbit controls
+
     const cameraOrbitRef = useRef(0);
     const cameraVerticalRef = useRef(0);
     const isDraggingRef = useRef(false);
     const lastMousePos = useRef({ x: 0, y: 0 });
-    
+
     useEffect(() => {
         const canvas = gl.domElement;
         const handleMouseDown = (e: MouseEvent) => {
@@ -552,7 +912,7 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
         };
         const handleMouseUp = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
         const handleMouseLeave = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
-        
+
         canvas.style.cursor = 'grab';
         canvas.addEventListener('mousedown', handleMouseDown);
         canvas.addEventListener('mousemove', handleMouseMove);
@@ -566,21 +926,29 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
             canvas.style.cursor = 'default';
         };
     }, [gl]);
-    
+
     const isFluffy = characterVariant === 'fluffy';
     const isLobster = characterVariant === 'lobster';
+    const dIsTarantula = characterVariant === 'tarantula';
+    const dIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
+    const dSpecialModelPath = useMemo(() => {
+        if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
+        if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        return null;
+    }, [characterVariant]);
 
     const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
     const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
     const { scene: lobsterScene } = useGLTF('/models/super lobster.glb');
-    
+    const { scene: dSpecialScene, animations: dSpecialAnimations } = useGLTF(dSpecialModelPath ?? '/models/deathvader-optimized.glb');
+
     const cloakColor = useMemo(() => {
         const config = CHARACTER_CONFIGS.find(c => c.id === characterVariant);
         return config?.cloakColor || '#1a1a1a';
     }, [characterVariant]);
 
     const clonedDeathvaderScene = useMemo(() => {
-        if (isFluffy || isLobster) return null;
+        if (isFluffy || isLobster || dSpecialModelPath) return null;
         const clone = deathvaderScene.clone();
         const cloakColorObj = new THREE.Color(cloakColor);
         clone.traverse((child) => {
@@ -590,7 +958,7 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
                 mesh.receiveShadow = true;
                 const applyColorToMaterial = (mat: THREE.Material): THREE.Material => {
                     const clonedMat = mat.clone();
-                    if (clonedMat instanceof THREE.MeshStandardMaterial || 
+                    if (clonedMat instanceof THREE.MeshStandardMaterial ||
                         clonedMat instanceof THREE.MeshBasicMaterial ||
                         clonedMat instanceof THREE.MeshPhongMaterial ||
                         clonedMat instanceof THREE.MeshLambertMaterial) {
@@ -607,7 +975,7 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
             }
         });
         return clone;
-    }, [deathvaderScene, cloakColor, isFluffy, isLobster]);
+    }, [deathvaderScene, cloakColor, isFluffy, isLobster, dSpecialModelPath]);
 
     const clonedFluffyScene = useMemo(() => {
         if (!isFluffy) return null;
@@ -647,46 +1015,95 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
         return clone;
     }, [lobsterScene, isLobster]);
 
+    const dClonedSpecialScene = useMemo(() => {
+        if (!dSpecialModelPath) return null;
+        const clone = skeletonClone(dSpecialScene) as THREE.Group;
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (characterVariant === 'blackScorpion') desaturateMesh(mesh);
+            }
+        });
+        return clone;
+    }, [dSpecialScene, dSpecialModelPath, characterVariant]);
+
+    const dSpecialTransform = useMemo(() => {
+        if (!dClonedSpecialScene) return null;
+        const box = new THREE.Box3().setFromObject(dClonedSpecialScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+        const scale = 7.5 / maxDimension;
+        let yOffset = -box.min.y * scale;
+        if (dIsScorpion) yOffset -= 3.0;
+        return {
+            scale,
+            x: -center.x * scale,
+            y: yOffset,
+            z: -center.z * scale,
+            rotationY: (dIsTarantula || dIsScorpion) ? 0 : -Math.PI / 2
+        };
+    }, [dClonedSpecialScene, dIsTarantula, dIsScorpion]);
+
+    // Tarantula locomotion animation for desert
+    const updateDesertTarantulaAnim = useTarantulaAnimation(
+        dIsTarantula, dSpecialAnimations, dClonedSpecialScene, controlsRef
+    );
+
+    // Scorpion multi-state animation for desert
+    const updateDesertScorpionAnim = useScorpionAnimation(
+        dIsScorpion, dSpecialAnimations, dClonedSpecialScene, controlsRef
+    );
+
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
     const ATTACK_DURATION = 0.25;
 
+    const _dForward = useRef(new THREE.Vector3());
+    const _dCamOffset = useRef(new THREE.Vector3());
+    const _dTargetCam = useRef(new THREE.Vector3());
+    const _dLookTarget = useRef(new THREE.Vector3());
+
     useFrame((state, delta) => {
         if (!group.current) return;
+        updateDesertTarantulaAnim(delta);
+        updateDesertScorpionAnim(delta);
         const { up, down, left, right, attack } = controlsRef.current;
-        
+
         if (left) group.current.rotation.y += ROTATION_SPEED * delta;
         if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
 
-        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), group.current.rotation.y);
+        const forward = _dForward.current.set(0, 0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, group.current.rotation.y);
         const speed = SPEED * delta;
-        const currentPos = group.current.position.clone();
-        
+        const curX = group.current.position.x;
+        const curZ = group.current.position.z;
+
         if (up) {
-            const movement = forward.clone().multiplyScalar(speed);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
-            // FOREST COLLISION CHECK
-            if (!checkForestCollision(newX, newZ)) {
+            const newX = curX + forward.x * speed;
+            const newZ = curZ + forward.z * speed;
+            if (!checkDesertCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkForestCollision(newX, currentPos.z)) group.current.position.x = newX;
-                else if (!checkForestCollision(currentPos.x, newZ)) group.current.position.z = newZ;
+                if (!checkDesertCollision(newX, curZ)) group.current.position.x = newX;
+                else if (!checkDesertCollision(curX, newZ)) group.current.position.z = newZ;
             }
         }
-        
+
         if (down) {
-            const movement = forward.clone().multiplyScalar(-speed * 0.6);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
-            // FOREST COLLISION CHECK
-            if (!checkForestCollision(newX, newZ)) {
+            const backSpeed = -speed * 0.6;
+            const newX = curX + forward.x * backSpeed;
+            const newZ = curZ + forward.z * backSpeed;
+            if (!checkDesertCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkForestCollision(newX, currentPos.z)) group.current.position.x = newX;
-                else if (!checkForestCollision(currentPos.x, newZ)) group.current.position.z = newZ;
+                if (!checkDesertCollision(newX, curZ)) group.current.position.x = newX;
+                else if (!checkDesertCollision(curX, newZ)) group.current.position.z = newZ;
             }
         }
 
@@ -694,18 +1111,17 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
         positionRef.current.copy(group.current.position);
         onPositionUpdate?.(group.current.position.x, group.current.position.y, group.current.position.z, group.current.rotation.y);
 
-        // Camera follow
         const dist = 12;
         const baseHeight = 5.5;
         const orbitAngle = group.current.rotation.y + cameraOrbitRef.current;
         const verticalAngle = cameraVerticalRef.current;
         const height = baseHeight + Math.sin(verticalAngle) * 8;
         const horizontalDist = dist * Math.cos(verticalAngle * 0.5);
-        const camOffset = new THREE.Vector3(-Math.sin(orbitAngle) * horizontalDist, height, -Math.cos(orbitAngle) * horizontalDist);
-        const targetCamPos = group.current.position.clone().add(camOffset);
-        camera.position.lerp(targetCamPos, 0.1);
-        const lookTarget = group.current.position.clone().add(new THREE.Vector3(0, 2, 0));
-        camera.lookAt(lookTarget);
+        _dCamOffset.current.set(-Math.sin(orbitAngle) * horizontalDist, height, -Math.cos(orbitAngle) * horizontalDist);
+        _dTargetCam.current.copy(group.current.position).add(_dCamOffset.current);
+        camera.position.lerp(_dTargetCam.current, 0.1);
+        _dLookTarget.current.set(group.current.position.x, group.current.position.y + 2, group.current.position.z);
+        camera.lookAt(_dLookTarget.current);
 
         if (attack && !isAttacking.current) {
             isAttacking.current = true;
@@ -735,6 +1151,18 @@ const ForestPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
 
     if (isFluffy) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedFluffyScene && <primitive object={clonedFluffyScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}</group>;
     if (isLobster) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedLobsterScene && <primitive object={clonedLobsterScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}<pointLight position={[0, 1.5, 0]} color="#ff6b35" intensity={3} distance={15} decay={2} /></group>;
+    if (dSpecialModelPath && dClonedSpecialScene && dSpecialTransform) {
+        return (
+            <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+                <primitive
+                    object={dClonedSpecialScene}
+                    scale={dSpecialTransform.scale}
+                    rotation={[0, dSpecialTransform.rotationY, 0]}
+                    position={[dSpecialTransform.x, dSpecialTransform.y, dSpecialTransform.z]}
+                />
+            </group>
+        );
+    }
     return (
         <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
             {clonedDeathvaderScene && <primitive object={clonedDeathvaderScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
@@ -823,10 +1251,18 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
     
     const isFluffy = characterVariant === 'fluffy';
     const isLobster = characterVariant === 'lobster';
+    const cIsTarantula = characterVariant === 'tarantula';
+    const cIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
+    const cSpecialModelPath = useMemo(() => {
+        if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
+        if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        return null;
+    }, [characterVariant]);
 
     const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
     const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
     const { scene: lobsterScene } = useGLTF('/models/super lobster.glb');
+    const { scene: cSpecialScene, animations: cSpecialAnimations } = useGLTF(cSpecialModelPath ?? '/models/deathvader-optimized.glb');
     
     const cloakColor = useMemo(() => {
         const config = CHARACTER_CONFIGS.find(c => c.id === characterVariant);
@@ -834,7 +1270,7 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
     }, [characterVariant]);
 
     const clonedDeathvaderScene = useMemo(() => {
-        if (isFluffy || isLobster) return null;
+        if (isFluffy || isLobster || cSpecialModelPath) return null;
         
         const clone = deathvaderScene.clone();
         const cloakColorObj = new THREE.Color(cloakColor);
@@ -873,7 +1309,7 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
             }
         });
         return clone;
-    }, [deathvaderScene, cloakColor, isFluffy, isLobster]);
+    }, [deathvaderScene, cloakColor, isFluffy, isLobster, cSpecialModelPath]);
 
     const clonedFluffyScene = useMemo(() => {
         if (!isFluffy) return null;
@@ -934,59 +1370,109 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
         return clone;
     }, [lobsterScene, isLobster]);
 
+    const cClonedSpecialScene = useMemo(() => {
+        if (!cSpecialModelPath) return null;
+        const clone = skeletonClone(cSpecialScene) as THREE.Group;
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (characterVariant === 'blackScorpion') desaturateMesh(mesh);
+            }
+        });
+        return clone;
+    }, [cSpecialScene, cSpecialModelPath, characterVariant]);
+
+    const cSpecialTransform = useMemo(() => {
+        if (!cClonedSpecialScene) return null;
+        const box = new THREE.Box3().setFromObject(cClonedSpecialScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+        const scale = 7.5 / maxDimension;
+        let yOffset = -box.min.y * scale;
+        if (cIsScorpion) yOffset -= 3.0;
+        return {
+            scale,
+            x: -center.x * scale,
+            y: yOffset,
+            z: -center.z * scale,
+            rotationY: (cIsTarantula || cIsScorpion) ? 0 : -Math.PI / 2
+        };
+    }, [cClonedSpecialScene, cIsTarantula, cIsScorpion]);
+
+    // Tarantula locomotion animation for cave
+    const updateCaveTarantulaAnim = useTarantulaAnimation(
+        cIsTarantula, cSpecialAnimations, cClonedSpecialScene, controlsRef
+    );
+
+    // Scorpion multi-state animation for cave
+    const updateCaveScorpionAnim = useScorpionAnimation(
+        cIsScorpion, cSpecialAnimations, cClonedSpecialScene, controlsRef
+    );
+
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
     const ATTACK_DURATION = 0.25;
 
+    // Reusable vectors for CavePlayer
+    const _cForward = useRef(new THREE.Vector3());
+    const _cCamOffset = useRef(new THREE.Vector3());
+    const _cTargetCam = useRef(new THREE.Vector3());
+    const _cLookTarget = useRef(new THREE.Vector3());
+
     useFrame((state, delta) => {
         if (!group.current) return;
+        updateCaveTarantulaAnim(delta);
+        updateCaveScorpionAnim(delta);
 
         const { up, down, left, right, attack } = controlsRef.current;
         
         if (left) group.current.rotation.y += ROTATION_SPEED * delta;
         if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
 
-        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), group.current.rotation.y);
+        const forward = _cForward.current.set(0, 0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, group.current.rotation.y);
 
         const speed = SPEED * delta;
-        const currentPos = group.current.position.clone();
+        const curX = group.current.position.x;
+        const curZ = group.current.position.z;
         
         if (up) {
-            const movement = forward.clone().multiplyScalar(speed);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
+            const newX = curX + forward.x * speed;
+            const newZ = curZ + forward.z * speed;
 
-            // Use cave collision instead of overworld
             if (!checkCaveCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkCaveCollision(newX, currentPos.z)) {
+                if (!checkCaveCollision(newX, curZ)) {
                     group.current.position.x = newX;
-                } else if (!checkCaveCollision(currentPos.x, newZ)) {
+                } else if (!checkCaveCollision(curX, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
         }
         
         if (down) {
-            const movement = forward.clone().multiplyScalar(-speed * 0.6);
-            const newX = currentPos.x + movement.x;
-            const newZ = currentPos.z + movement.z;
+            const backSpeed = -speed * 0.6;
+            const newX = curX + forward.x * backSpeed;
+            const newZ = curZ + forward.z * backSpeed;
 
             if (!checkCaveCollision(newX, newZ)) {
                 group.current.position.x = newX;
                 group.current.position.z = newZ;
             } else {
-                if (!checkCaveCollision(newX, currentPos.z)) {
+                if (!checkCaveCollision(newX, curZ)) {
                     group.current.position.x = newX;
-                } else if (!checkCaveCollision(currentPos.x, newZ)) {
+                } else if (!checkCaveCollision(curX, newZ)) {
                     group.current.position.z = newZ;
                 }
             }
         }
 
-        // Cave has flat floor
         group.current.position.y = 0;
 
         positionRef.current.copy(group.current.position);
@@ -1001,26 +1487,23 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
         const dist = 12;
         const baseHeight = 5.5;
         
-        // Apply camera orbit offset to the camera position
-        // Rotate the camera offset around the player based on mouse drag
         const orbitAngle = group.current.rotation.y + cameraOrbitRef.current;
         const verticalAngle = cameraVerticalRef.current;
         
-        // Calculate camera position with orbit
         const height = baseHeight + Math.sin(verticalAngle) * 8;
         const horizontalDist = dist * Math.cos(verticalAngle * 0.5);
         
-        const camOffset = new THREE.Vector3(
+        _cCamOffset.current.set(
             -Math.sin(orbitAngle) * horizontalDist,
             height,
             -Math.cos(orbitAngle) * horizontalDist
         );
-        const targetCamPos = group.current.position.clone().add(camOffset);
+        _cTargetCam.current.copy(group.current.position).add(_cCamOffset.current);
         
-        camera.position.lerp(targetCamPos, 0.1);
+        camera.position.lerp(_cTargetCam.current, 0.1);
         
-        const lookTarget = group.current.position.clone().add(new THREE.Vector3(0, 2, 0));
-        camera.lookAt(lookTarget);
+        _cLookTarget.current.set(group.current.position.x, group.current.position.y + 2, group.current.position.z);
+        camera.lookAt(_cLookTarget.current);
 
         if (attack && !isAttacking.current) {
             isAttacking.current = true;
@@ -1142,7 +1625,7 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
                         <meshStandardMaterial color="#2a2a2a" metalness={0.8} roughness={0.3} />
                     </mesh>
                     
-                    {/* Main flashlight beam - powerful spotlight pointing forward (10+ body lengths ahead) */}
+                    {/* Main flashlight beam - powerful spotlight pointing forward (no shadow for perf) */}
                     <spotLight
                         position={[0, 1.0, 0]}
                         target-position={[0, 80, 0]}
@@ -1152,7 +1635,7 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
                         penumbra={0.2}
                         distance={80}
                         decay={1.2}
-                        castShadow
+                        castShadow={false}
                     />
                     
                     {/* Secondary fill light for immediate area */}
@@ -1164,6 +1647,19 @@ const CavePlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'bl
                         decay={2}
                     />
                 </group>
+            </group>
+        );
+    }
+
+    if (cSpecialModelPath && cClonedSpecialScene && cSpecialTransform) {
+        return (
+            <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+                <primitive
+                    object={cClonedSpecialScene}
+                    scale={cSpecialTransform.scale}
+                    rotation={[0, cSpecialTransform.rotationY, 0]}
+                    position={[cSpecialTransform.x, cSpecialTransform.y, cSpecialTransform.z]}
+                />
             </group>
         );
     }
@@ -1337,6 +1833,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     const [particles, setParticles] = useState<{ id: string, pos: THREE.Vector3, color: string }[]>([]);
     const [footprints, setFootprints] = useState<Footprint[]>([]);
     const hasClimbedPoopRef = useRef(false);
+    const attackTriggerRef = useRef(0);
 
     // Set initial player position based on level
     const playerPos = useRef(new THREE.Vector3(
@@ -1359,29 +1856,35 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                 playerPos.current.set(0, 0, 8);
             }
 
-            // Initialize balloons for overworld
-            const newBalloons: BalloonPhysics[] = [];
-            const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            for(let i=0; i<750; i++) {
-                let x = (Math.random()-0.5)*120;
-                let z = (Math.random()-0.5)*120;
-                if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
+            // Initialize balloons for overworld only (quality-driven count)
+            if (selectedLevel === 'overworld') {
+                const quality = getQualitySettings();
+                const newBalloons: BalloonPhysics[] = [];
+                const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+                const balloonCount = Math.min(750, Math.floor(750 * quality.densityMultiplier));
+                for(let i=0; i<balloonCount; i++) {
+                    let x = (Math.random()-0.5)*120;
+                    let z = (Math.random()-0.5)*120;
+                    if (Math.abs(x) < 12 && Math.abs(z) < 12) x += 20;
 
-                const baseY = 1.5 + Math.random() * 2;
-                newBalloons.push({
-                    id: Math.random().toString(),
-                    x,
-                    y: baseY,
-                    z,
-                    vx: 0,
-                    vy: 0,
-                    vz: 0,
-                    baseY,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    offset: Math.random() * 100
-                });
+                    const baseY = 1.5 + Math.random() * 2;
+                    newBalloons.push({
+                        id: Math.random().toString(),
+                        x,
+                        y: baseY,
+                        z,
+                        vx: 0,
+                        vy: 0,
+                        vz: 0,
+                        baseY,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        offset: Math.random() * 100
+                    });
+                }
+                balloonsRef.current = newBalloons;
+            } else {
+                balloonsRef.current = [];
             }
-            balloonsRef.current = newBalloons;
         }
     }, [isPlaying, selectedLevel]);
 
@@ -1412,6 +1915,9 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
     };
 
     const handleAttack = useCallback(() => {
+        // Increment attack trigger for level-specific hit detection
+        attackTriggerRef.current++;
+
         // Broadcast attack to other players
         if (isConnected) {
             broadcastAttack(true);
@@ -1419,60 +1925,63 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
             setTimeout(() => broadcastAttack(false), 250);
         }
         
-        const swordPos = playerPos.current.clone();
-        swordPos.y += 1;
-        
-        const RANGE = 4.0;
-        let hits = 0;
-        const poppedIds: string[] = [];
+        // Balloon popping only applies to overworld
+        if (selectedLevel === 'overworld') {
+            const swordPos = playerPos.current.clone();
+            swordPos.y += 1;
+            
+            const RANGE = 4.0;
+            let hits = 0;
+            const poppedIds: string[] = [];
 
-        const surviving: BalloonPhysics[] = [];
-        for (const b of balloonsRef.current) {
-            const bPos = new THREE.Vector3(b.x, b.y, b.z);
-            if (bPos.distanceTo(swordPos) < RANGE) {
-                playSound('pop');
-                handlePopEffect(bPos, b.color);
-                hits++;
-                poppedIds.push(b.id);
-            } else {
-                surviving.push(b);
+            const surviving: BalloonPhysics[] = [];
+            for (const b of balloonsRef.current) {
+                const bPos = new THREE.Vector3(b.x, b.y, b.z);
+                if (bPos.distanceTo(swordPos) < RANGE) {
+                    playSound('pop');
+                    handlePopEffect(bPos, b.color);
+                    hits++;
+                    poppedIds.push(b.id);
+                } else {
+                    surviving.push(b);
+                }
+            }
+
+            // Broadcast balloon pops to other players
+            if (isConnected && poppedIds.length > 0) {
+                broadcastBalloonPop(poppedIds);
+            }
+
+            if (surviving.length < 700) {
+                const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+                for(let k=0; k<3; k++) {
+                    let x = (Math.random()-0.5)*120;
+                    let z = (Math.random()-0.5)*120;
+                    if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
+                    
+                    const baseY = 1.5 + Math.random() * 2;
+                    surviving.push({
+                        id: Math.random().toString(),
+                        x,
+                        y: baseY,
+                        z,
+                        vx: 0,
+                        vy: 0,
+                        vz: 0,
+                        baseY,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        offset: Math.random() * 100
+                    });
+                }
+            }
+
+            balloonsRef.current = surviving;
+
+            if (hits > 0) {
+                onScoreUpdate(prev => prev + hits);
             }
         }
-
-        // Broadcast balloon pops to other players
-        if (isConnected && poppedIds.length > 0) {
-            broadcastBalloonPop(poppedIds);
-        }
-
-        if (surviving.length < 700) {
-            const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-            for(let k=0; k<3; k++) {
-                let x = (Math.random()-0.5)*120;
-                let z = (Math.random()-0.5)*120;
-                if (Math.abs(x) < 15 && Math.abs(z) < 15) x += 20;
-                
-                const baseY = 1.5 + Math.random() * 2;
-                surviving.push({
-                    id: Math.random().toString(),
-                    x,
-                    y: baseY,
-                    z,
-                    vx: 0,
-                    vy: 0,
-                    vz: 0,
-                    baseY,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    offset: Math.random() * 100
-                });
-            }
-        }
-
-        balloonsRef.current = surviving;
-
-        if (hits > 0) {
-            onScoreUpdate(prev => prev + hits);
-        }
-    }, [isConnected, broadcastAttack, broadcastBalloonPop, onScoreUpdate]);
+    }, [isConnected, broadcastAttack, broadcastBalloonPop, onScoreUpdate, selectedLevel]);
 
     // Show loading screen during transitions
     if (loadingState === 'loading') {
@@ -1488,15 +1997,19 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
         [remotePlayerArray]
     );
 
+    // Dev perf monitor (set to true for debugging, false for production)
+    const showPerfMonitor = false;
+
     // Render level based on selectedLevel prop
-    if (selectedLevel === 'forest') {
+    if (selectedLevel === 'desert') {
         return (
             <Suspense fallback={<LoadingScreen />}>
-                <ForestLevel
+                <DesertLevel
                     playerPosRef={playerPos}
                     onScoreUpdate={onScoreUpdate}
+                    attackTriggerRef={attackTriggerRef}
                 >
-                    <ForestPlayer
+                    <DesertPlayer
                         controlsRef={controlsRef}
                         onAttack={handleAttack}
                         positionRef={playerPos}
@@ -1510,7 +2023,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     ))}
 
                     <Particles particles={particles} />
-                </ForestLevel>
+                </DesertLevel>
             </Suspense>
         );
     }
@@ -1520,7 +2033,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
             <Suspense fallback={<LoadingScreen />}>
                 <CaveLevel
                     playerPosRef={playerPos}
-                    onExitCave={() => {}} // No-op - cave is a standalone level
+                    onExitCave={() => {}}
                     onScoreUpdate={onScoreUpdate}
                 >
                     <CavePlayer
@@ -1531,12 +2044,12 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                         onPositionUpdate={isConnected ? broadcastPosition : undefined}
                     />
 
-                    {/* Render remote players */}
                     {remotePlayerArray.map(player => (
                         <RemotePlayer key={player.id} player={player} />
                     ))}
 
                     <Particles particles={particles} />
+                    <PerfMonitor show={showPerfMonitor} />
                 </CaveLevel>
             </Suspense>
         );
@@ -1550,7 +2063,7 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                 balloonsRef={balloonsRef}
                 footprints={footprints}
                 remotePlayerPositions={remotePlayerPositions}
-                onEnterCave={() => {}} // No-op - door is decorative in overworld
+                onEnterCave={() => {}}
             >
                 <Player
                     controlsRef={controlsRef}
@@ -1562,12 +2075,12 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
                     onPositionUpdate={isConnected ? broadcastPosition : undefined}
                 />
 
-                {/* Render remote players */}
                 {remotePlayerArray.map(player => (
                     <RemotePlayer key={player.id} player={player} />
                 ))}
 
                 <Particles particles={particles} />
+                <PerfMonitor show={showPerfMonitor} />
             </OverWorld>
         </Suspense>
     );

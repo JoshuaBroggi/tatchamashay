@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { CharacterVariant, CHARACTER_CONFIGS } from '../types';
 import { InterpolatedPlayer } from '../multiplayer/types';
 
@@ -17,6 +18,17 @@ interface RemotePlayerProps {
 export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag = true }) => {
   const groupRef = useRef<THREE.Group>(null);
   const swordRef = useRef<THREE.Group>(null);
+  const isTarantula = player.characterVariant === 'tarantula';
+  const isScorpion = player.characterVariant === 'scorpion' || player.characterVariant === 'blackScorpion';
+  const specialModelPath = useMemo(() => {
+    if (player.characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
+    if (player.characterVariant === 'warDino') return '/models/war_dinosaur_-_rigged.glb';
+    if (player.characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
+    if (player.characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
+    if (player.characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
+    if (player.characterVariant === 'scorpion' || player.characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+    return null;
+  }, [player.characterVariant]);
   
   // Current interpolated position/rotation
   const currentPos = useRef(new THREE.Vector3(
@@ -40,6 +52,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
   
   // Load the character model
   const { scene } = useGLTF('/models/deathvader-optimized.glb');
+  const { scene: specialScene, animations: specialAnimations } = useGLTF(specialModelPath ?? '/models/deathvader-optimized.glb');
   
   // Get cloak color from character config
   const cloakColor = useMemo(() => {
@@ -49,6 +62,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
 
   // Clone and color the scene
   const clonedScene = useMemo(() => {
+    if (specialModelPath) return null;
     const clone = scene.clone();
     const cloakColorObj = new THREE.Color(cloakColor);
     
@@ -87,7 +101,186 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
       }
     });
     return clone;
-  }, [scene, cloakColor]);
+  }, [scene, cloakColor, specialModelPath]);
+
+  // Use SkeletonUtils.clone to preserve skin/bone bindings for rigged models
+  const clonedSpecialScene = useMemo(() => {
+    if (!specialModelPath) return null;
+    const clone = skeletonClone(specialScene) as THREE.Group;
+    clone.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        // Desaturate for black scorpion variant
+        if (player.characterVariant === 'blackScorpion') {
+          const desat = (mat: THREE.Material): THREE.Material => {
+            const m = mat.clone();
+            if (m instanceof THREE.MeshStandardMaterial) {
+              m.onBeforeCompile = (shader) => {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <map_fragment>',
+                  `#include <map_fragment>
+                  float _dGray = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                  diffuseColor.rgb = vec3(_dGray);`
+                );
+              };
+              m.customProgramCacheKey = () => 'blackScorpion_desaturated';
+            }
+            return m;
+          };
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+              mesh.material = mesh.material.map(desat);
+            } else {
+              mesh.material = desat(mesh.material);
+            }
+          }
+        }
+      }
+    });
+    return clone;
+  }, [specialScene, specialModelPath, player.characterVariant]);
+
+  const specialTransform = useMemo(() => {
+    if (!clonedSpecialScene) return null;
+    // Force-update world matrices so SkinnedMesh bone transforms are correct
+    // before computing bounding box (stale after skeletonClone).
+    clonedSpecialScene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(clonedSpecialScene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+    let scale: number;
+    if (player.characterVariant === 'trex') {
+      // Normalize T-Rex Y-height to match Fluffy's rendered height (0.774 * 7.5)
+      const fluffyGameHeight = 0.774 * 7.5;
+      scale = fluffyGameHeight / size.y;
+    } else {
+      scale = 7.5 / maxDimension;
+    }
+    const x = -center.x * scale;
+    const z = -center.z * scale;
+    // Per-character facing correction
+    let rotationY = -Math.PI / 2;
+    if (player.characterVariant === 'legoMosasaurus') rotationY = 0;
+    if (player.characterVariant === 'tarantula') rotationY = 0;
+    if (isScorpion) rotationY = 0;
+    // Vertical offset: scorpion's Idle animation lifts the mesh above
+    // the rest-pose bounding box. Empirically tuned so feet touch ground.
+    let yOffset = -box.min.y * scale;
+    if (isScorpion) yOffset -= 3.0;
+    return {
+      scale,
+      x,
+      y: yOffset,
+      z,
+      rotationY
+    };
+  }, [clonedSpecialScene, player.characterVariant]);
+
+  // Refs for procedural swim sway (Lego Mosasaurus)
+  const swimRef = useRef<THREE.Group>(null);
+  const prevPos = useRef(new THREE.Vector3(
+    player.currentPosition.x,
+    player.currentPosition.y,
+    player.currentPosition.z
+  ));
+
+  // Tarantula animation mixer for remote players (simple play/pause)
+  const tarantulaMixer = useMemo(() => {
+    if (!isTarantula || !clonedSpecialScene || specialAnimations.length === 0) return null;
+    return new THREE.AnimationMixer(clonedSpecialScene);
+  }, [isTarantula, clonedSpecialScene, specialAnimations]);
+
+  const tarantulaAction = useRef<THREE.AnimationAction | null>(null);
+  const remotePrevMoving = useRef(false);
+
+  useEffect(() => {
+    if (!tarantulaMixer || specialAnimations.length === 0) return;
+    const clip = specialAnimations[0];
+    if (!clip) return;
+    const action = tarantulaMixer.clipAction(clip);
+    action.reset();
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.timeScale = 1;
+    action.play();
+    action.paused = true;
+    tarantulaAction.current = action;
+    return () => {
+      tarantulaMixer.stopAllAction();
+      tarantulaAction.current = null;
+    };
+  }, [tarantulaMixer, specialAnimations]);
+
+  // Scorpion animation mixer for remote players (Idle / Walk / Area Attack)
+  const scorpionMixer = useMemo(() => {
+    if (!isScorpion || !clonedSpecialScene || specialAnimations.length === 0) return null;
+    return new THREE.AnimationMixer(clonedSpecialScene);
+  }, [isScorpion, clonedSpecialScene, specialAnimations]);
+
+  const scorpionActionsRef = useRef<Record<string, THREE.AnimationAction>>({});
+  const scorpionStateRef = useRef<'idle' | 'walk' | 'attack'>('idle');
+  const scorpionAttackingRef = useRef(false);
+  const scorpionPrevAttacking = useRef(false);
+
+  useEffect(() => {
+    if (!scorpionMixer || specialAnimations.length === 0) return;
+    const map: Record<string, THREE.AnimationAction> = {};
+    for (const clip of specialAnimations) {
+      map[clip.name] = scorpionMixer.clipAction(clip);
+    }
+    scorpionActionsRef.current = map;
+
+    // Configure looping clips
+    for (const name of ['Idle', 'Walk']) {
+      const action = map[name];
+      if (action) {
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.clampWhenFinished = false;
+      }
+    }
+
+    // Configure one-shot attack clip
+    const attackAction = map['Area Attack'];
+    if (attackAction) {
+      attackAction.setLoop(THREE.LoopOnce, 1);
+      attackAction.clampWhenFinished = true;
+    }
+
+    // Start with Idle
+    const idleAction = map['Idle'];
+    if (idleAction) {
+      idleAction.reset().play();
+      scorpionStateRef.current = 'idle';
+    }
+
+    // When attack finishes, crossfade back to Idle (the frame-loop
+    // state-mismatch check will correct to Walk if still moving)
+    const onFinished = (e: { action: THREE.AnimationAction }) => {
+      if (e.action === map['Area Attack']) {
+        scorpionAttackingRef.current = false;
+        const targetAction = map['Idle'];
+        if (targetAction) {
+          e.action.fadeOut(0.2);
+          targetAction.reset().fadeIn(0.2).play();
+          scorpionStateRef.current = 'idle';
+        }
+      }
+    };
+    scorpionMixer.addEventListener('finished', onFinished);
+
+    return () => {
+      scorpionMixer.removeEventListener('finished', onFinished);
+      scorpionMixer.stopAllAction();
+      scorpionActionsRef.current = {};
+      scorpionStateRef.current = 'idle';
+      scorpionAttackingRef.current = false;
+    };
+  }, [scorpionMixer, specialAnimations]);
 
   // Update target position when player data changes
   useEffect(() => {
@@ -129,8 +322,90 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     groupRef.current.position.copy(currentPos.current);
     groupRef.current.rotation.y = currentRot.current;
 
+    // Procedural swim sway for Lego Mosasaurus (derive movement from position delta)
+    if (player.characterVariant === 'legoMosasaurus' && swimRef.current) {
+      const posDelta = currentPos.current.distanceTo(prevPos.current);
+      const isSwimming = posDelta > 0.01;
+      prevPos.current.copy(currentPos.current);
+      if (isSwimming) {
+        const t = state.clock.elapsedTime;
+        swimRef.current.rotation.z = Math.sin(t * 4) * 0.15;
+        swimRef.current.rotation.x = Math.sin(t * 3) * 0.08;
+      } else {
+        swimRef.current.rotation.z *= 0.9;
+        swimRef.current.rotation.x *= 0.9;
+      }
+    }
+
+    // Tarantula animation for remote players - infer movement from position delta
+    if (isTarantula && tarantulaMixer) {
+      const posDelta = currentPos.current.distanceTo(prevPos.current);
+      const rotDelta = Math.abs(targetRot.current - currentRot.current);
+      const isRemoteMoving = posDelta > 0.005 || rotDelta > 0.01;
+      if (isRemoteMoving && !remotePrevMoving.current && tarantulaAction.current) {
+        tarantulaAction.current.paused = false;
+      } else if (!isRemoteMoving && remotePrevMoving.current && tarantulaAction.current) {
+        tarantulaAction.current.paused = true;
+      }
+      remotePrevMoving.current = isRemoteMoving;
+      if (!player.characterVariant.startsWith('lego')) {
+        prevPos.current.copy(currentPos.current);
+      }
+      tarantulaMixer.update(delta);
+    }
+
+    // Scorpion animation for remote players - Idle / Walk / Area Attack
+    if (isScorpion && scorpionMixer) {
+      const actions = scorpionActionsRef.current;
+      const posDelta = currentPos.current.distanceTo(prevPos.current);
+      const isRemoteMoving = posDelta > 0.005;
+      prevPos.current.copy(currentPos.current);
+
+      // Handle attack: detect rising edge of player.isAttacking
+      const remoteAttackNow = player.isAttacking;
+      if (remoteAttackNow && !scorpionPrevAttacking.current) {
+        scorpionAttackingRef.current = true;
+        const attackAction = actions['Area Attack'];
+        if (attackAction) {
+          const currentName = scorpionStateRef.current === 'walk' ? 'Walk' : 'Idle';
+          const currentAction = actions[currentName];
+          if (currentAction) currentAction.fadeOut(0.15);
+          attackAction.stop().reset().fadeIn(0.15).play();
+          scorpionStateRef.current = 'attack';
+        }
+      }
+      scorpionPrevAttacking.current = remoteAttackNow;
+
+      // Handle Walk / Idle transitions (only when not attacking).
+      // Use state-mismatch detection so transitions are never missed.
+      if (!scorpionAttackingRef.current) {
+        const desiredState = isRemoteMoving ? 'walk' : 'idle';
+        if (desiredState !== scorpionStateRef.current) {
+          if (desiredState === 'walk') {
+            const idleAction = actions['Idle'];
+            const walkAction = actions['Walk'];
+            if (idleAction && walkAction) {
+              idleAction.fadeOut(0.2);
+              walkAction.reset().fadeIn(0.2).play();
+              scorpionStateRef.current = 'walk';
+            }
+          } else {
+            const walkAction = actions['Walk'];
+            const idleAction = actions['Idle'];
+            if (walkAction && idleAction) {
+              walkAction.fadeOut(0.2);
+              idleAction.reset().fadeIn(0.2).play();
+              scorpionStateRef.current = 'idle';
+            }
+          }
+        }
+      }
+
+      scorpionMixer.update(delta);
+    }
+
     // Handle attack animation
-    if (isAttacking.current && swordRef.current) {
+    if (isAttacking.current && !specialModelPath && swordRef.current) {
       attackProgress.current += delta;
       const progress = Math.min(attackProgress.current / ATTACK_DURATION, 1);
       
@@ -141,7 +416,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
         isAttacking.current = false;
         swordRef.current.rotation.x = 0;
       }
-    } else if (!player.isAttacking && swordRef.current) {
+    } else if (!player.isAttacking && !specialModelPath && swordRef.current) {
       // Reset sword if attack ended from network
       isAttacking.current = false;
       swordRef.current.rotation.x = 0;
@@ -151,10 +426,21 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
   return (
     <group ref={groupRef} rotation={[0, Math.PI, 0]}>
       {/* Character model */}
-      <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />
+      {specialModelPath && clonedSpecialScene && specialTransform ? (
+        <group ref={swimRef}>
+          <primitive
+            object={clonedSpecialScene}
+            scale={specialTransform.scale}
+            rotation={[0, specialTransform.rotationY, 0]}
+            position={[specialTransform.x, specialTransform.y, specialTransform.z]}
+          />
+        </group>
+      ) : (
+        <primitive object={clonedScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />
+      )}
       
       {/* Sword with lightsaber effect */}
-      <group position={[0.6, 1.2, 0]} ref={swordRef}>
+      {!specialModelPath && <group position={[0.6, 1.2, 0]} ref={swordRef}>
         <pointLight 
           position={[0, 0.7, 0.3]}
           color="#60A5FA" 
@@ -195,7 +481,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
             emissiveIntensity={0.3}
           />
         </mesh>
-      </group>
+      </group>}
       
       {/* Name tag above head */}
       {showNameTag && (
@@ -216,6 +502,12 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
 
 // Preload the model
 useGLTF.preload('/models/deathvader-optimized.glb');
+useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
+useGLTF.preload('/models/war_dinosaur_-_rigged.glb');
+useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
+useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
+useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
+useGLTF.preload('/models/scorpion.glb');
 
 export default RemotePlayer;
 

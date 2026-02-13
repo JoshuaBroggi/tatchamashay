@@ -234,3 +234,4 @@ Before submitting changes, verify:
 - **Score/progress**: Calculated server-side to prevent cheating
 
 Remember: This is a real-time multiplayer game where synchronization is critical. Always err on the side of caution and ask for clarification when unsure about multiplayer implications.
+

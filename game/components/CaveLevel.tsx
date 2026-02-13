@@ -1,6 +1,8 @@
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { getQualitySettings } from '../world/quality';
+import { sharedDummy, _tempColor } from '../world/instancing';
 
 // --- CAVE CONSTANTS ---
 export const MAIN_CAVERN_RADIUS = 40;
@@ -618,7 +620,7 @@ const JewelSystem = ({
         if (!meshRef.current || !colorAttributeRef.current) return;
         
         const time = state.clock.elapsedTime;
-        const dummy = new THREE.Object3D();
+        const dummy = sharedDummy; // Reuse module-level dummy
         const playerPos = playerPosRef.current;
         const colors = colorAttributeRef.current.array as Float32Array;
         let gemsCollectedThisFrame = 0;
@@ -628,7 +630,6 @@ const JewelSystem = ({
             
             // Check if already collected
             if (collectedGemsRef.current.has(i)) {
-                // Hide collected gems by setting scale to 0
                 dummy.position.set(j.x, j.baseY, j.z);
                 dummy.scale.setScalar(0);
                 dummy.updateMatrix();
@@ -642,11 +643,9 @@ const JewelSystem = ({
             const distSq = dx * dx + dz * dz;
             
             if (distSq < GEM_COLLECT_RADIUS * GEM_COLLECT_RADIUS) {
-                // Collect this gem!
                 collectedGemsRef.current.add(i);
                 gemsCollectedThisFrame++;
                 
-                // Hide immediately
                 dummy.position.set(j.x, j.baseY, j.z);
                 dummy.scale.setScalar(0);
                 dummy.updateMatrix();
@@ -654,13 +653,13 @@ const JewelSystem = ({
                 continue;
             }
             
-            // Rainbow color cycling - each gem cycles through colors at different speeds
+            // Rainbow color cycling - reuse _tempColor instead of allocating
             const colorCycleSpeed = 0.5 + (j.offset * 0.02);
             const hue = ((time * colorCycleSpeed) + j.offset * 0.1) % 1;
-            const color = new THREE.Color().setHSL(hue, 1.0, 0.5);
-            colors[i * 3] = color.r;
-            colors[i * 3 + 1] = color.g;
-            colors[i * 3 + 2] = color.b;
+            _tempColor.setHSL(hue, 1.0, 0.5);
+            colors[i * 3] = _tempColor.r;
+            colors[i * 3 + 1] = _tempColor.g;
+            colors[i * 3 + 2] = _tempColor.b;
             
             // Bobbing animation
             const y = j.baseY + Math.sin(time * 2 + j.offset) * 0.3;
@@ -668,16 +667,14 @@ const JewelSystem = ({
             // Rotation and pulsing scale
             const pulseScale = j.scale * (1 + Math.sin(time * 3 + j.offset) * 0.1);
             dummy.position.set(j.x, y, j.z);
-            dummy.rotation.y = time * 0.5 + j.offset;
-            dummy.rotation.x = time * 0.3 + j.offset * 0.5;
+            dummy.rotation.set(time * 0.3 + j.offset * 0.5, time * 0.5 + j.offset, 0);
             dummy.scale.setScalar(pulseScale);
             dummy.updateMatrix();
             meshRef.current.setMatrixAt(i, dummy.matrix);
         }
         
-        // Notify about collected gems
         if (gemsCollectedThisFrame > 0) {
-            onGemCollect(gemsCollectedThisFrame * 10); // 10 points per gem
+            onGemCollect(gemsCollectedThisFrame * 10);
         }
         
         meshRef.current.instanceMatrix.needsUpdate = true;
@@ -765,7 +762,7 @@ const TreasurePile = ({
         if (!meshRef.current || !colorAttributeRef.current) return;
         
         const time = state.clock.elapsedTime;
-        const dummy = new THREE.Object3D();
+        const dummy = sharedDummy; // Reuse module-level dummy
         const playerPos = playerPosRef.current;
         const colors = colorAttributeRef.current.array as Float32Array;
         let gemsCollectedThisFrame = 0;
@@ -774,7 +771,6 @@ const TreasurePile = ({
             const j = jewelData[i];
             const globalGemIndex = gemIndexOffset + i;
             
-            // Check if already collected
             if (collectedGemsRef.current.has(globalGemIndex)) {
                 dummy.position.set(j.x, j.y, j.z);
                 dummy.scale.setScalar(0);
@@ -783,7 +779,6 @@ const TreasurePile = ({
                 continue;
             }
             
-            // Check for collection (player proximity to center treasure pile)
             const dx = playerPos.x - j.x;
             const dz = playerPos.z - j.z;
             const distSq = dx * dx + dz * dz;
@@ -799,26 +794,24 @@ const TreasurePile = ({
                 continue;
             }
             
-            // Rainbow color cycling
+            // Rainbow color cycling - reuse _tempColor
             const colorCycleSpeed = 0.8 + (j.offset * 0.02);
             const hue = ((time * colorCycleSpeed) + j.offset * 0.1) % 1;
-            const color = new THREE.Color().setHSL(hue, 1.0, 0.55);
-            colors[i * 3] = color.r;
-            colors[i * 3 + 1] = color.g;
-            colors[i * 3 + 2] = color.b;
+            _tempColor.setHSL(hue, 1.0, 0.55);
+            colors[i * 3] = _tempColor.r;
+            colors[i * 3 + 1] = _tempColor.g;
+            colors[i * 3 + 2] = _tempColor.b;
             
-            // Animation
             const pulseScale = j.scale * (1 + Math.sin(time * 4 + j.offset) * 0.15);
             dummy.position.set(j.x, j.y, j.z);
-            dummy.rotation.y = j.rotY + time * 0.5;
-            dummy.rotation.x = Math.sin(time * 2 + j.offset) * 0.2;
+            dummy.rotation.set(Math.sin(time * 2 + j.offset) * 0.2, j.rotY + time * 0.5, 0);
             dummy.scale.setScalar(pulseScale);
             dummy.updateMatrix();
             meshRef.current.setMatrixAt(i, dummy.matrix);
         }
         
         if (gemsCollectedThisFrame > 0) {
-            onGemCollect(gemsCollectedThisFrame * 15); // 15 points per treasure gem
+            onGemCollect(gemsCollectedThisFrame * 15);
         }
         
         meshRef.current.instanceMatrix.needsUpdate = true;
@@ -1103,37 +1096,33 @@ const GiantSpider = ({ playerPosRef }: { playerPosRef: React.MutableRefObject<TH
                 </mesh>
                 
                 {/* Eyes (8 of them) - glowing brightly in the dark */}
-                {/* Main eyes with point lights */}
+                {/* Main eyes - single consolidated light for both */}
                 <mesh position={[0.3, 0.4, 1.8]}>
                     <sphereGeometry args={[0.2, 8, 8]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0.1]} color="#ff0000" intensity={3} distance={8} decay={2} />
                 </mesh>
                 <mesh position={[-0.3, 0.4, 1.8]}>
                     <sphereGeometry args={[0.2, 8, 8]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0.1]} color="#ff0000" intensity={3} distance={8} decay={2} />
                 </mesh>
-                {/* Secondary eyes with lights */}
+                {/* Single consolidated point light for all eyes (replaces 6 individual lights) */}
+                <pointLight position={[0, 0.4, 1.7]} color="#ff0000" intensity={5} distance={10} decay={2} />
+                {/* Secondary eyes (no individual lights - covered by consolidated light) */}
                 <mesh position={[0.5, 0.6, 1.5]}>
                     <sphereGeometry args={[0.12, 6, 6]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0]} color="#ff0000" intensity={1.5} distance={5} decay={2} />
                 </mesh>
                 <mesh position={[-0.5, 0.6, 1.5]}>
                     <sphereGeometry args={[0.12, 6, 6]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0]} color="#ff0000" intensity={1.5} distance={5} decay={2} />
                 </mesh>
                 <mesh position={[0.6, 0.3, 1.6]}>
                     <sphereGeometry args={[0.1, 6, 6]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0]} color="#ff0000" intensity={1} distance={4} decay={2} />
                 </mesh>
                 <mesh position={[-0.6, 0.3, 1.6]}>
                     <sphereGeometry args={[0.1, 6, 6]} />
                     <meshBasicMaterial color="#ff0000" />
-                    <pointLight position={[0, 0, 0]} color="#ff0000" intensity={1} distance={4} decay={2} />
                 </mesh>
                 
                 {/* Fangs */}
@@ -1252,11 +1241,12 @@ export const CaveLevel: React.FC<CaveLevelProps> = ({
             <ambientLight intensity={0.05} color="#404040" />
             <hemisphereLight args={['#202020', '#0a0a0a', 0.03]} />
             
-            {/* Very dim directional light */}
+            {/* Very dim directional light - no shadow needed in dark cave */}
             <directionalLight 
                 position={[20, 40, 20]} 
                 intensity={0.05} 
                 color="#404050"
+                castShadow={false}
             />
             
             {/* Strategic point lights */}

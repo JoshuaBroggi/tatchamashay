@@ -23,7 +23,7 @@ type MessageType =
   | { type: "attack_end"; playerId: string }
   | { type: "balloon_pop"; balloonIds: string[]; poppedBy: string }
   | { type: "gem_collect"; gemId: string; collectedBy: string }
-  | { type: "level_change"; level: "overworld" | "cave" }
+  | { type: "level_change"; level: "overworld" | "cave" | "desert" }
   | { type: "game_start" }
   | { type: "sync_state"; state: GameState }
   | { type: "player_list"; players: PlayerInfo[]; hostId: string }
@@ -42,7 +42,7 @@ interface PlayerInfo {
 interface GameState {
   hostId: string;
   players: PlayerInfo[];
-  currentLevel: "overworld" | "cave";
+  currentLevel: "overworld" | "cave" | "desert";
   gameStarted: boolean;
   poppedBalloons: string[];
   collectedGems: string[];
@@ -52,7 +52,7 @@ export default class GameRoom implements Party.Server {
   private players: Map<string, PlayerInfo> = new Map();
   private hostId: string | null = null;
   private gameStarted: boolean = false;
-  private currentLevel: "overworld" | "cave" = "overworld";
+  private currentLevel: "overworld" | "cave" | "desert" = "overworld";
   private poppedBalloons: Set<string> = new Set();
   private collectedGems: Set<string> = new Set();
 
@@ -247,7 +247,7 @@ export default class GameRoom implements Party.Server {
     this.room.broadcast(JSON.stringify(data));
   }
 
-  private handleLevelChange(data: { level: "overworld" | "cave" }) {
+  private handleLevelChange(data: { level: "overworld" | "cave" | "desert" }) {
     this.currentLevel = data.level;
     
     // Reset level-specific state

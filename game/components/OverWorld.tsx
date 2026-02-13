@@ -3,6 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Float, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Door } from './Door';
+import { getQualitySettings } from '../world/quality';
+import { sharedDummy, _tempVec3A, _tempColor } from '../world/instancing';
 
 // Player radius constant - must be defined before use in generateMountainColliders
 export const PLAYER_RADIUS = 0.6;
@@ -153,13 +155,16 @@ export const checkOverworldCollision = (newX: number, newZ: number): boolean => 
     return false;
 };
 
-// --- FLOOR ---
-const Floor = () => (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[1000, 1000]} />
-        <meshStandardMaterial color="#E6C288" />
-    </mesh>
-);
+// --- FLOOR (quality-driven tessellation) ---
+const Floor = () => {
+    const quality = getQualitySettings();
+    return (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[1000, 1000, quality.floorSegments, quality.floorSegments]} />
+            <meshStandardMaterial color="#E6C288" />
+        </mesh>
+    );
+};
 
 // --- GRASS SYSTEM ---
 const GrassPatch = ({ position, radius, density, seed }: {
@@ -171,9 +176,10 @@ const GrassPatch = ({ position, radius, density, seed }: {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     
     const { matrices, colors } = useMemo(() => {
+        const quality = getQualitySettings();
         const matrices: THREE.Matrix4[] = [];
         const colors: THREE.Color[] = [];
-        const numBlades = Math.floor(density * radius * radius * Math.PI);
+        const numBlades = Math.floor(density * radius * radius * Math.PI * quality.densityMultiplier);
         
         const greenPalette = [
             new THREE.Color('#4ade80'),
@@ -184,6 +190,12 @@ const GrassPatch = ({ position, radius, density, seed }: {
             new THREE.Color('#84cc16'),
             new THREE.Color('#65a30d'),
         ];
+        
+        // Reuse temp objects for matrix composition instead of allocating per blade
+        const pos = new THREE.Vector3();
+        const quat = new THREE.Quaternion();
+        const scaleVec = new THREE.Vector3();
+        const euler = new THREE.Euler();
         
         for (let i = 0; i < numBlades; i++) {
             const matrix = new THREE.Matrix4();
@@ -199,18 +211,13 @@ const GrassPatch = ({ position, radius, density, seed }: {
             
             const scaleX = 0.8 + seededRandom(seed + i * 3 + 5) * 0.5;
             const scaleY = 0.6 + seededRandom(seed + i * 3 + 6) * 0.8;
-            const scaleZ = scaleX;
             
-            const pos = new THREE.Vector3(x, 0, z);
-            const quat = new THREE.Quaternion();
-            quat.setFromEuler(new THREE.Euler(
-                lean * Math.cos(leanDir),
-                rotY,
-                lean * Math.sin(leanDir)
-            ));
-            const scale = new THREE.Vector3(scaleX, scaleY, scaleZ);
+            pos.set(x, 0, z);
+            euler.set(lean * Math.cos(leanDir), rotY, lean * Math.sin(leanDir));
+            quat.setFromEuler(euler);
+            scaleVec.set(scaleX, scaleY, scaleX);
             
-            matrix.compose(pos, quat, scale);
+            matrix.compose(pos, quat, scaleVec);
             matrices.push(matrix);
             
             const colorIndex = Math.floor(seededRandom(seed + i * 3 + 7) * greenPalette.length);
@@ -379,6 +386,7 @@ const FlowerSystem = ({ flowers }: {
 
 const GrassPatches = () => {
     const patches = useMemo(() => {
+        const quality = getQualitySettings();
         const result: {
             position: [number, number, number],
             radius: number,
@@ -386,7 +394,7 @@ const GrassPatches = () => {
             seed: number
         }[] = [];
         
-        const numLargePatches = 12;
+        const numLargePatches = Math.min(12, Math.floor(quality.maxGrassPatches * 0.17));
         for (let i = 0; i < numLargePatches; i++) {
             const angle = (i / numLargePatches) * Math.PI * 2 + seededRandom(i * 100) * 0.5;
             const dist = 20 + seededRandom(i * 100 + 1) * 30;
@@ -756,37 +764,37 @@ const PoopPile = () => {
                 </mesh>
             </group>
             
-            {/* Small poop lumps around base */}
-            <mesh position={[5.8, 0.5, 2.2]} scale={[1.3, 0.8, 1.3]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            {/* Small poop lumps around base - no shadow casting for perf */}
+            <mesh position={[5.8, 0.5, 2.2]} scale={[1.3, 0.8, 1.3]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopMid} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[4.2, 0.4, 4.8]} scale={[1.0, 0.7, 1.0]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[4.2, 0.4, 4.8]} scale={[1.0, 0.7, 1.0]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopDark} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[-5.2, 0.5, -2.8]} scale={[1.2, 0.75, 1.2]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[-5.2, 0.5, -2.8]} scale={[1.2, 0.75, 1.2]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopHighlight} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[-3.8, 0.4, -5.2]} scale={[0.9, 0.6, 0.9]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[-3.8, 0.4, -5.2]} scale={[0.9, 0.6, 0.9]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopColor} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[0.6, 0.45, 6.2]} scale={[1.25, 0.7, 1.25]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[0.6, 0.45, 6.2]} scale={[1.25, 0.7, 1.25]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopDark} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[-0.4, 0.4, -6.0]} scale={[1.1, 0.65, 1.1]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[-0.4, 0.4, -6.0]} scale={[1.1, 0.65, 1.1]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopMid} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[-6.3, 0.5, 1.2]} scale={[1.0, 0.7, 1.0]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[-6.3, 0.5, 1.2]} scale={[1.0, 0.7, 1.0]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopHighlight} roughness={0.75} metalness={0.02} />
             </mesh>
-            <mesh position={[6.4, 0.45, -1.8]} scale={[1.15, 0.7, 1.15]} castShadow receiveShadow>
-                <sphereGeometry args={[1, 10, 10]} />
+            <mesh position={[6.4, 0.45, -1.8]} scale={[1.15, 0.7, 1.15]} receiveShadow>
+                <sphereGeometry args={[1, 8, 8]} />
                 <meshStandardMaterial color={poopColor} roughness={0.75} metalness={0.02} />
             </mesh>
             
@@ -877,10 +885,12 @@ const ChristmasTree = ({ position }: { position: [number, number, number] }) => 
     }, []);
     
     const lights = useMemo(() => {
+        const quality = getQualitySettings();
         const result: { position: [number, number, number], color: string, phase: number }[] = [];
         const lightColors = ['#fef08a', '#fde047', '#facc15', '#ffffff', '#fef9c3'];
         
-        const numLights = 60;
+        // Reduce light mesh count based on quality tier
+        const numLights = Math.floor(60 * quality.densityMultiplier);
         for (let i = 0; i < numLights; i++) {
             const t = i / numLights;
             const height = 2 + t * 24;
@@ -943,8 +953,8 @@ const ChristmasTree = ({ position }: { position: [number, number, number] }) => 
             </group>
             
             {ornaments.map((orn, i) => (
-                <mesh key={`ornament-${i}`} position={orn.position} castShadow>
-                    <sphereGeometry args={[0.6, 12, 12]} />
+                <mesh key={`ornament-${i}`} position={orn.position}>
+                    <sphereGeometry args={[0.6, 8, 8]} />
                     <meshStandardMaterial 
                         color={orn.color} 
                         metalness={0.4} 
@@ -1068,15 +1078,20 @@ export const BalloonSystem = ({
     remotePlayerPositions?: { x: number; y: number; z: number }[]
 }) => {
     const meshRef = useRef<THREE.InstancedMesh>(null);
-    const dummy = useMemo(() => new THREE.Object3D(), []);
     const colorArray = useRef<Float32Array | null>(null);
-    const MAX_BALLOONS = 800;
+    const quality = getQualitySettings();
+    const MAX_BALLOONS = quality.maxBalloons;
+    
+    // Reuse a single spatial grid across frames instead of recreating
+    const gridRef = useRef<Map<string, number[]>>(new Map());
+    // Reuse remote player Vector3 pool to avoid per-frame allocations
+    const remoteVecPool = useRef<THREE.Vector3[]>([]);
 
     useEffect(() => {
         if (meshRef.current && !colorArray.current) {
             colorArray.current = new Float32Array(MAX_BALLOONS * 3);
         }
-    }, []);
+    }, [MAX_BALLOONS]);
 
     useFrame((state, delta) => {
         if (!meshRef.current) return;
@@ -1086,7 +1101,9 @@ export const BalloonSystem = ({
         const dt = Math.min(delta, 0.05);
 
         if (balloons.length > 0) {
-            const grid: Map<string, number[]> = new Map();
+            // Clear and reuse spatial grid
+            const grid = gridRef.current;
+            grid.clear();
             for (let i = 0; i < balloons.length; i++) {
                 const b = balloons[i];
                 const key = getGridKey(b.x, b.z);
@@ -1136,11 +1153,16 @@ export const BalloonSystem = ({
                 }
             }
 
-            // Collect all player positions (local + remote)
-            const allPlayerPositions = [
-                playerPosRef.current,
-                ...remotePlayerPositions.map(p => new THREE.Vector3(p.x, p.y, p.z))
-            ];
+            // Collect all player positions (local + remote) without allocating new Vector3s
+            // Grow the reusable pool if needed
+            while (remoteVecPool.current.length < remotePlayerPositions.length) {
+                remoteVecPool.current.push(new THREE.Vector3());
+            }
+            const allPlayerPositions: THREE.Vector3[] = [playerPosRef.current];
+            for (let ri = 0; ri < remotePlayerPositions.length; ri++) {
+                const rp = remotePlayerPositions[ri];
+                allPlayerPositions.push(remoteVecPool.current[ri].set(rp.x, rp.y, rp.z));
+            }
             
             const playerBalloonDist = BALLOON_RADIUS + PLAYER_RADIUS;
             const playerBalloonDistSq = playerBalloonDist * playerBalloonDist;
@@ -1202,13 +1224,14 @@ export const BalloonSystem = ({
         }
 
         const colors = colorArray.current;
+        const dummy = sharedDummy;
 
         for (let i = 0; i < balloons.length; i++) {
             const b = balloons[i];
             
             const bobbing = Math.sin(time * 2 + b.offset) * 0.3;
             dummy.position.set(b.x, b.y + bobbing, b.z);
-            dummy.rotation.y = time * 0.5 + b.offset;
+            dummy.rotation.set(0, time * 0.5 + b.offset, 0);
             dummy.scale.set(1, 1, 1);
             
             dummy.updateMatrix();
@@ -1223,11 +1246,14 @@ export const BalloonSystem = ({
             }
         }
 
-        for (let i = balloons.length; i < MAX_BALLOONS; i++) {
+        // Hide remaining slots with a single zero-scale matrix
+        if (balloons.length < MAX_BALLOONS) {
             dummy.position.set(0, -100, 0);
             dummy.scale.set(0, 0, 0);
             dummy.updateMatrix();
-            meshRef.current.setMatrixAt(i, dummy.matrix);
+            for (let i = balloons.length; i < MAX_BALLOONS; i++) {
+                meshRef.current.setMatrixAt(i, dummy.matrix);
+            }
         }
 
         meshRef.current.instanceMatrix.needsUpdate = true;
@@ -1243,10 +1269,10 @@ export const BalloonSystem = ({
         <instancedMesh 
             ref={meshRef} 
             args={[undefined, undefined, MAX_BALLOONS]}
-            castShadow
-            frustumCulled={false}
+            castShadow={quality.decorativeShadows}
+            frustumCulled={true}
         >
-            <sphereGeometry args={[BALLOON_RADIUS, 12, 12]} />
+            <sphereGeometry args={[BALLOON_RADIUS, quality.balloonSegments, quality.balloonSegments]} />
             <meshStandardMaterial 
                 roughness={0.3} 
                 metalness={0.1}
@@ -1267,11 +1293,12 @@ export interface Footprint {
 
 export const FootprintSystem = ({ footprints }: { footprints: Footprint[] }) => {
     const meshRef = useRef<THREE.InstancedMesh>(null);
-    const dummy = useMemo(() => new THREE.Object3D(), []);
     const MAX_FOOTPRINTS = 200;
 
     useFrame(() => {
         if (!meshRef.current) return;
+        
+        const dummy = sharedDummy;
         
         for (let i = 0; i < footprints.length && i < MAX_FOOTPRINTS; i++) {
             const fp = footprints[i];
@@ -1282,11 +1309,14 @@ export const FootprintSystem = ({ footprints }: { footprints: Footprint[] }) => 
             meshRef.current.setMatrixAt(i, dummy.matrix);
         }
         
-        for (let i = footprints.length; i < MAX_FOOTPRINTS; i++) {
+        // Batch-hide remaining with a single matrix
+        if (footprints.length < MAX_FOOTPRINTS) {
             dummy.position.set(0, -100, 0);
             dummy.scale.set(0, 0, 0);
             dummy.updateMatrix();
-            meshRef.current.setMatrixAt(i, dummy.matrix);
+            for (let i = footprints.length; i < MAX_FOOTPRINTS; i++) {
+                meshRef.current.setMatrixAt(i, dummy.matrix);
+            }
         }
         
         meshRef.current.instanceMatrix.needsUpdate = true;
@@ -1342,6 +1372,7 @@ export const OverWorld: React.FC<OverWorldProps> = ({
     remotePlayerPositions = []
 }) => {
     const { gl, scene } = useThree();
+    const quality = getQualitySettings();
     
     // Cleanup on unmount - dispose of Three.js resources to free memory
     useEffect(() => {
@@ -1352,12 +1383,9 @@ export const OverWorld: React.FC<OverWorldProps> = ({
             // Traverse scene and dispose of geometries and materials
             scene.traverse((object) => {
                 if (object instanceof THREE.Mesh) {
-                    // Dispose geometry
                     if (object.geometry) {
                         object.geometry.dispose();
                     }
-                    
-                    // Dispose material(s)
                     if (object.material) {
                         if (Array.isArray(object.material)) {
                             object.material.forEach((material) => {
@@ -1369,7 +1397,6 @@ export const OverWorld: React.FC<OverWorldProps> = ({
                     }
                 }
                 
-                // Dispose instanced meshes
                 if (object instanceof THREE.InstancedMesh) {
                     if (object.geometry) {
                         object.geometry.dispose();
@@ -1386,10 +1413,12 @@ export const OverWorld: React.FC<OverWorldProps> = ({
                 }
             });
             
-            // Force garbage collection hint
             gl.dispose();
         };
     }, [balloonsRef, gl, scene]);
+
+    const shadowSize = quality.shadowMapSize;
+    const frustum = quality.shadowFrustum;
 
     return (
         <>
@@ -1399,16 +1428,16 @@ export const OverWorld: React.FC<OverWorldProps> = ({
             
             <ambientLight intensity={0.6} />
             <hemisphereLight args={['#87CEEB', '#5C4033', 0.6]} />
-            <Environment preset="sunset" />
+            {quality.useEnvironmentMap && <Environment preset="sunset" />}
             <directionalLight 
                 position={[80, 150, 80]} 
                 intensity={1.5} 
-                castShadow 
-                shadow-mapSize={[2048, 2048]}
-                shadow-camera-left={-120}
-                shadow-camera-right={120}
-                shadow-camera-top={120}
-                shadow-camera-bottom={-120}
+                castShadow={quality.shadowsEnabled}
+                shadow-mapSize={[shadowSize, shadowSize]}
+                shadow-camera-left={-frustum}
+                shadow-camera-right={frustum}
+                shadow-camera-top={frustum}
+                shadow-camera-bottom={-frustum}
                 shadow-camera-far={400}
             />
 

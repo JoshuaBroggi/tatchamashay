@@ -83,3 +83,4 @@ This Code of Conduct is adapted from the [Contributor Covenant](https://www.cont
 Tatchamashay exists to bring families together through fun, creative gaming experiences. By maintaining a respectful and inclusive community, we ensure that contributors of all ages and backgrounds can safely participate in building games that families will love.
 
 Thank you for helping us create a positive environment! 🌟
+

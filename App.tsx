@@ -10,6 +10,7 @@ import Game3D from './game/Game3D';
 import { useMultiplayer } from './game/multiplayer';
 import { LandingPage } from './game/components/LandingPage';
 import { AboutPage } from './game/components/AboutPage';
+import { getQualitySettings } from './game/world/quality';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -444,11 +445,11 @@ const GameRoute: React.FC = () => {
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none font-sans bg-[#87CEEB]">
-      {/* 3D Game Scene */}
+      {/* 3D Game Scene - quality-driven DPR */}
       <Canvas
-        shadows
+        shadows={getQualitySettings().shadowsEnabled}
         camera={{ position: [0, 8, 12], fov: 50, near: 0.1, far: 2000 }}
-        dpr={[1, 2]}
+        dpr={getQualitySettings().dprRange}
         className="absolute inset-0 z-0"
         onError={(e) => console.error("Canvas Error:", e)}
       >
