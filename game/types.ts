@@ -9,7 +9,7 @@ export type Controls = {
   attack: boolean;
 };
 
-export type Level = 'overworld' | 'cave' | 'desert';
+export type Level = 'overworld' | 'desert';
 
 // Level configuration
 export interface LevelConfig {
@@ -23,11 +23,6 @@ export const LEVEL_CONFIGS: LevelConfig[] = [
     id: 'overworld',
     name: 'Sunny Balloon World',
     description: 'Pop colorful balloons in a bright, sunny world!'
-  },
-  {
-    id: 'cave',
-    name: 'Crystal Caverns',
-    description: 'Explore underground caves filled with glowing jewels!'
   },
   {
     id: 'desert',

@@ -270,7 +270,7 @@ const LevelSelectRoute: React.FC = () => {
   };
 
   const currentLevelConfig = LEVEL_CONFIGS.find(l => l.id === selectedLevel);
-  const bgColor = selectedLevel === 'cave' ? '#0a0908' : '#87CEEB';
+  const bgColor = selectedLevel === 'desert' ? '#e8c98a' : '#87CEEB';
 
   return (
     <div className="relative w-full h-screen" style={{ backgroundColor: bgColor }}>

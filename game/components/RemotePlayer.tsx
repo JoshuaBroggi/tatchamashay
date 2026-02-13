@@ -167,6 +167,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     let rotationY = -Math.PI / 2;
     if (player.characterVariant === 'legoMosasaurus') rotationY = 0;
     if (player.characterVariant === 'tarantula') rotationY = 0;
+    if (player.characterVariant === 'trex') rotationY = 0;
     if (isScorpion) rotationY = 0;
     // Vertical offset: scorpion's Idle animation lifts the mesh above
     // the rest-pose bounding box. Empirically tuned so feet touch ground.
@@ -215,6 +216,38 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
       tarantulaAction.current = null;
     };
   }, [tarantulaMixer, specialAnimations]);
+
+  // T-Rex animation mixer for remote players (walk on movement, roar burst on attack)
+  const isTrex = player.characterVariant === 'trex';
+  const trexMixer = useMemo(() => {
+    if (!isTrex || !clonedSpecialScene || specialAnimations.length === 0) return null;
+    return new THREE.AnimationMixer(clonedSpecialScene);
+  }, [isTrex, clonedSpecialScene, specialAnimations]);
+
+  const trexAction = useRef<THREE.AnimationAction | null>(null);
+  const trexPrevMoving = useRef(false);
+  const trexPrevAttacking = useRef(false);
+  const trexAttackingRef = useRef(false);
+  const trexAttackTimer = useRef(0);
+  const TREX_ATTACK_DURATION = 0.6;
+
+  useEffect(() => {
+    if (!trexMixer || specialAnimations.length === 0) return;
+    const clip = specialAnimations.find(c => c.name === 'CINEMA_4D_Main') ?? specialAnimations[0];
+    if (!clip) return;
+    const action = trexMixer.clipAction(clip);
+    action.reset();
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.timeScale = 1;
+    action.play();
+    action.paused = true;
+    trexAction.current = action;
+    return () => {
+      trexMixer.stopAllAction();
+      trexAction.current = null;
+    };
+  }, [trexMixer, specialAnimations]);
 
   // Scorpion animation mixer for remote players (Idle / Walk / Area Attack)
   const scorpionMixer = useMemo(() => {
@@ -402,6 +435,51 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
       }
 
       scorpionMixer.update(delta);
+    }
+
+    // T-Rex animation for remote players - walk on movement, roar burst on attack
+    if (isTrex && trexMixer && trexAction.current) {
+      const action = trexAction.current;
+      const posDelta = currentPos.current.distanceTo(prevPos.current);
+      const isRemoteMoving = posDelta > 0.005;
+      if (!isTarantula && !isScorpion) {
+        prevPos.current.copy(currentPos.current);
+      }
+
+      // Detect attack rising edge from network
+      const remoteAttackNow = player.isAttacking;
+      if (remoteAttackNow && !trexPrevAttacking.current && !trexAttackingRef.current) {
+        trexAttackingRef.current = true;
+        trexAttackTimer.current = 0;
+        action.paused = false;
+        action.timeScale = 2.5;
+      }
+      trexPrevAttacking.current = remoteAttackNow;
+
+      // Count down attack burst
+      if (trexAttackingRef.current) {
+        trexAttackTimer.current += delta;
+        if (trexAttackTimer.current >= TREX_ATTACK_DURATION) {
+          trexAttackingRef.current = false;
+          action.timeScale = 1;
+          if (!isRemoteMoving) {
+            action.paused = true;
+          }
+        }
+      }
+
+      // Walk / Idle transitions when not attacking
+      if (!trexAttackingRef.current) {
+        if (isRemoteMoving && !trexPrevMoving.current) {
+          action.paused = false;
+          action.timeScale = 1;
+        } else if (!isRemoteMoving && trexPrevMoving.current) {
+          action.paused = true;
+        }
+      }
+      trexPrevMoving.current = isRemoteMoving;
+
+      trexMixer.update(delta);
     }
 
     // Handle attack animation

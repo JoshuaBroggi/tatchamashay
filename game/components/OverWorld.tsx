@@ -2,7 +2,6 @@ import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Float, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Door } from './Door';
 import { getQualitySettings } from '../world/quality';
 import { sharedDummy, _tempVec3A, _tempColor } from '../world/instancing';
 
@@ -1355,7 +1354,6 @@ export const FootprintSystem = ({ footprints }: { footprints: Footprint[] }) => 
 // --- OVERWORLD PROPS ---
 export interface OverWorldProps {
     playerPosRef: React.MutableRefObject<THREE.Vector3>;
-    onEnterCave: () => void;
     balloonsRef: React.MutableRefObject<BalloonPhysics[]>;
     footprints: Footprint[];
     children?: React.ReactNode;
@@ -1365,7 +1363,6 @@ export interface OverWorldProps {
 // --- MAIN OVERWORLD COMPONENT ---
 export const OverWorld: React.FC<OverWorldProps> = ({ 
     playerPosRef, 
-    onEnterCave,
     balloonsRef,
     footprints,
     children,
@@ -1449,15 +1446,7 @@ export const OverWorld: React.FC<OverWorldProps> = ({
             {/* Christmas Tree - 25 units from the poop pile */}
             <ChristmasTree position={[25, 0, 0]} />
             
-            {/* Portal door to cave */}
-            <Door 
-                position={[12, 0, 0]}
-                rotation={[0, -Math.PI / 2, 0]}
-                playerPosRef={playerPosRef}
-                onPlayerNear={onEnterCave}
-            />
-            
-            {/* Footprints left after climbing poop */}
+            {/* Footprints after climbing poop */}
             <FootprintSystem footprints={footprints} />
             
             {/* Instanced balloon system - single draw call for all balloons */}
