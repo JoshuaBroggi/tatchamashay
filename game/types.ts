@@ -9,7 +9,7 @@ export type Controls = {
   attack: boolean;
 };
 
-export type Level = 'overworld' | 'desert';
+export type Level = 'overworld' | 'desert' | 'jurassicPark';
 
 // Level configuration
 export interface LevelConfig {
@@ -28,6 +28,11 @@ export const LEVEL_CONFIGS: LevelConfig[] = [
     id: 'desert',
     name: 'Scorched Sands',
     description: 'A blazing desert crawling with cobras, scorpions, and hardy cacti.'
+  },
+  {
+    id: 'jurassicPark',
+    name: 'Jurassic Park',
+    description: 'Survive a prehistoric jungle prowled by a ferocious T-Rex!'
   }
 ];
 
@@ -37,12 +42,12 @@ export type CharacterVariant =
   | 'fluffy'
   | 'lobster'
   | 'trex'
-  | 'warDino'
   | 'mosasaurus'
   | 'legoMosasaurus'
   | 'tarantula'
   | 'scorpion'
-  | 'blackScorpion';
+  | 'blackScorpion'
+  | 'spittingCobra';
 
 export interface CharacterConfig {
   id: CharacterVariant;
@@ -77,12 +82,6 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
     description: 'A roaring prehistoric powerhouse with a fabulous strut'
   },
   {
-    id: 'warDino',
-    name: 'War Dinosaur',
-    cloakColor: '#6B7280', // Not used for War Dinosaur
-    description: 'An armored dinosaur ready for battle'
-  },
-  {
     id: 'mosasaurus',
     name: 'Mosasaurus',
     cloakColor: '#0F766E', // Not used for Mosasaurus
@@ -111,6 +110,12 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
     name: 'Black Scorpion',
     cloakColor: '#1A1A1A', // Not used for Black Scorpion
     description: 'A shadowy desaturated scorpion, cold as obsidian'
+  },
+  {
+    id: 'spittingCobra',
+    name: 'Spitting Cobra',
+    cloakColor: '#2D5A27', // Not used for Spitting Cobra
+    description: 'A venomous cobra that spits deadly venom at its prey'
   }
 ];
 

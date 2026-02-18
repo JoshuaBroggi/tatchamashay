@@ -13,11 +13,13 @@ import { getQualitySettings } from './world/quality';
 // Lazy load the world components
 const OverWorld = lazy(() => import('./components/OverWorld'));
 const DesertLevel = lazy(() => import('./components/DesertLevel'));
+const JurassicParkLevel = lazy(() => import('./components/JurassicParkLevel'));
 
 // Import types from OverWorld for balloon and footprint systems
 import type { BalloonPhysics, Footprint } from './components/OverWorld';
 import { checkOverworldCollision, getPoopPileHeight, PLAYER_RADIUS } from './components/OverWorld';
 import { checkDesertCollision } from './components/DesertLevel';
+import { checkJurassicCollision } from './components/JurassicParkLevel';
 
 // Augment React's JSX namespace to include Three.js elements
 declare global {
@@ -368,6 +370,124 @@ function useScorpionAnimation(
     return updateAnimation;
 }
 
+// --- SPITTING COBRA ANIMATION HELPERS ---
+
+/**
+ * Custom hook that manages spitting cobra animation.
+ * Plays idle animation on loop, paused when stationary, resumed when moving.
+ * Triggers attack animation burst on attack input.
+ */
+function useSnakeAnimation(
+    isSnake: boolean,
+    animations: THREE.AnimationClip[],
+    clonedScene: THREE.Group | null,
+    controlsRef: React.MutableRefObject<Controls>
+) {
+    const actionsRef = useRef<Record<string, THREE.AnimationAction>>({});
+    const currentStateRef = useRef<'idle' | 'attack'>('idle');
+    const prevAttackRef = useRef(false);
+    const attackingRef = useRef(false);
+
+    const mixer = useMemo(() => {
+        if (!isSnake || !clonedScene || animations.length === 0) return null;
+        return new THREE.AnimationMixer(clonedScene);
+    }, [isSnake, clonedScene, animations]);
+
+    useEffect(() => {
+        if (!mixer || animations.length === 0) return;
+        const map: Record<string, THREE.AnimationAction> = {};
+        for (const clip of animations) {
+            map[clip.name] = mixer.clipAction(clip);
+        }
+        actionsRef.current = map;
+
+        const resolveClip = (keywords: string[]): THREE.AnimationAction | null => {
+            for (const kw of keywords) {
+                const match = animations.find(c => c.name.toLowerCase().includes(kw.toLowerCase()));
+                if (match && map[match.name]) return map[match.name];
+            }
+            return null;
+        };
+
+        const idleAction = resolveClip(['idle', 'rest', 'stand']) ?? Object.values(map).find(Boolean);
+        if (idleAction) {
+            idleAction.reset();
+            idleAction.setLoop(THREE.LoopRepeat, Infinity);
+            idleAction.clampWhenFinished = false;
+            idleAction.timeScale = 1;
+            idleAction.play();
+            idleAction.paused = true;
+            currentStateRef.current = 'idle';
+        }
+
+        const attackAction = resolveClip(['attack', 'bite', 'strike', 'hit', 'sting']);
+        if (attackAction) {
+            attackAction.setLoop(THREE.LoopOnce, 1);
+            attackAction.clampWhenFinished = true;
+        }
+
+        const onFinished = (e: { action: THREE.AnimationAction }) => {
+            if (e.action === attackAction) {
+                attackingRef.current = false;
+                if (idleAction) {
+                    e.action.fadeOut(0.2);
+                    idleAction.reset().fadeIn(0.2).play();
+                    const { up, down, left, right } = controlsRef.current;
+                    idleAction.paused = !(up || down || left || right);
+                    currentStateRef.current = 'idle';
+                }
+            }
+        };
+        mixer.addEventListener('finished', onFinished as any);
+
+        return () => {
+            mixer.removeEventListener('finished', onFinished as any);
+            mixer.stopAllAction();
+            actionsRef.current = {};
+        };
+    }, [mixer, animations, controlsRef]);
+
+    const updateAnimation = useCallback((delta: number) => {
+        if (!mixer) return;
+        const actions = actionsRef.current;
+        const { up, down, left, right, attack } = controlsRef.current;
+        const isMoving = up || down || left || right;
+
+        const resolveAction = (keywords: string[]): THREE.AnimationAction | null => {
+            for (const kw of keywords) {
+                const match = Object.keys(actions).find(n => n.toLowerCase().includes(kw.toLowerCase()));
+                if (match && actions[match]) return actions[match];
+            }
+            return null;
+        };
+
+        const idleAction = resolveAction(['idle', 'rest', 'stand']) ?? Object.values(actions).find(Boolean);
+        const attackAction = resolveAction(['attack', 'bite', 'strike', 'hit', 'sting']);
+
+        const attackJustPressed = attack && !prevAttackRef.current;
+        prevAttackRef.current = attack;
+
+        if (attackJustPressed && !attackingRef.current && attackAction) {
+            attackingRef.current = true;
+            if (idleAction) idleAction.fadeOut(0.2);
+            attackAction.reset().fadeIn(0.2).play();
+            currentStateRef.current = 'attack';
+        }
+
+        if (!attackingRef.current && idleAction) {
+            if (isMoving) {
+                idleAction.paused = false;
+            } else {
+                idleAction.paused = true;
+            }
+        }
+
+        mixer.update(delta);
+    }, [mixer, controlsRef]);
+
+    return updateAnimation;
+}
+
 // --- AUDIO SYSTEM (Singleton AudioContext for performance) ---
 let audioCtx: AudioContext | null = null;
 const getAudioContext = (): AudioContext => {
@@ -491,13 +611,14 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     const isLobster = characterVariant === 'lobster';
     const isTarantula = characterVariant === 'tarantula';
     const isScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
+    const isSpittingCobra = characterVariant === 'spittingCobra';
     const specialModelPath = useMemo(() => {
         if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
-        if (characterVariant === 'warDino') return '/models/war_dinosaur_-_rigged.glb';
         if (characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
         if (characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
         if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
         if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
         return null;
     }, [characterVariant]);
 
@@ -685,6 +806,11 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         isScorpion, specialAnimations, clonedSpecialScene, controlsRef
     );
 
+    // Spitting cobra animation
+    const updateSnakeAnim = useSnakeAnimation(
+        isSpittingCobra, specialAnimations, clonedSpecialScene, controlsRef
+    );
+
     // T-Rex animation (walk on movement, roar/bite burst on attack)
     const isTrex = characterVariant === 'trex';
     const updateTrexAnim = useTrexAnimation(
@@ -710,6 +836,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         updateTarantulaAnim(delta);
         updateScorpionAnim(delta);
         updateTrexAnim(delta);
+        updateSnakeAnim(delta);
 
         const { up, down, left, right, attack } = controlsRef.current;
         
@@ -1036,10 +1163,12 @@ const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
     const dIsTarantula = characterVariant === 'tarantula';
     const dIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
     const dIsTrex = characterVariant === 'trex';
+    const dIsSpittingCobra = characterVariant === 'spittingCobra';
     const dSpecialModelPath = useMemo(() => {
         if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
         if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
         if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
         return null;
     }, [characterVariant]);
 
@@ -1177,6 +1306,11 @@ const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
         dIsTrex, dSpecialAnimations, dClonedSpecialScene, controlsRef
     );
 
+    // Spitting cobra animation for desert
+    const updateDesertSnakeAnim = useSnakeAnimation(
+        dIsSpittingCobra, dSpecialAnimations, dClonedSpecialScene, controlsRef
+    );
+
     const SPEED = 10;
     const ROTATION_SPEED = 2.5;
     const ATTACK_DURATION = 0.25;
@@ -1191,6 +1325,7 @@ const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
         updateDesertTarantulaAnim(delta);
         updateDesertScorpionAnim(delta);
         updateDesertTrexAnim(delta);
+        updateDesertSnakeAnim(delta);
         const { up, down, left, right, attack } = controlsRef.current;
 
         if (left) group.current.rotation.y += ROTATION_SPEED * delta;
@@ -1278,6 +1413,304 @@ const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
                     scale={dSpecialTransform.scale}
                     rotation={[0, dSpecialTransform.rotationY, 0]}
                     position={[dSpecialTransform.x, dSpecialTransform.y, dSpecialTransform.z]}
+                />
+            </group>
+        );
+    }
+    return (
+        <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+            {clonedDeathvaderScene && <primitive object={clonedDeathvaderScene} scale={2.5} rotation={[0, -Math.PI / 2, 0]} />}
+            <group position={[0.6, 1.2, 0]} ref={swordRef}>
+                <pointLight position={[0, 0.7, 0.3]} color="#60A5FA" intensity={1.5} distance={6} decay={2} />
+                <mesh position={[0, 0.7, 0.3]} rotation={[0, Math.PI/4, 0]} castShadow><coneGeometry args={[0.12, 1.6, 4]} /><meshStandardMaterial color="#a5d8ff" emissive="#60A5FA" emissiveIntensity={0.6} metalness={0.9} roughness={0.1} /></mesh>
+            </group>
+        </group>
+    );
+};
+
+// --- JURASSIC PARK PLAYER COMPONENT (uses jurassic collision) ---
+const JurassicParkPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = 'black', onPositionUpdate }: {
+    controlsRef: React.MutableRefObject<Controls>,
+    onAttack: () => void,
+    positionRef: React.MutableRefObject<THREE.Vector3>,
+    characterVariant?: CharacterVariant,
+    onPositionUpdate?: (x: number, y: number, z: number, rotation: number) => void
+}) => {
+    const group = useRef<THREE.Group>(null);
+    const swordRef = useRef<THREE.Group>(null);
+    const isAttacking = useRef(false);
+    const attackTime = useRef(0);
+    const { camera, gl } = useThree();
+
+    const cameraOrbitRef = useRef(0);
+    const cameraVerticalRef = useRef(0);
+    const isDraggingRef = useRef(false);
+    const lastMousePos = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const canvas = gl.domElement;
+        const handleMouseDown = (e: MouseEvent) => {
+            isDraggingRef.current = true;
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+            canvas.style.cursor = 'grabbing';
+        };
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDraggingRef.current) return;
+            const deltaX = e.clientX - lastMousePos.current.x;
+            const deltaY = e.clientY - lastMousePos.current.y;
+            const sensitivity = 0.005;
+            cameraOrbitRef.current -= deltaX * sensitivity;
+            cameraVerticalRef.current += deltaY * sensitivity;
+            cameraVerticalRef.current = Math.max(-0.5, Math.min(0.8, cameraVerticalRef.current));
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+        };
+        const handleMouseUp = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
+        const handleMouseLeave = () => { isDraggingRef.current = false; canvas.style.cursor = 'grab'; };
+
+        canvas.style.cursor = 'grab';
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseLeave);
+        return () => {
+            canvas.removeEventListener('mousedown', handleMouseDown);
+            canvas.removeEventListener('mousemove', handleMouseMove);
+            canvas.removeEventListener('mouseup', handleMouseUp);
+            canvas.removeEventListener('mouseleave', handleMouseLeave);
+            canvas.style.cursor = 'default';
+        };
+    }, [gl]);
+
+    const isFluffy = characterVariant === 'fluffy';
+    const isLobster = characterVariant === 'lobster';
+    const jpIsTarantula = characterVariant === 'tarantula';
+    const jpIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
+    const jpIsTrex = characterVariant === 'trex';
+    const jpIsSpittingCobra = characterVariant === 'spittingCobra';
+    const jpSpecialModelPath = useMemo(() => {
+        if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
+        if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
+        if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+        if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
+        return null;
+    }, [characterVariant]);
+
+    const { scene: deathvaderScene } = useGLTF('/models/deathvader-optimized.glb');
+    const { scene: fluffyScene } = useGLTF('/models/fluffy unicorn.glb');
+    const { scene: lobsterScene } = useGLTF('/models/super lobster.glb');
+    const { scene: jpSpecialScene, animations: jpSpecialAnimations } = useGLTF(jpSpecialModelPath ?? '/models/deathvader-optimized.glb');
+
+    const cloakColor = useMemo(() => {
+        const config = CHARACTER_CONFIGS.find(c => c.id === characterVariant);
+        return config?.cloakColor || '#1a1a1a';
+    }, [characterVariant]);
+
+    const clonedDeathvaderScene = useMemo(() => {
+        if (isFluffy || isLobster || jpSpecialModelPath) return null;
+        const clone = deathvaderScene.clone();
+        const cloakColorObj = new THREE.Color(cloakColor);
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                const applyColorToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    if (clonedMat instanceof THREE.MeshStandardMaterial ||
+                        clonedMat instanceof THREE.MeshBasicMaterial ||
+                        clonedMat instanceof THREE.MeshPhongMaterial ||
+                        clonedMat instanceof THREE.MeshLambertMaterial) {
+                        const originalColor = clonedMat.color;
+                        const luminance = 0.299 * originalColor.r + 0.587 * originalColor.g + 0.114 * originalColor.b;
+                        if (luminance < 0.5) clonedMat.color = cloakColorObj.clone();
+                    }
+                    return clonedMat;
+                };
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(applyColorToMaterial);
+                    else mesh.material = applyColorToMaterial(mesh.material);
+                }
+            }
+        });
+        return clone;
+    }, [deathvaderScene, cloakColor, isFluffy, isLobster, jpSpecialModelPath]);
+
+    const clonedFluffyScene = useMemo(() => {
+        if (!isFluffy) return null;
+        const clone = fluffyScene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) { (child as THREE.Mesh).castShadow = true; (child as THREE.Mesh).receiveShadow = true; }
+        });
+        return clone;
+    }, [fluffyScene, isFluffy]);
+
+    const clonedLobsterScene = useMemo(() => {
+        if (!isLobster) return null;
+        const clone = lobsterScene.clone();
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                const applyGlowToMaterial = (mat: THREE.Material): THREE.Material => {
+                    const clonedMat = mat.clone();
+                    if (clonedMat instanceof THREE.MeshStandardMaterial) {
+                        clonedMat.emissive = new THREE.Color('#ff4500');
+                        clonedMat.emissiveIntensity = 0.04;
+                    }
+                    return clonedMat;
+                };
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(applyGlowToMaterial);
+                    else mesh.material = applyGlowToMaterial(mesh.material);
+                }
+            }
+        });
+        return clone;
+    }, [lobsterScene, isLobster]);
+
+    const jpClonedSpecialScene = useMemo(() => {
+        if (!jpSpecialModelPath) return null;
+        const clone = skeletonClone(jpSpecialScene) as THREE.Group;
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (characterVariant === 'blackScorpion') desaturateMesh(mesh);
+            }
+        });
+        return clone;
+    }, [jpSpecialScene, jpSpecialModelPath, characterVariant]);
+
+    const jpSpecialTransform = useMemo(() => {
+        if (!jpClonedSpecialScene) return null;
+        jpClonedSpecialScene.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(jpClonedSpecialScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        let scale: number;
+        if (jpIsTrex) {
+            const fluffyGameHeight = 0.774 * 7.5;
+            scale = fluffyGameHeight / size.y;
+        } else {
+            const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+            scale = 7.5 / maxDimension;
+        }
+        let yOffset = -box.min.y * scale;
+        if (jpIsScorpion) yOffset -= 3.0;
+        return {
+            scale,
+            x: -center.x * scale,
+            y: yOffset,
+            z: -center.z * scale,
+            rotationY: (jpIsTarantula || jpIsScorpion || jpIsTrex) ? 0 : -Math.PI / 2
+        };
+    }, [jpClonedSpecialScene, jpIsTarantula, jpIsScorpion, jpIsTrex]);
+
+    const updateJPTarantulaAnim = useTarantulaAnimation(jpIsTarantula, jpSpecialAnimations, jpClonedSpecialScene, controlsRef);
+    const updateJPScorpionAnim = useScorpionAnimation(jpIsScorpion, jpSpecialAnimations, jpClonedSpecialScene, controlsRef);
+    const updateJPTrexAnim = useTrexAnimation(jpIsTrex, jpSpecialAnimations, jpClonedSpecialScene, controlsRef);
+    const updateJPSnakeAnim = useSnakeAnimation(jpIsSpittingCobra, jpSpecialAnimations, jpClonedSpecialScene, controlsRef);
+
+    const SPEED = 10;
+    const ROTATION_SPEED = 2.5;
+    const ATTACK_DURATION = 0.25;
+
+    const _jpForward = useRef(new THREE.Vector3());
+    const _jpCamOffset = useRef(new THREE.Vector3());
+    const _jpTargetCam = useRef(new THREE.Vector3());
+    const _jpLookTarget = useRef(new THREE.Vector3());
+
+    useFrame((state, delta) => {
+        if (!group.current) return;
+        updateJPTarantulaAnim(delta);
+        updateJPScorpionAnim(delta);
+        updateJPTrexAnim(delta);
+        updateJPSnakeAnim(delta);
+        const { up, down, left, right, attack } = controlsRef.current;
+
+        if (left) group.current.rotation.y += ROTATION_SPEED * delta;
+        if (right) group.current.rotation.y -= ROTATION_SPEED * delta;
+
+        const forward = _jpForward.current.set(0, 0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, group.current.rotation.y);
+        const speed = SPEED * delta;
+        const curX = group.current.position.x;
+        const curZ = group.current.position.z;
+
+        if (up) {
+            const newX = curX + forward.x * speed;
+            const newZ = curZ + forward.z * speed;
+            if (!checkJurassicCollision(newX, newZ)) {
+                group.current.position.x = newX;
+                group.current.position.z = newZ;
+            } else {
+                if (!checkJurassicCollision(newX, curZ)) group.current.position.x = newX;
+                else if (!checkJurassicCollision(curX, newZ)) group.current.position.z = newZ;
+            }
+        }
+
+        if (down) {
+            const backSpeed = -speed * 0.6;
+            const newX = curX + forward.x * backSpeed;
+            const newZ = curZ + forward.z * backSpeed;
+            if (!checkJurassicCollision(newX, newZ)) {
+                group.current.position.x = newX;
+                group.current.position.z = newZ;
+            } else {
+                if (!checkJurassicCollision(newX, curZ)) group.current.position.x = newX;
+                else if (!checkJurassicCollision(curX, newZ)) group.current.position.z = newZ;
+            }
+        }
+
+        group.current.position.y = 0;
+        positionRef.current.copy(group.current.position);
+        onPositionUpdate?.(group.current.position.x, group.current.position.y, group.current.position.z, group.current.rotation.y);
+
+        const dist = 12;
+        const baseHeight = 5.5;
+        const orbitAngle = group.current.rotation.y + cameraOrbitRef.current;
+        const verticalAngle = cameraVerticalRef.current;
+        const height = baseHeight + Math.sin(verticalAngle) * 8;
+        const horizontalDist = dist * Math.cos(verticalAngle * 0.5);
+        _jpCamOffset.current.set(-Math.sin(orbitAngle) * horizontalDist, height, -Math.cos(orbitAngle) * horizontalDist);
+        _jpTargetCam.current.copy(group.current.position).add(_jpCamOffset.current);
+        camera.position.lerp(_jpTargetCam.current, 0.1);
+        _jpLookTarget.current.set(group.current.position.x, group.current.position.y + 2, group.current.position.z);
+        camera.lookAt(_jpLookTarget.current);
+
+        if (attack && !isAttacking.current) {
+            isAttacking.current = true;
+            attackTime.current = 0;
+            playSound('swing');
+            onAttack();
+        }
+
+        if (isAttacking.current) {
+            attackTime.current += delta;
+            const progress = Math.min(attackTime.current / ATTACK_DURATION, 1);
+            if (!isFluffy && !jpSpecialModelPath && swordRef.current) {
+                const swingAngle = Math.sin(progress * Math.PI) * 2;
+                swordRef.current.rotation.x = swingAngle;
+                if (progress >= 1) { isAttacking.current = false; swordRef.current.rotation.x = 0; }
+            } else if (progress >= 1) { isAttacking.current = false; }
+        }
+    });
+
+    useEffect(() => { if (group.current) group.current.position.copy(positionRef.current); }, [positionRef]);
+
+    if (isFluffy) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedFluffyScene && <primitive object={clonedFluffyScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}</group>;
+    if (isLobster) return <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>{clonedLobsterScene && <primitive object={clonedLobsterScene} scale={7.5} rotation={[0, -Math.PI / 2, 0]} />}<pointLight position={[0, 1.5, 0]} color="#ff6b35" intensity={3} distance={15} decay={2} /></group>;
+    if (jpSpecialModelPath && jpClonedSpecialScene && jpSpecialTransform) {
+        return (
+            <group ref={group} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]} rotation={[0, Math.PI, 0]}>
+                <primitive
+                    object={jpClonedSpecialScene}
+                    scale={jpSpecialTransform.scale}
+                    rotation={[0, jpSpecialTransform.rotationY, 0]}
+                    position={[jpSpecialTransform.x, jpSpecialTransform.y, jpSpecialTransform.z]}
                 />
             </group>
         );
@@ -1595,6 +2028,33 @@ const Game3D: React.FC<GameProps> = ({ isPlaying, controlsRef, onScoreUpdate, on
 
                     <Particles particles={particles} />
                 </DesertLevel>
+            </Suspense>
+        );
+    }
+
+    if (selectedLevel === 'jurassicPark') {
+        return (
+            <Suspense fallback={<LoadingScreen />}>
+                <JurassicParkLevel
+                    playerPosRef={playerPos}
+                    onScoreUpdate={onScoreUpdate}
+                    attackTriggerRef={attackTriggerRef}
+                >
+                    <JurassicParkPlayer
+                        controlsRef={controlsRef}
+                        onAttack={handleAttack}
+                        positionRef={playerPos}
+                        characterVariant={selectedCharacter}
+                        onPositionUpdate={isConnected ? broadcastPosition : undefined}
+                    />
+
+                    {/* Render remote players */}
+                    {remotePlayerArray.map(player => (
+                        <RemotePlayer key={player.id} player={player} />
+                    ))}
+
+                    <Particles particles={particles} />
+                </JurassicParkLevel>
             </Suspense>
         );
     }

@@ -14,6 +14,7 @@ export const DESERT_RADIUS = 45;
 const CACTUS_COLLISION_RADIUS = 1.2;
 const SCORPION_COLLISION_RADIUS = 1.5;
 const TARANTULA_COLLISION_RADIUS = 1.3;
+const SNAKE_COLLISION_RADIUS = 1.2;
 
 // Module-level collision registries – populated by DesertLevel at runtime
 // so the exported checkDesertCollision can reference them without prop drilling.
@@ -21,6 +22,7 @@ let _aliveCactuses: { id: string; pos: [number, number, number] }[] = [];
 let _aliveCactusIds: Set<string> = new Set();
 let _scorpions: { x: number; z: number; alive: boolean }[] = [];
 let _tarantulas: { x: number; z: number; alive: boolean }[] = [];
+let _snakes: { x: number; z: number; alive: boolean }[] = [];
 let _perimeterRocks: { x: number; z: number; collisionRadius: number }[] = [];
 
 /** Called by DesertLevel to keep the collision data in sync. */
@@ -29,11 +31,13 @@ export function _updateDesertCollisionData(
     aliveIds: Set<string>,
     scorpions: { x: number; z: number; alive: boolean }[],
     tarantulas: { x: number; z: number; alive: boolean }[],
+    snakes: { x: number; z: number; alive: boolean }[],
 ) {
     _aliveCactuses = cactuses;
     _aliveCactusIds = aliveIds;
     _scorpions = scorpions;
     _tarantulas = tarantulas;
+    _snakes = snakes;
 }
 
 export const checkDesertCollision = (x: number, z: number): boolean => {
@@ -69,6 +73,14 @@ export const checkDesertCollision = (x: number, z: number): boolean => {
         const dx = x - ta.x;
         const dz = z - ta.z;
         if (dx * dx + dz * dz < TARANTULA_COLLISION_RADIUS * TARANTULA_COLLISION_RADIUS) return true;
+    }
+
+    // Snake NPCs (skip collision if dead)
+    for (const sn of _snakes) {
+        if (!sn.alive) continue;
+        const dx = x - sn.x;
+        const dz = z - sn.z;
+        if (dx * dx + dz * dz < SNAKE_COLLISION_RADIUS * SNAKE_COLLISION_RADIUS) return true;
     }
 
     return false;
@@ -525,20 +537,19 @@ const ScorpionNPC: React.FC<{
         return clone;
     }, [scene]);
 
-    // Compute vertical offset so the model's animated bottom sits on y=0.
-    // The scorpion's Idle/Walk animation lifts the mesh above its rest-pose
-    // bounding box. At game scale (7.5/maxDim) the lift is ~3.0 world units;
-    // scale proportionally for the NPC render scale (2).
-    const yOffset = useMemo(() => {
+    const transform = useMemo(() => {
         const box = new THREE.Box3().setFromObject(clonedScene);
         const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
         box.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        box.getCenter(center);
         const NPC_SCALE = 2;
-        const restGrounding = -box.min.y * NPC_SCALE;
-        const localLift = 3.0 / (7.5 / maxDim);
-        const animCorrection = localLift * NPC_SCALE;
-        return restGrounding - animCorrection;
+        return {
+            scale: NPC_SCALE,
+            x: -center.x * NPC_SCALE,
+            y: -box.min.y * NPC_SCALE - 3.0,
+            z: -center.z * NPC_SCALE,
+        };
     }, [clonedScene]);
 
     const { actions, names } = useAnimations(animations, clonedScene);
@@ -717,7 +728,11 @@ const ScorpionNPC: React.FC<{
 
     return (
         <group ref={groupRef}>
-            <primitive object={clonedScene} scale={[2, 2, 2]} position={[0, yOffset, 0]} />
+            <primitive
+                object={clonedScene}
+                scale={transform.scale}
+                position={[transform.x, transform.y, transform.z]}
+            />
         </group>
     );
 };
@@ -952,6 +967,382 @@ const TarantulaNPC: React.FC<{
 useGLTF.preload(TARANTULA_MODEL_PATH);
 
 // ============================================================
+// VENOM SPRAY – green confetti spraying from the snake's fangs
+// ============================================================
+const VENOM_PARTICLE_COUNT = 24;
+const VENOM_COLORS = ['#00ff44', '#22cc22', '#44ff66', '#00dd33', '#33ff55'];
+
+const VenomSprayEffect: React.FC<{ active: boolean; rotation: number }> = ({ active, rotation }) => {
+    const pointsRef = useRef<THREE.Points>(null);
+    const velocitiesRef = useRef<{ x: number; y: number; z: number }[]>([]);
+    const ageRef = useRef(new Float32Array(VENOM_PARTICLE_COUNT));
+    const colorsRef = useRef<Float32Array | null>(null);
+
+    const positions = useMemo(() => new Float32Array(VENOM_PARTICLE_COUNT * 3), []);
+
+    useEffect(() => {
+        const cols = new Float32Array(VENOM_PARTICLE_COUNT * 3);
+        for (let i = 0; i < VENOM_PARTICLE_COUNT; i++) {
+            const hex = VENOM_COLORS[Math.floor(Math.random() * VENOM_COLORS.length)];
+            const c = new THREE.Color(hex);
+            cols[i * 3] = c.r;
+            cols[i * 3 + 1] = c.g;
+            cols[i * 3 + 2] = c.b;
+        }
+        colorsRef.current = cols;
+    }, []);
+
+    const spawnParticle = useCallback((index: number, rot: number) => {
+        const spread = 0.4;
+        const forwardX = Math.sin(rot);
+        const forwardZ = Math.cos(rot);
+        const lateralX = Math.cos(rot);
+        const lateralZ = -Math.sin(rot);
+
+        const speed = 4 + Math.random() * 6;
+        const lateral = (Math.random() - 0.5) * spread;
+        const upward = 0.8 + Math.random() * 2.5;
+
+        velocitiesRef.current[index] = {
+            x: forwardX * speed + lateralX * lateral * speed,
+            y: upward,
+            z: forwardZ * speed + lateralZ * lateral * speed,
+        };
+
+        positions[index * 3] = forwardX * 0.5;
+        positions[index * 3 + 1] = 1.2 + Math.random() * 0.4;
+        positions[index * 3 + 2] = forwardZ * 0.5;
+
+        ageRef.current[index] = 0;
+    }, [positions]);
+
+    const spawnTimerRef = useRef(0);
+    const nextSpawnIndexRef = useRef(0);
+
+    useEffect(() => {
+        velocitiesRef.current = Array.from({ length: VENOM_PARTICLE_COUNT }, () => ({ x: 0, y: 0, z: 0 }));
+        for (let i = 0; i < VENOM_PARTICLE_COUNT; i++) {
+            positions[i * 3] = 0;
+            positions[i * 3 + 1] = -10;
+            positions[i * 3 + 2] = 0;
+            ageRef.current[i] = 999;
+        }
+    }, [positions]);
+
+    useFrame((_state, delta) => {
+        if (!pointsRef.current) return;
+        const geo = pointsRef.current.geometry;
+        const posAttr = geo.attributes.position as THREE.BufferAttribute;
+        const vels = velocitiesRef.current;
+        const ages = ageRef.current;
+
+        if (active) {
+            spawnTimerRef.current += delta;
+            const spawnInterval = 0.04;
+            while (spawnTimerRef.current >= spawnInterval) {
+                spawnTimerRef.current -= spawnInterval;
+                const idx = nextSpawnIndexRef.current % VENOM_PARTICLE_COUNT;
+                spawnParticle(idx, rotation);
+                nextSpawnIndexRef.current++;
+            }
+        }
+
+        for (let i = 0; i < VENOM_PARTICLE_COUNT; i++) {
+            ages[i] += delta;
+            if (ages[i] > 1.0) {
+                posAttr.array[i * 3 + 1] = -10;
+                continue;
+            }
+
+            posAttr.array[i * 3] += vels[i].x * delta;
+            posAttr.array[i * 3 + 1] += vels[i].y * delta;
+            posAttr.array[i * 3 + 2] += vels[i].z * delta;
+
+            vels[i].y -= delta * 5;
+            vels[i].x *= 0.97;
+            vels[i].z *= 0.97;
+        }
+
+        posAttr.needsUpdate = true;
+
+        const mat = pointsRef.current.material as THREE.PointsMaterial;
+        mat.opacity = active ? 0.85 : Math.max(0, mat.opacity - delta * 3);
+    });
+
+    return (
+        <points ref={pointsRef}>
+            <bufferGeometry>
+                <bufferAttribute
+                    attach="attributes-position"
+                    count={VENOM_PARTICLE_COUNT}
+                    array={positions}
+                    itemSize={3}
+                />
+                {colorsRef.current && (
+                    <bufferAttribute
+                        attach="attributes-color"
+                        count={VENOM_PARTICLE_COUNT}
+                        array={colorsRef.current}
+                        itemSize={3}
+                    />
+                )}
+            </bufferGeometry>
+            <pointsMaterial
+                vertexColors
+                size={0.25}
+                sizeAttenuation
+                transparent
+                opacity={0.85}
+                depthWrite={false}
+            />
+        </points>
+    );
+};
+
+// ============================================================
+// SNAKE NPC – GLB model with chase AI and attack animation
+// ============================================================
+const SNAKE_MODEL_PATH = '/models/snake_attack_animations_multiple.glb';
+const SNAKE_CHASE_SPEED = 3.5;
+const SNAKE_ATTACK_RANGE = 2.5;
+const SNAKE_START_X = -10;
+const SNAKE_START_Z = 15;
+
+const SNAKE_NPC_BODY_RADIUS = 1.8;
+
+const SnakeNPC: React.FC<{
+    id: string;
+    playerPosRef: React.MutableRefObject<THREE.Vector3>;
+    startX: number;
+    startZ: number;
+    isAlive: boolean;
+    onPositionUpdate: (x: number, z: number) => void;
+    allSnakePositionsRef: React.MutableRefObject<Map<string, { x: number; z: number }>>;
+}> = ({ id, playerPosRef, startX, startZ, isAlive, onPositionUpdate, allSnakePositionsRef }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { scene, animations } = useGLTF(SNAKE_MODEL_PATH);
+
+    const clonedScene = useMemo(() => {
+        const clone = skeletonClone(scene) as THREE.Group;
+        const orangeColor = new THREE.Color('#ff8800');
+        const emissiveColor = new THREE.Color('#cc4400');
+        const makeOrange = (mat: THREE.Material): THREE.Material => {
+            const m = mat.clone() as THREE.MeshStandardMaterial;
+            m.color = orangeColor.clone();
+            m.map = null;
+            m.emissive = emissiveColor.clone();
+            m.emissiveMap = null;
+            m.emissiveIntensity = 0.3;
+            m.roughness = 0.6;
+            m.metalness = 0.05;
+            m.needsUpdate = true;
+            return m;
+        };
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material = mesh.material.map(makeOrange);
+                    } else {
+                        mesh.material = makeOrange(mesh.material);
+                    }
+                }
+            }
+        });
+        return clone;
+    }, [scene]);
+
+    const transform = useMemo(() => {
+        const box = new THREE.Box3().setFromObject(clonedScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const scale = 15.0 / maxDim;
+        return {
+            scale,
+            x: -center.x * scale,
+            y: -box.min.y * scale,
+            z: -center.z * scale,
+        };
+    }, [clonedScene]);
+
+    const { actions, names } = useAnimations(animations, clonedScene);
+
+    useEffect(() => {
+        if (names.length > 0) {
+            console.log('[SnakeNPC] Available animations:', names);
+        }
+    }, [names]);
+
+    const resolveClip = useCallback(
+        (keywords: string[]): THREE.AnimationAction | null => {
+            for (const kw of keywords) {
+                const match = names.find((n) => n.toLowerCase().includes(kw.toLowerCase()));
+                if (match && actions[match]) return actions[match]!;
+            }
+            return null;
+        },
+        [actions, names],
+    );
+
+    const idleAction = useMemo(() => resolveClip(['idle', 'rest', 'stand']), [resolveClip]);
+    const attackAction = useMemo(() => resolveClip(['attack', 'bite', 'strike', 'hit', 'sting']), [resolveClip]);
+    const deathAction = useMemo(() => resolveClip(['death', 'die', 'dead', 'defeat', 'collapse']), [resolveClip]);
+    const fallbackAction = useMemo(() => {
+        if (idleAction || attackAction) return null;
+        const first = names[0];
+        return first ? actions[first] ?? null : null;
+    }, [idleAction, attackAction, actions, names]);
+
+    const stateRef = useRef({
+        x: startX,
+        z: startZ,
+        rotation: 0,
+        isAttacking: false,
+    });
+
+    const [venomActive, setVenomActive] = useState(false);
+    const venomRotationRef = useRef(0);
+
+    const deathTriggeredRef = useRef(false);
+    const deathTiltRef = useRef(0);
+
+    useEffect(() => {
+        const action = idleAction ?? fallbackAction;
+        if (action) {
+            action.reset();
+            action.setLoop(THREE.LoopRepeat, Infinity);
+            action.clampWhenFinished = false;
+            action.timeScale = 1;
+            action.play();
+        }
+    }, [idleAction, fallbackAction]);
+
+    useEffect(() => {
+        if (!isAlive && !deathTriggeredRef.current) {
+            deathTriggeredRef.current = true;
+            setVenomActive(false);
+
+            const idle = idleAction ?? fallbackAction;
+            if (idle) idle.fadeOut(0.3);
+            if (attackAction) attackAction.fadeOut(0.3);
+
+            if (deathAction) {
+                deathAction.reset();
+                deathAction.setLoop(THREE.LoopOnce, 1);
+                deathAction.clampWhenFinished = true;
+                deathAction.timeScale = 1;
+                deathAction.fadeIn(0.3).play();
+            }
+        }
+    }, [isAlive, idleAction, attackAction, deathAction, fallbackAction]);
+
+    useFrame((_state, delta) => {
+        if (!groupRef.current) return;
+
+        if (!isAlive) {
+            if (!deathAction && groupRef.current) {
+                deathTiltRef.current = Math.min(deathTiltRef.current + delta * 2, Math.PI / 2);
+                groupRef.current.rotation.z = deathTiltRef.current;
+            }
+            return;
+        }
+
+        const s = stateRef.current;
+        const pp = playerPosRef.current;
+
+        const dx = pp.x - s.x;
+        const dz = pp.z - s.z;
+        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+        const shouldAttack = distToPlayer < SNAKE_ATTACK_RANGE;
+
+        if (shouldAttack && !s.isAttacking) {
+            s.isAttacking = true;
+            setVenomActive(true);
+            const idle = idleAction ?? fallbackAction;
+            if (idle) idle.fadeOut(0.3);
+            if (attackAction) {
+                attackAction.reset();
+                attackAction.setLoop(THREE.LoopRepeat, Infinity);
+                attackAction.clampWhenFinished = false;
+                attackAction.timeScale = 1;
+                attackAction.fadeIn(0.3).play();
+            }
+        } else if (!shouldAttack && s.isAttacking) {
+            s.isAttacking = false;
+            setVenomActive(false);
+            if (attackAction) attackAction.fadeOut(0.3);
+            const idle = idleAction ?? fallbackAction;
+            if (idle) {
+                idle.reset();
+                idle.setLoop(THREE.LoopRepeat, Infinity);
+                idle.clampWhenFinished = false;
+                idle.timeScale = 1;
+                idle.fadeIn(0.3).play();
+            }
+        }
+
+        const PLAYER_BODY_RADIUS = 1.0;
+        if (distToPlayer > SNAKE_ATTACK_RANGE * 0.6) {
+            const speed = SNAKE_CHASE_SPEED * delta;
+            const nx = s.x + (dx / distToPlayer) * speed;
+            const nz = s.z + (dz / distToPlayer) * speed;
+
+            const boundaryOk = Math.sqrt(nx * nx + nz * nz) <= DESERT_RADIUS - 2;
+            const dxNew = pp.x - nx;
+            const dzNew = pp.z - nz;
+            const distNewToPlayer = Math.sqrt(dxNew * dxNew + dzNew * dzNew);
+            const playerOk = distNewToPlayer > PLAYER_BODY_RADIUS;
+
+            let otherSnakeOk = true;
+            const minDist = SNAKE_NPC_BODY_RADIUS * 2;
+            allSnakePositionsRef.current.forEach((pos, otherId) => {
+                if (otherId === id) return;
+                const odx = nx - pos.x;
+                const odz = nz - pos.z;
+                if (odx * odx + odz * odz < minDist * minDist) {
+                    otherSnakeOk = false;
+                }
+            });
+
+            if (boundaryOk && playerOk && otherSnakeOk) {
+                s.x = nx;
+                s.z = nz;
+            }
+        }
+
+        const targetRotation = Math.atan2(dx, dz);
+        s.rotation = THREE.MathUtils.lerp(s.rotation, targetRotation, delta * 6);
+        venomRotationRef.current = s.rotation;
+
+        groupRef.current.position.set(s.x, 0, s.z);
+        groupRef.current.rotation.y = s.rotation;
+
+        onPositionUpdate(s.x, s.z);
+    });
+
+    return (
+        <group ref={groupRef}>
+            <primitive
+                object={clonedScene}
+                scale={transform.scale}
+                rotation={[0, -Math.PI / 2, 0]}
+                position={[transform.x, transform.y, transform.z]}
+            />
+            {isAlive && <VenomSprayEffect active={venomActive} rotation={0} />}
+        </group>
+    );
+};
+
+useGLTF.preload(SNAKE_MODEL_PATH);
+
+// ============================================================
 // DESERT DUNE – procedural sand dune for terrain variation
 // ============================================================
 const SandDune: React.FC<{ position: [number, number, number]; scale: [number, number, number] }> = ({ position, scale }) => (
@@ -1156,6 +1547,42 @@ export const DesertLevel: React.FC<DesertLevelProps> = ({
     const nextTarantulaIdRef = useRef(1); // monotonic id counter
 
     // ----------------------------------------------------------
+    // Multi-snake system (max 3 alive at a time)
+    // ----------------------------------------------------------
+    const MAX_SNAKES = 3;
+    const SNAKE_RESPAWN_DELAY = 5000;
+
+    interface SnakeInstance {
+        id: string;
+        startX: number;
+        startZ: number;
+        alive: boolean;
+    }
+
+    const randomSnakeSpawn = useCallback((): { x: number; z: number } => {
+        const px = playerPosRef.current.x;
+        const pz = playerPosRef.current.z;
+        let x: number, z: number, dist: number;
+        do {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 15 + Math.random() * (DESERT_RADIUS - 20);
+            x = Math.cos(angle) * r;
+            z = Math.sin(angle) * r;
+            const ddx = x - px;
+            const ddz = z - pz;
+            dist = Math.sqrt(ddx * ddx + ddz * ddz);
+        } while (dist < 20);
+        return { x, z };
+    }, [playerPosRef]);
+
+    const [snakes, setSnakes] = useState<SnakeInstance[]>(() => {
+        return [{ id: 'snake-0', startX: SNAKE_START_X, startZ: SNAKE_START_Z, alive: true }];
+    });
+
+    const snakePositionsRef = useRef<Map<string, { x: number; z: number }>>(new Map());
+    const nextSnakeIdRef = useRef(1);
+
+    // ----------------------------------------------------------
     // Cactus alive tracking & confetti effects
     // ----------------------------------------------------------
     const aliveCactusesRef = useRef<Set<string>>(new Set(cactusPositions.map(c => c.id)));
@@ -1290,6 +1717,46 @@ export const DesertLevel: React.FC<DesertLevelProps> = ({
             }
         }
 
+        // Check if player attack hits any alive snake NPC
+        for (const sn of snakes) {
+            if (!sn.alive) continue;
+            const pos = snakePositionsRef.current.get(sn.id);
+            if (!pos) continue;
+            const sndx = px - pos.x;
+            const sndz = pz - pos.z;
+            const snakeDist = Math.sqrt(sndx * sndx + sndz * sndz);
+            if (snakeDist < RANGE) {
+                setSnakes(prev => prev.map(s => s.id === sn.id ? { ...s, alive: false } : s));
+                onScoreUpdate(prev => prev + 12);
+
+                const effectPos = new THREE.Vector3(pos.x, 1.5, pos.z);
+                const effectId = `pop-${sn.id}-${Date.now()}`;
+                setPopEffects(prev => [...prev, { id: effectId, position: effectPos }]);
+                setTimeout(() => {
+                    setPopEffects(prev => prev.filter(e => e.id !== effectId));
+                }, 1200);
+
+                playCactusPopSound();
+
+                setTimeout(() => {
+                    setSnakes(prev => {
+                        const alive = prev.filter(s => s.alive);
+                        const toSpawn = MAX_SNAKES - alive.length;
+                        if (toSpawn <= 0) return alive;
+                        const newSnakes = [...alive];
+                        for (let i = 0; i < toSpawn; i++) {
+                            const spawn = randomSnakeSpawn();
+                            const newId = `snake-${nextSnakeIdRef.current++}`;
+                            newSnakes.push({ id: newId, startX: spawn.x, startZ: spawn.z, alive: true });
+                        }
+                        return newSnakes;
+                    });
+                }, SNAKE_RESPAWN_DELAY);
+
+                break;
+            }
+        }
+
         if (poppedAny) {
             setEntityVersion(v => v + 1);
         }
@@ -1315,21 +1782,30 @@ export const DesertLevel: React.FC<DesertLevelProps> = ({
                 alive: ta.alive,
             };
         });
+        const snakeCollisionData = snakes.map(sn => {
+            const pos = snakePositionsRef.current.get(sn.id);
+            return {
+                x: pos?.x ?? sn.startX,
+                z: pos?.z ?? sn.startZ,
+                alive: sn.alive,
+            };
+        });
         _updateDesertCollisionData(
             cactusPositions,
             aliveCactusesRef.current,
             scorpionCollisionData,
             tarantulaCollisionData,
+            snakeCollisionData,
         );
     });
 
     return (
         <group>
             {/* ==================== LIGHTING ==================== */}
-            <ambientLight intensity={0.6} color="#fff5e0" />
+            <ambientLight intensity={1.02} color="#fff5e0" />
             <directionalLight
                 position={[15, 30, 10]}
-                intensity={1.8}
+                intensity={3.06}
                 color="#fff0d0"
                 castShadow={quality.shadowsEnabled}
                 shadow-mapSize={[shadowSize, shadowSize]}
@@ -1337,7 +1813,7 @@ export const DesertLevel: React.FC<DesertLevelProps> = ({
                 <orthographicCamera attach="shadow-camera" args={[-35, 35, 35, -35, 0.1, 100]} />
             </directionalLight>
             {/* Hot secondary sun glow */}
-            <directionalLight position={[-10, 20, -15]} intensity={0.4} color="#ffcc80" />
+            <directionalLight position={[-10, 20, -15]} intensity={0.68} color="#ffcc80" />
             <fog attach="fog" args={['#e8c98a', 30, 70]} />
 
             {/* ==================== SKY DOME ==================== */}
@@ -1428,6 +1904,22 @@ export const DesertLevel: React.FC<DesertLevelProps> = ({
                     isAlive={ta.alive}
                     onPositionUpdate={(x, z) => {
                         tarantulaPositionsRef.current.set(ta.id, { x, z });
+                    }}
+                />
+            ))}
+
+            {/* ==================== SNAKE NPCs (max 3) ==================== */}
+            {snakes.map(sn => (
+                <SnakeNPC
+                    key={sn.id}
+                    id={sn.id}
+                    playerPosRef={playerPosRef}
+                    startX={sn.startX}
+                    startZ={sn.startZ}
+                    isAlive={sn.alive}
+                    allSnakePositionsRef={snakePositionsRef}
+                    onPositionUpdate={(x, z) => {
+                        snakePositionsRef.current.set(sn.id, { x, z });
                     }}
                 />
             ))}

@@ -408,21 +408,6 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
         );
     }
 
-    if (variant === 'warDino') {
-        return (
-            <Float speed={1.4} rotationIntensity={0} floatIntensity={0.18}>
-                <GenericAutoFitPreviewModel
-                    modelPath="/models/war_dinosaur_-_rigged.glb"
-                    isSelected={isSelected}
-                    targetSizeSelected={3.5}
-                    targetSizeUnselected={3.0}
-                    yBase={-1.45}
-                    zBase={-1.3}
-                />
-            </Float>
-        );
-    }
-
     if (variant === 'mosasaurus') {
         return (
             <Float speed={1.2} rotationIntensity={0} floatIntensity={0.16}>
@@ -478,7 +463,7 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
                     isSelected={isSelected}
                     targetSizeSelected={3.5}
                     targetSizeUnselected={3.0}
-                    yBase={-3.8}
+                    yBase={-2.86}
                     zBase={-1.3}
                 />
             </Float>
@@ -493,9 +478,24 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
                     isSelected={isSelected}
                     targetSizeSelected={3.5}
                     targetSizeUnselected={3.0}
-                    yBase={-3.8}
+                    yBase={-2.86}
                     zBase={-1.3}
                     desaturate
+                />
+            </Float>
+        );
+    }
+
+    if (variant === 'spittingCobra') {
+        return (
+            <Float speed={1.3} rotationIntensity={0} floatIntensity={0.16}>
+                <GenericAutoFitPreviewModel
+                    modelPath="/models/snake_attack_animations_multiple.glb"
+                    isSelected={isSelected}
+                    targetSizeSelected={3.5}
+                    targetSizeUnselected={3.0}
+                    yBase={-1.45}
+                    zBase={-1.3}
                 />
             </Float>
         );
@@ -599,10 +599,10 @@ useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
 useGLTF.preload('/models/super lobster.glb');
 useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
-useGLTF.preload('/models/war_dinosaur_-_rigged.glb');
 useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
 useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
 useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
 useGLTF.preload('/models/scorpion.glb');
+useGLTF.preload('/models/snake_attack_animations_multiple.glb');
 
 export default CharacterSelectScene;

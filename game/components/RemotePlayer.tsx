@@ -20,13 +20,14 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
   const swordRef = useRef<THREE.Group>(null);
   const isTarantula = player.characterVariant === 'tarantula';
   const isScorpion = player.characterVariant === 'scorpion' || player.characterVariant === 'blackScorpion';
+  const isSpittingCobra = player.characterVariant === 'spittingCobra';
   const specialModelPath = useMemo(() => {
     if (player.characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
-    if (player.characterVariant === 'warDino') return '/models/war_dinosaur_-_rigged.glb';
     if (player.characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
     if (player.characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
     if (player.characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
     if (player.characterVariant === 'scorpion' || player.characterVariant === 'blackScorpion') return '/models/scorpion.glb';
+    if (player.characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
     return null;
   }, [player.characterVariant]);
   
@@ -315,6 +316,72 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     };
   }, [scorpionMixer, specialAnimations]);
 
+  // Spitting cobra animation mixer for remote players (idle with play/pause + attack)
+  const snakeMixer = useMemo(() => {
+    if (!isSpittingCobra || !clonedSpecialScene || specialAnimations.length === 0) return null;
+    return new THREE.AnimationMixer(clonedSpecialScene);
+  }, [isSpittingCobra, clonedSpecialScene, specialAnimations]);
+
+  const snakeActionsRef = useRef<Record<string, THREE.AnimationAction>>({});
+  const snakeStateRef = useRef<'idle' | 'attack'>('idle');
+  const snakeAttackingRef = useRef(false);
+  const snakePrevAttacking = useRef(false);
+  const snakePrevMoving = useRef(false);
+
+  useEffect(() => {
+    if (!snakeMixer || specialAnimations.length === 0) return;
+    const map: Record<string, THREE.AnimationAction> = {};
+    for (const clip of specialAnimations) {
+      map[clip.name] = snakeMixer.clipAction(clip);
+    }
+    snakeActionsRef.current = map;
+
+    const resolveClip = (keywords: string[]): THREE.AnimationAction | null => {
+      for (const kw of keywords) {
+        const match = specialAnimations.find(c => c.name.toLowerCase().includes(kw.toLowerCase()));
+        if (match && map[match.name]) return map[match.name];
+      }
+      return null;
+    };
+
+    const idleAction = resolveClip(['idle', 'rest', 'stand']) ?? Object.values(map).find(Boolean);
+    if (idleAction) {
+      idleAction.reset();
+      idleAction.setLoop(THREE.LoopRepeat, Infinity);
+      idleAction.clampWhenFinished = false;
+      idleAction.play();
+      idleAction.paused = true;
+      snakeStateRef.current = 'idle';
+    }
+
+    const attackAction = resolveClip(['attack', 'bite', 'strike', 'hit', 'sting']);
+    if (attackAction) {
+      attackAction.setLoop(THREE.LoopOnce, 1);
+      attackAction.clampWhenFinished = true;
+    }
+
+    const onFinished = (e: { action: THREE.AnimationAction }) => {
+      if (e.action === attackAction) {
+        snakeAttackingRef.current = false;
+        if (idleAction) {
+          e.action.fadeOut(0.2);
+          idleAction.reset().fadeIn(0.2).play();
+          idleAction.paused = !snakePrevMoving.current;
+          snakeStateRef.current = 'idle';
+        }
+      }
+    };
+    snakeMixer.addEventListener('finished', onFinished as any);
+
+    return () => {
+      snakeMixer.removeEventListener('finished', onFinished as any);
+      snakeMixer.stopAllAction();
+      snakeActionsRef.current = {};
+      snakeStateRef.current = 'idle';
+      snakeAttackingRef.current = false;
+    };
+  }, [snakeMixer, specialAnimations]);
+
   // Update target position when player data changes
   useEffect(() => {
     targetPos.current.set(
@@ -482,6 +549,45 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
       trexMixer.update(delta);
     }
 
+    // Spitting cobra animation for remote players - idle play/pause + attack
+    if (isSpittingCobra && snakeMixer) {
+      const actions = snakeActionsRef.current;
+      const posDelta = currentPos.current.distanceTo(prevPos.current);
+      const isRemoteMoving = posDelta > 0.005;
+      prevPos.current.copy(currentPos.current);
+
+      const resolveAction = (keywords: string[]): THREE.AnimationAction | null => {
+        for (const kw of keywords) {
+          const match = Object.keys(actions).find(n => n.toLowerCase().includes(kw.toLowerCase()));
+          if (match && actions[match]) return actions[match];
+        }
+        return null;
+      };
+
+      const idleAction = resolveAction(['idle', 'rest', 'stand']) ?? Object.values(actions).find(Boolean);
+      const attackAction = resolveAction(['attack', 'bite', 'strike', 'hit', 'sting']);
+
+      const remoteAttackNow = player.isAttacking;
+      if (remoteAttackNow && !snakePrevAttacking.current && !snakeAttackingRef.current && attackAction) {
+        snakeAttackingRef.current = true;
+        if (idleAction) idleAction.fadeOut(0.2);
+        attackAction.stop().reset().fadeIn(0.2).play();
+        snakeStateRef.current = 'attack';
+      }
+      snakePrevAttacking.current = remoteAttackNow;
+
+      if (!snakeAttackingRef.current && idleAction) {
+        if (isRemoteMoving && !snakePrevMoving.current) {
+          idleAction.paused = false;
+        } else if (!isRemoteMoving && snakePrevMoving.current) {
+          idleAction.paused = true;
+        }
+      }
+      snakePrevMoving.current = isRemoteMoving;
+
+      snakeMixer.update(delta);
+    }
+
     // Handle attack animation
     if (isAttacking.current && !specialModelPath && swordRef.current) {
       attackProgress.current += delta;
@@ -586,6 +692,7 @@ useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
 useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
 useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
 useGLTF.preload('/models/scorpion.glb');
+useGLTF.preload('/models/snake_attack_animations_multiple.glb');
 
 export default RemotePlayer;
 
