@@ -614,8 +614,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     const isSpittingCobra = characterVariant === 'spittingCobra';
     const specialModelPath = useMemo(() => {
         if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
-        if (characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
-        if (characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
+        if (characterVariant === 'distortusRex') return '/models/distortus_rex.glb';
         if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
         if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
         if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
@@ -765,8 +764,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         box.getCenter(center);
         const maxDimension = Math.max(size.x, size.y, size.z) || 1;
         let scale: number;
-        if (characterVariant === 'trex') {
-            // Normalize T-Rex Y-height to match Fluffy's rendered height (0.774 * 7.5)
+        if (characterVariant === 'trex' || characterVariant === 'distortusRex') {
             const fluffyGameHeight = 0.774 * 7.5;
             scale = fluffyGameHeight / size.y;
         } else {
@@ -776,9 +774,8 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         const z = -center.z * scale;
         // Per-character facing correction
         let rotationY = -Math.PI / 2;
-        if (characterVariant === 'legoMosasaurus') rotationY = 0;
         if (characterVariant === 'tarantula') rotationY = 0;
-        if (characterVariant === 'trex') rotationY = 0;
+        if (characterVariant === 'trex' || characterVariant === 'distortusRex') rotationY = 0;
         if (isScorpion) rotationY = 0;
         // Vertical offset: scorpion's Idle animation lifts the mesh above
         // the rest-pose bounding box. Empirically tuned so feet touch ground.
@@ -793,7 +790,6 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
         };
     }, [clonedSpecialScene, characterVariant]);
 
-    // Ref for procedural swim animation on Lego Mosasaurus
     const swimRef = useRef<THREE.Group>(null);
 
     // Tarantula locomotion animation
@@ -812,7 +808,7 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
     );
 
     // T-Rex animation (walk on movement, roar/bite burst on attack)
-    const isTrex = characterVariant === 'trex';
+    const isTrex = characterVariant === 'trex' || characterVariant === 'distortusRex';
     const updateTrexAnim = useTrexAnimation(
         isTrex, specialAnimations, clonedSpecialScene, controlsRef
     );
@@ -913,18 +909,6 @@ const Player = ({ controlsRef, onAttack, positionRef, onFootprint, hasClimbedPoo
             group.current.position.z,
             group.current.rotation.y
         );
-
-        // Procedural swim sway for Lego Mosasaurus
-        if (characterVariant === 'legoMosasaurus' && swimRef.current) {
-            if (isMoving) {
-                const t = state.clock.elapsedTime;
-                swimRef.current.rotation.z = Math.sin(t * 4) * 0.15;
-                swimRef.current.rotation.x = Math.sin(t * 3) * 0.08;
-            } else {
-                swimRef.current.rotation.z *= 0.9;
-                swimRef.current.rotation.x *= 0.9;
-            }
-        }
 
         const dist = 12;
         const baseHeight = 5.5;
@@ -1098,9 +1082,8 @@ useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
 useGLTF.preload('/models/super lobster.glb');
 useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
+useGLTF.preload('/models/distortus_rex.glb');
 useGLTF.preload('/models/war_dinosaur_-_rigged.glb');
-useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
-useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
 useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
 useGLTF.preload('/models/scorpion.glb');
 
@@ -1162,10 +1145,11 @@ const DesertPlayer = ({ controlsRef, onAttack, positionRef, characterVariant = '
     const isLobster = characterVariant === 'lobster';
     const dIsTarantula = characterVariant === 'tarantula';
     const dIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
-    const dIsTrex = characterVariant === 'trex';
+    const dIsTrex = characterVariant === 'trex' || characterVariant === 'distortusRex';
     const dIsSpittingCobra = characterVariant === 'spittingCobra';
     const dSpecialModelPath = useMemo(() => {
         if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
+        if (characterVariant === 'distortusRex') return '/models/distortus_rex.glb';
         if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
         if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
         if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
@@ -1485,10 +1469,11 @@ const JurassicParkPlayer = ({ controlsRef, onAttack, positionRef, characterVaria
     const isLobster = characterVariant === 'lobster';
     const jpIsTarantula = characterVariant === 'tarantula';
     const jpIsScorpion = characterVariant === 'scorpion' || characterVariant === 'blackScorpion';
-    const jpIsTrex = characterVariant === 'trex';
+    const jpIsTrex = characterVariant === 'trex' || characterVariant === 'distortusRex';
     const jpIsSpittingCobra = characterVariant === 'spittingCobra';
     const jpSpecialModelPath = useMemo(() => {
         if (characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
+        if (characterVariant === 'distortusRex') return '/models/distortus_rex.glb';
         if (characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
         if (characterVariant === 'scorpion' || characterVariant === 'blackScorpion') return '/models/scorpion.glb';
         if (characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';

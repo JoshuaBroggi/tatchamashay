@@ -42,8 +42,7 @@ export type CharacterVariant =
   | 'fluffy'
   | 'lobster'
   | 'trex'
-  | 'mosasaurus'
-  | 'legoMosasaurus'
+  | 'distortusRex'
   | 'tarantula'
   | 'scorpion'
   | 'blackScorpion'
@@ -82,16 +81,10 @@ export const CHARACTER_CONFIGS: CharacterConfig[] = [
     description: 'A roaring prehistoric powerhouse with a fabulous strut'
   },
   {
-    id: 'mosasaurus',
-    name: 'Mosasaurus',
-    cloakColor: '#0F766E', // Not used for Mosasaurus
-    description: 'A giant ocean reptile from the ancient seas'
-  },
-  {
-    id: 'legoMosasaurus',
-    name: 'Lego Mosasaurus',
-    cloakColor: '#1D4ED8', // Not used for Lego Mosasaurus
-    description: 'A blocky, toy-inspired aquatic titan'
+    id: 'distortusRex',
+    name: 'Distortus Rex',
+    cloakColor: '#6B2121', // Not used for Distortus Rex
+    description: 'A terrifying warped T-Rex with a bone-chilling presence'
   },
   {
     id: 'tarantula',

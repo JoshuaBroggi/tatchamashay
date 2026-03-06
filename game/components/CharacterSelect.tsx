@@ -125,8 +125,11 @@ const LobsterPreviewModel: React.FC<{ scale: number; isSelected: boolean }> = ({
 };
 
 // --- RIGGED T-REX PREVIEW MODEL (GLB) ---
-const TrexPreviewModel: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-    const { scene, animations } = useGLTF('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
+const TrexPreviewModel: React.FC<{ isSelected: boolean; modelPath?: string }> = ({
+    isSelected,
+    modelPath = '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb',
+}) => {
+    const { scene, animations } = useGLTF(modelPath);
 
     // Use SkeletonUtils clone so skinned meshes/rig animations behave correctly.
     const clonedScene = useMemo(() => {
@@ -408,33 +411,12 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
         );
     }
 
-    if (variant === 'mosasaurus') {
+    if (variant === 'distortusRex') {
         return (
-            <Float speed={1.2} rotationIntensity={0} floatIntensity={0.16}>
-                <GenericAutoFitPreviewModel
-                    modelPath="/models/jurassic_world_mosasaurus.glb"
+            <Float speed={1.5} rotationIntensity={0} floatIntensity={0.18}>
+                <TrexPreviewModel
                     isSelected={isSelected}
-                    targetSizeSelected={3.6}
-                    targetSizeUnselected={3.1}
-                    yBase={-1.45}
-                    zBase={-1.35}
-                    autoRotate={false}
-                />
-            </Float>
-        );
-    }
-
-    if (variant === 'legoMosasaurus') {
-        return (
-            <Float speed={1.3} rotationIntensity={0} floatIntensity={0.17}>
-                <GenericAutoFitPreviewModel
-                    modelPath="/models/rigged_mosasaurus_lego.glb"
-                    isSelected={isSelected}
-                    targetSizeSelected={3.5}
-                    targetSizeUnselected={3.0}
-                    yBase={-1.45}
-                    zBase={-1.3}
-                    autoRotate={false}
+                    modelPath="/models/distortus_rex.glb"
                 />
             </Float>
         );
@@ -599,10 +581,9 @@ useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/fluffy unicorn.glb');
 useGLTF.preload('/models/super lobster.glb');
 useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
-useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
-useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
 useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
 useGLTF.preload('/models/scorpion.glb');
 useGLTF.preload('/models/snake_attack_animations_multiple.glb');
+useGLTF.preload('/models/distortus_rex.glb');
 
 export default CharacterSelectScene;

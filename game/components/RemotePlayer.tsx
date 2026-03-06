@@ -23,8 +23,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
   const isSpittingCobra = player.characterVariant === 'spittingCobra';
   const specialModelPath = useMemo(() => {
     if (player.characterVariant === 'trex') return '/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb';
-    if (player.characterVariant === 'mosasaurus') return '/models/jurassic_world_mosasaurus.glb';
-    if (player.characterVariant === 'legoMosasaurus') return '/models/rigged_mosasaurus_lego.glb';
+    if (player.characterVariant === 'distortusRex') return '/models/distortus_rex.glb';
     if (player.characterVariant === 'tarantula') return '/models/theraphosa-blondi/source/hi-fi-spider.glb';
     if (player.characterVariant === 'scorpion' || player.characterVariant === 'blackScorpion') return '/models/scorpion.glb';
     if (player.characterVariant === 'spittingCobra') return '/models/snake_attack_animations_multiple.glb';
@@ -155,8 +154,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     box.getCenter(center);
     const maxDimension = Math.max(size.x, size.y, size.z) || 1;
     let scale: number;
-    if (player.characterVariant === 'trex') {
-      // Normalize T-Rex Y-height to match Fluffy's rendered height (0.774 * 7.5)
+    if (player.characterVariant === 'trex' || player.characterVariant === 'distortusRex') {
       const fluffyGameHeight = 0.774 * 7.5;
       scale = fluffyGameHeight / size.y;
     } else {
@@ -166,9 +164,8 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     const z = -center.z * scale;
     // Per-character facing correction
     let rotationY = -Math.PI / 2;
-    if (player.characterVariant === 'legoMosasaurus') rotationY = 0;
     if (player.characterVariant === 'tarantula') rotationY = 0;
-    if (player.characterVariant === 'trex') rotationY = 0;
+    if (player.characterVariant === 'trex' || player.characterVariant === 'distortusRex') rotationY = 0;
     if (isScorpion) rotationY = 0;
     // Vertical offset: scorpion's Idle animation lifts the mesh above
     // the rest-pose bounding box. Empirically tuned so feet touch ground.
@@ -183,7 +180,6 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     };
   }, [clonedSpecialScene, player.characterVariant]);
 
-  // Refs for procedural swim sway (Lego Mosasaurus)
   const swimRef = useRef<THREE.Group>(null);
   const prevPos = useRef(new THREE.Vector3(
     player.currentPosition.x,
@@ -219,7 +215,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
   }, [tarantulaMixer, specialAnimations]);
 
   // T-Rex animation mixer for remote players (walk on movement, roar burst on attack)
-  const isTrex = player.characterVariant === 'trex';
+  const isTrex = player.characterVariant === 'trex' || player.characterVariant === 'distortusRex';
   const trexMixer = useMemo(() => {
     if (!isTrex || !clonedSpecialScene || specialAnimations.length === 0) return null;
     return new THREE.AnimationMixer(clonedSpecialScene);
@@ -421,21 +417,6 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
     // Apply to group
     groupRef.current.position.copy(currentPos.current);
     groupRef.current.rotation.y = currentRot.current;
-
-    // Procedural swim sway for Lego Mosasaurus (derive movement from position delta)
-    if (player.characterVariant === 'legoMosasaurus' && swimRef.current) {
-      const posDelta = currentPos.current.distanceTo(prevPos.current);
-      const isSwimming = posDelta > 0.01;
-      prevPos.current.copy(currentPos.current);
-      if (isSwimming) {
-        const t = state.clock.elapsedTime;
-        swimRef.current.rotation.z = Math.sin(t * 4) * 0.15;
-        swimRef.current.rotation.x = Math.sin(t * 3) * 0.08;
-      } else {
-        swimRef.current.rotation.z *= 0.9;
-        swimRef.current.rotation.x *= 0.9;
-      }
-    }
 
     // Tarantula animation for remote players - infer movement from position delta
     if (isTarantula && tarantulaMixer) {
@@ -687,9 +668,8 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
 // Preload the model
 useGLTF.preload('/models/deathvader-optimized.glb');
 useGLTF.preload('/models/rigged-t-rex-fabulous/source/rigged_t-rex_fabulous.glb');
+useGLTF.preload('/models/distortus_rex.glb');
 useGLTF.preload('/models/war_dinosaur_-_rigged.glb');
-useGLTF.preload('/models/jurassic_world_mosasaurus.glb');
-useGLTF.preload('/models/rigged_mosasaurus_lego.glb');
 useGLTF.preload('/models/theraphosa-blondi/source/hi-fi-spider.glb');
 useGLTF.preload('/models/scorpion.glb');
 useGLTF.preload('/models/snake_attack_animations_multiple.glb');

@@ -544,6 +544,202 @@ const TrexNPC: React.FC<{
 useGLTF.preload(TREX_MODEL_PATH);
 
 // ============================================================
+// DISTORTUS REX NPC – GLB model with roam/chase/attack AI
+// ============================================================
+const DISTORTUS_REX_MODEL_PATH = '/models/distortus_rex.glb';
+const DISTORTUS_CHASE_SPEED = 7;
+const DISTORTUS_ROAM_SPEED = 3;
+const DISTORTUS_ATTACK_RANGE = 5.5;
+const DISTORTUS_DETECTION_RANGE = 30;
+
+const DistortusRexNPC: React.FC<{
+    playerPosRef: React.MutableRefObject<THREE.Vector3>;
+    startX: number;
+    startZ: number;
+    isAlive: boolean;
+    onPositionUpdate: (x: number, z: number) => void;
+}> = ({ playerPosRef, startX, startZ, isAlive, onPositionUpdate }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { scene, animations } = useGLTF(DISTORTUS_REX_MODEL_PATH);
+
+    const clonedScene = useMemo(() => {
+        const clone = skeletonClone(scene) as THREE.Group;
+        clone.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+            }
+        });
+        return clone;
+    }, [scene]);
+
+    const transform = useMemo(() => {
+        clonedScene.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(clonedScene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        const fluffyGameHeight = 0.774 * 7.5;
+        const scale = fluffyGameHeight / size.y;
+        return {
+            scale,
+            x: -center.x * scale,
+            y: -box.min.y * scale,
+            z: -center.z * scale,
+        };
+    }, [clonedScene]);
+
+    const { actions, names } = useAnimations(animations, clonedScene);
+
+    const mainAction = useMemo(() => {
+        const clip = names.find(n => n === 'CINEMA_4D_Main') ?? names[0];
+        return clip ? actions[clip] ?? null : null;
+    }, [actions, names]);
+
+    const stateRef = useRef({
+        x: startX,
+        z: startZ,
+        rotation: 0,
+        mode: 'roam' as 'roam' | 'chase' | 'attack',
+        roamTargetX: startX - 10,
+        roamTargetZ: startZ - 10,
+        roamTimer: 0,
+        attackTimer: 0,
+    });
+
+    const deathTriggeredRef = useRef(false);
+    const deathTiltRef = useRef(0);
+
+    useEffect(() => {
+        if (mainAction) {
+            mainAction.reset();
+            mainAction.setLoop(THREE.LoopRepeat, Infinity);
+            mainAction.clampWhenFinished = false;
+            mainAction.timeScale = 1;
+            mainAction.play();
+            mainAction.paused = true;
+        }
+    }, [mainAction]);
+
+    useEffect(() => {
+        if (!isAlive && !deathTriggeredRef.current) {
+            deathTriggeredRef.current = true;
+            if (mainAction) mainAction.fadeOut(0.3);
+        }
+    }, [isAlive, mainAction]);
+
+    useFrame((_state, delta) => {
+        if (!groupRef.current) return;
+
+        if (!isAlive) {
+            deathTiltRef.current = Math.min(deathTiltRef.current + delta * 1.5, Math.PI / 2);
+            groupRef.current.rotation.z = deathTiltRef.current;
+            return;
+        }
+
+        const s = stateRef.current;
+        const pp = playerPosRef.current;
+
+        const dx = pp.x - s.x;
+        const dz = pp.z - s.z;
+        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+        if (distToPlayer < DISTORTUS_ATTACK_RANGE) {
+            if (s.mode !== 'attack') {
+                s.mode = 'attack';
+                s.attackTimer = 0;
+                if (mainAction) {
+                    mainAction.paused = false;
+                    mainAction.timeScale = 2.5;
+                }
+            }
+        } else if (distToPlayer < DISTORTUS_DETECTION_RANGE) {
+            if (s.mode !== 'chase') {
+                s.mode = 'chase';
+                if (mainAction) {
+                    mainAction.paused = false;
+                    mainAction.timeScale = 1.2;
+                }
+            }
+        } else {
+            if (s.mode !== 'roam') {
+                s.mode = 'roam';
+                if (mainAction) {
+                    mainAction.paused = false;
+                    mainAction.timeScale = 0.6;
+                }
+            }
+        }
+
+        const PLAYER_BODY_RADIUS = 1.5;
+
+        if (s.mode === 'chase') {
+            if (distToPlayer > DISTORTUS_ATTACK_RANGE * 0.6) {
+                const speed = DISTORTUS_CHASE_SPEED * delta;
+                const nx = s.x + (dx / distToPlayer) * speed;
+                const nz = s.z + (dz / distToPlayer) * speed;
+                const boundaryOk = Math.sqrt(nx * nx + nz * nz) <= JUNGLE_RADIUS - 4;
+                const dxNew = pp.x - nx;
+                const dzNew = pp.z - nz;
+                const playerOk = Math.sqrt(dxNew * dxNew + dzNew * dzNew) > PLAYER_BODY_RADIUS;
+                if (boundaryOk && playerOk) {
+                    s.x = nx;
+                    s.z = nz;
+                }
+            }
+            const targetRotation = Math.atan2(dx, dz);
+            s.rotation = THREE.MathUtils.lerp(s.rotation, targetRotation, delta * 4);
+        } else if (s.mode === 'attack') {
+            s.attackTimer += delta;
+            const targetRotation = Math.atan2(dx, dz);
+            s.rotation = THREE.MathUtils.lerp(s.rotation, targetRotation, delta * 6);
+        } else {
+            s.roamTimer += delta;
+            if (s.roamTimer > 4) {
+                s.roamTimer = 0;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 10 + Math.random() * 20;
+                s.roamTargetX = Math.cos(angle) * dist;
+                s.roamTargetZ = Math.sin(angle) * dist;
+            }
+            const rdx = s.roamTargetX - s.x;
+            const rdz = s.roamTargetZ - s.z;
+            const roamDist = Math.sqrt(rdx * rdx + rdz * rdz);
+            if (roamDist > 2) {
+                const speed = DISTORTUS_ROAM_SPEED * delta;
+                const nx = s.x + (rdx / roamDist) * speed;
+                const nz = s.z + (rdz / roamDist) * speed;
+                const boundaryOk = Math.sqrt(nx * nx + nz * nz) <= JUNGLE_RADIUS - 4;
+                if (boundaryOk) {
+                    s.x = nx;
+                    s.z = nz;
+                }
+                const targetRotation = Math.atan2(rdx, rdz);
+                s.rotation = THREE.MathUtils.lerp(s.rotation, targetRotation, delta * 3);
+            }
+        }
+
+        groupRef.current.position.set(s.x, 0, s.z);
+        groupRef.current.rotation.y = s.rotation;
+        onPositionUpdate(s.x, s.z);
+    });
+
+    return (
+        <group ref={groupRef}>
+            <primitive
+                object={clonedScene}
+                scale={transform.scale}
+                position={[transform.x, transform.y, transform.z]}
+            />
+        </group>
+    );
+};
+
+useGLTF.preload(DISTORTUS_REX_MODEL_PATH);
+
+// ============================================================
 // DYNAMIC SPOTLIGHTS – follow player and T-Rex NPC
 // ============================================================
 const PlayerSpotlight: React.FC<{
@@ -722,11 +918,14 @@ export const JurassicParkLevel: React.FC<JurassicParkLevelProps> = ({
     // ----------------------------------------------------------
     const TREX_RESPAWN_DELAY = 8000;
 
+    type DinoVariant = 'trex' | 'distortusRex';
+
     interface TrexInstance {
         id: string;
         startX: number;
         startZ: number;
         alive: boolean;
+        variant: DinoVariant;
     }
 
     const randomTrexSpawn = useCallback((): { x: number; z: number } => {
@@ -746,7 +945,10 @@ export const JurassicParkLevel: React.FC<JurassicParkLevelProps> = ({
     }, [playerPosRef]);
 
     const [trexInstances, setTrexInstances] = useState<TrexInstance[]>(() => {
-        return [{ id: 'trex-0', startX: 25, startZ: 25, alive: true }];
+        return [
+            { id: 'trex-0', startX: 25, startZ: 25, alive: true, variant: 'trex' },
+            { id: 'distortus-0', startX: -30, startZ: -20, alive: true, variant: 'distortusRex' },
+        ];
     });
 
     const trexPositionsRef = useRef<Map<string, { x: number; z: number }>>(new Map());
@@ -784,13 +986,15 @@ export const JurassicParkLevel: React.FC<JurassicParkLevelProps> = ({
 
                 playTrexDeathSound();
 
+                const deadVariant = tr.variant;
                 setTimeout(() => {
                     setTrexInstances(prev => {
                         const alive = prev.filter(t => t.alive);
-                        if (alive.length >= 1) return alive;
+                        const hasVariant = alive.some(t => t.variant === deadVariant);
+                        if (hasVariant) return alive;
                         const spawn = randomTrexSpawn();
-                        const newId = `trex-${nextTrexIdRef.current++}`;
-                        return [...alive, { id: newId, startX: spawn.x, startZ: spawn.z, alive: true }];
+                        const newId = `${deadVariant}-${nextTrexIdRef.current++}`;
+                        return [...alive, { id: newId, startX: spawn.x, startZ: spawn.z, alive: true, variant: deadVariant }];
                     });
                 }, TREX_RESPAWN_DELAY);
 
@@ -895,18 +1099,31 @@ export const JurassicParkLevel: React.FC<JurassicParkLevelProps> = ({
                 <TrexPopEffect key={e.id} position={e.position} />
             ))}
 
-            {/* ==================== T-REX NPC ==================== */}
+            {/* ==================== DINOSAUR NPCs ==================== */}
             {trexInstances.map(tr => (
-                <TrexNPC
-                    key={tr.id}
-                    playerPosRef={playerPosRef}
-                    startX={tr.startX}
-                    startZ={tr.startZ}
-                    isAlive={tr.alive}
-                    onPositionUpdate={(x, z) => {
-                        trexPositionsRef.current.set(tr.id, { x, z });
-                    }}
-                />
+                tr.variant === 'distortusRex' ? (
+                    <DistortusRexNPC
+                        key={tr.id}
+                        playerPosRef={playerPosRef}
+                        startX={tr.startX}
+                        startZ={tr.startZ}
+                        isAlive={tr.alive}
+                        onPositionUpdate={(x, z) => {
+                            trexPositionsRef.current.set(tr.id, { x, z });
+                        }}
+                    />
+                ) : (
+                    <TrexNPC
+                        key={tr.id}
+                        playerPosRef={playerPosRef}
+                        startX={tr.startX}
+                        startZ={tr.startZ}
+                        isAlive={tr.alive}
+                        onPositionUpdate={(x, z) => {
+                            trexPositionsRef.current.set(tr.id, { x, z });
+                        }}
+                    />
+                )
             ))}
 
             {children}
