@@ -236,7 +236,8 @@ enum Sparkles: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 /// The treasure's own sound. `chime`, `fanfare` and `giggle` came first; the rest are the
-/// hide-for-parent flow's choices. Only the manifest's `sounds` have files so far.
+/// hide-for-parent flow's choices. Each has a file in the manifest's `sounds` under the same id;
+/// play it with `SoundEffect(sound)`.
 enum TreasureSound: String, Codable, CaseIterable, Identifiable, Sendable {
     case chime, fanfare, giggle
     case boing, toot, splash, ding, snore
@@ -286,6 +287,9 @@ struct Adventure: Identifiable, Codable, Hashable, Sendable {
     /// The starter adventure this was made from (`id:` in its story file), whose goal, reveal and
     /// finale lines the guide speaks. Nil for an adventure the parent wrote.
     var storyID: String?
+    /// The child who invented this adventure's treasure and hid it for the grown-up (the
+    /// hide-for-parent flow). The hunt can say who hid it. Nil for adventures the parent made.
+    var hiddenBy: ChildProfile.ID?
     var createdAt = Date()
     var syncState: SyncState = .waitingToSync
     var publication: PublicationState = .private

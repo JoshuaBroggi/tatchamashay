@@ -51,6 +51,12 @@ struct TreasureCatalog: Sendable {
 
     func modelURL(for entry: Entry) -> URL? { url(for: entry.file) }
     func thumbnailURL(for model: BuiltInModel) -> URL? { url(for: entry(for: model)?.thumbnail) }
+    /// The thumbnail painted in the treasure's default color (`<id>-default-color.png`), as the
+    /// child first sees it; falls back to the plain thumbnail.
+    func colorThumbnailURL(for model: BuiltInModel) -> URL? {
+        url(for: entry(for: model)?.thumbnail.map { $0.replacingOccurrences(of: ".png", with: "-default-color.png") })
+            ?? thumbnailURL(for: model)
+    }
     func soundURL(for effect: SoundEffect) -> URL? { url(for: sounds.first { $0.id == effect.rawValue }?.file) }
 
     // MARK: Manifest types
@@ -130,6 +136,23 @@ enum SoundEffect: String, CaseIterable, Sendable {
     case revealSparkle = "reveal_sparkle"
     /// The last treasure of an adventure is found.
     case finaleFanfare = "finale_fanfare"
+
+    // A treasure's own sound (`TreasureSound`), which the child picks when inventing it.
+    case boing, toot, giggle, splash, ding, snore, chime, fanfare
+
+    /// The sound a treasure's look plays. The raw values match.
+    init(_ sound: TreasureSound) {
+        self = switch sound {
+        case .boing: .boing
+        case .toot: .toot
+        case .giggle: .giggle
+        case .splash: .splash
+        case .ding: .ding
+        case .snore: .snore
+        case .chime: .chime
+        case .fanfare: .fanfare
+        }
+    }
 }
 
 /// An sRGB color written as `#RRGGBB`.

@@ -6,7 +6,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 |---|---|
 | `Models/` | One USDZ per model: the chest and 9 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
-| `Sounds/` | Four short AAC sound effects (`.m4a`) |
+| `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
 | `tools/` | The generators. Re-run them after changing a model |
 
@@ -90,7 +90,7 @@ cd ios/Assets/tools
 npm install
 npm run build             # every model, thumbnail and manifest entry
 node build.mjs parrot     # just one model
-npm run sounds            # the sound effects
+npm run sounds            # the sound effects and treasure sounds
 ```
 
 Each model is a small JavaScript file in `tools/models/`. It builds the model from three.js shapes, with named groups and meshes, and a table of materials. `lib/usd.mjs` writes it out as USD, keeping the groups (so the lid and wings keep their pivots) and the names. three.js's own `USDZExporter` was not used, because it flattens the hierarchy and renames every part. The chest's wood and iron textures are drawn pixel by pixel in `lib/textures.mjs`, after the look of the design mockup's `render/chest.html`.
@@ -115,5 +115,19 @@ The renderer has no reflections, so metal looks darker here than it will in the 
 | `chest_creak.m4a` | The chest lid opening (1.5 s) |
 | `reveal_sparkle.m4a` | The treasure rising out of the chest (1.6 s) |
 | `finale_fanfare.m4a` | The last treasure of an adventure is found (2.4 s) |
+
+Each treasure also has its own sound, which the child picks when inventing one. The file name is the
+`TreasureSound` id the app stores in a treasure's look.
+
+| File | Sounds like |
+|---|---|
+| `boing.m4a` | A wobbly spring (0.9 s) |
+| `toot.m4a` | Two short horn toots (0.9 s) |
+| `giggle.m4a` | Bouncy "hee hee hee" chirps (1.0 s) |
+| `splash.m4a` | A splash with droplets (1.1 s) |
+| `ding.m4a` | One clear bell (1.4 s) |
+| `snore.m4a` | A rumbly snore and a whistle (1.5 s) |
+| `chime.m4a` | Three soft rising bells (1.3 s) |
+| `fanfare.m4a` | A tiny "ta-daa!" (1.1 s) |
 
 They are synthesized by `tools/sounds.mjs` (mono, 44.1 kHz, AAC 96 kbps). They are placeholders until someone listens to them on a phone.

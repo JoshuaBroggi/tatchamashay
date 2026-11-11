@@ -95,6 +95,7 @@ struct RootView: View {
                     TabView {
                         Tab("Map", systemImage: "map.fill") { HuntView() }
                         Tab("My Chest", systemImage: "shippingbox.fill") { ChestScreen() }
+                        Tab("Make", systemImage: "wand.and.stars") { CreateView() }
                         Tab("Grown-ups", systemImage: "person.2.fill") { ParentView() }
                     }
                     .tint(Palette.gold)

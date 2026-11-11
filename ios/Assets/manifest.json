@@ -281,6 +281,46 @@
       "id": "finale_fanfare",
       "file": "Sounds/finale_fanfare.m4a",
       "use": "The last treasure of an adventure is found"
+    },
+    {
+      "id": "boing",
+      "file": "Sounds/boing.m4a",
+      "use": "Treasure sound: Boing!"
+    },
+    {
+      "id": "toot",
+      "file": "Sounds/toot.m4a",
+      "use": "Treasure sound: Toot toot!"
+    },
+    {
+      "id": "giggle",
+      "file": "Sounds/giggle.m4a",
+      "use": "Treasure sound: Hee hee hee!"
+    },
+    {
+      "id": "splash",
+      "file": "Sounds/splash.m4a",
+      "use": "Treasure sound: Splash!"
+    },
+    {
+      "id": "ding",
+      "file": "Sounds/ding.m4a",
+      "use": "Treasure sound: Ding!"
+    },
+    {
+      "id": "snore",
+      "file": "Sounds/snore.m4a",
+      "use": "Treasure sound: Zzzzz!"
+    },
+    {
+      "id": "chime",
+      "file": "Sounds/chime.m4a",
+      "use": "Treasure sound: a soft chime"
+    },
+    {
+      "id": "fanfare",
+      "file": "Sounds/fanfare.m4a",
+      "use": "Treasure sound: ta-daa!"
     }
   ]
 }
