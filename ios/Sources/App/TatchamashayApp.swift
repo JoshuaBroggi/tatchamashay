@@ -41,6 +41,10 @@ final class AppModel {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
         }
+        // UI tests of the hunt start from a ready 3-treasure adventure.
+        if ProcessInfo.processInfo.arguments.contains("-huntFixture") {
+            HuntFixture.install(at: JSONFilePersistence.defaultURL)
+        }
         #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
         real = FamilyModel(store: store)
@@ -70,6 +74,11 @@ final class AppModel {
         demo = nil
         demoFix = nil
     }
+
+    /// The latest hunt moment (hunt start, getting close, foggy GPS, a find, next treasure, finale),
+    /// set by the hunt screen once per event. The guide watches it to speak and show its lines; the
+    /// hunt itself never speaks. `HuntMomentTracker` documents when each moment fires.
+    var huntMoment: HuntMomentEvent?
 
     /// Demo mode only: a pretend position, so testing doesn't need a walk.
     private(set) var demoFix: LocationFix?

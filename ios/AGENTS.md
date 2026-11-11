@@ -24,6 +24,8 @@ Warnings are errors (`SWIFT_TREAT_WARNINGS_AS_ERRORS`). Swift 6 language mode.
 (full size in `build/screenshots`, small JPEGs in `docs/screenshots`). The walkthrough UI test
 (`UITests/FamilySliceUITests.swift`) is milestone 1's definition of done: set up, hide a treasure
 on a reviewed spot, walk up, double-tap Dig!, open the chest, restart, check the chest, replay.
+`UITests/HuntUITests.swift` walks milestone 2's 3-treasure hunt (screenshots `21-…` to `26-…`): far,
+warm, Dig!, foggy GPS and We found it, 2 of 3, finale.
 
 To try it by hand: boot a simulator, set its location as above, install
 `build/Build/Products/Debug-iphonesimulator/Tatchamashay.app`, and grant location with
@@ -81,7 +83,16 @@ Shared pieces to use instead of writing your own:
 - **Adventures:** `Adventure.readiness`, `Adventure.isFull`, `FamilyModel.progress` (`HuntProgress`:
   `next`, `nextNumber`, `step(afterFinding:)` → `.next` or `.finale`). A starter adventure sets
   `Adventure.storyID`/`guideID` and `ChestPlacement.storyTreasureID`.
-- UI tests launch with `-silent` so nothing speaks.
+- **Hunt moments (track B → track C):** the hunt never speaks or shows guide lines. It sets
+  `AppModel.huntMoment: HuntMomentEvent?` (`moment: GuideMoment`, 1-based `treasureNumber`, `total`,
+  `placementID`, `at`) once per event: `.greeting` (hunt start), `.gettingClose`, `.digReady`,
+  `.foggyGPS`, `.reveal` (found by Dig!), `.weFoundIt` (found by the grown-up), `.nextTreasure` and
+  `.finale` (when a reveal closes). Watch it with `.onChange(of: app.huntMoment)` and speak the
+  matching guide lines. `HuntMomentTracker` (`Views/Hunt/HuntMoments.swift`) owns the rules: GPS
+  drift never repeats a moment, and foggy GPS fires again only after 20 s of good signal.
+- UI tests launch with `-silent` so nothing speaks. `-huntFixture` (debug builds) starts from a ready
+  3-treasure adventure in Golden Gate Park (`Views/Hunt/HuntFixture.swift`); `UITests/HuntUITests`
+  walks it.
 
 ## Rules that the code enforces
 
