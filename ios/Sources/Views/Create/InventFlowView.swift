@@ -276,7 +276,7 @@ private struct ObjectScreen: View {
                             let reply = app.stories.hideFlow?.reply(for: .object, context: StoryContext(object: model.spokenName))
                             onPick(reply ?? model.displayName)
                         } content: {
-                            Thumbnail(model: model)
+                            TreasureThumbnail(model: model)
                         }
                         .accessibilityIdentifier("object-\(model.rawValue)")
                     }
@@ -288,7 +288,7 @@ private struct ObjectScreen: View {
 }
 
 /// The catalog's picture of a treasure, in its own color.
-struct Thumbnail: View {
+struct TreasureThumbnail: View {
     let model: BuiltInModel
     @Environment(AppModel.self) private var app
 

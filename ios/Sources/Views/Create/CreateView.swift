@@ -70,7 +70,7 @@ private struct InventionRow: View {
     var body: some View {
         let look = design.current.look
         HStack(spacing: 12) {
-            Thumbnail(model: look.model)
+            TreasureThumbnail(model: look.model)
                 .frame(width: 64, height: 64)
                 .background(Color(look.color).opacity(0.35))
                 .overlay(Rectangle().stroke(Palette.invented, lineWidth: 1))
