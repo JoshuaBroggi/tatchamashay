@@ -1,0 +1,57 @@
+name: Tatchamashay
+options:
+  bundleIdPrefix: com.tatchamashay
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "2.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  Tatchamashay:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.app
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_CFBundleDisplayName: Tatchamashay
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Tatchamashay uses your location during a hunt to show the Dig! button when you reach a treasure. Your location stays on this phone."
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+  TatchamashayTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: Tatchamashay
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.tests
+  TatchamashayUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Tatchamashay
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.uitests
+        TEST_TARGET_NAME: Tatchamashay
+schemes:
+  Tatchamashay:
+    build:
+      targets:
+        Tatchamashay: all
+        TatchamashayTests: [test]
+        TatchamashayUITests: [test]
+    test:
+      targets: [TatchamashayTests, TatchamashayUITests]
