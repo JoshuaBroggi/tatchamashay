@@ -79,10 +79,21 @@ protocol FamilyStore: Sendable {
     func deleteDesign(_ id: TreasureDesign.ID) async throws -> FamilyData
     func saveAdventure(_ adventure: Adventure) async throws -> FamilyData
     func place(_ placement: ChestPlacement) async throws -> FamilyData
+    /// Saves a new adventure and places its first treasure in one write, so a failed placement
+    /// never leaves an empty adventure behind. The placement follows the same rules as `place`.
+    func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement) async throws -> FamilyData
     func removePlacement(_ id: ChestPlacement.ID) async throws -> FamilyData
     /// Safe to repeat: the same run never adds a treasure twice.
     func recordFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
                     method: FindMethod, at date: Date) async throws -> (CollectResult, FamilyData)
+}
+
+extension FamilyStore {
+    /// Two writes, for stores that can't do both at once. `LocalFamilyStore` does it in one.
+    func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement) async throws -> FamilyData {
+        _ = try await saveAdventure(adventure)
+        return try await place(placement)
+    }
 }
 
 // MARK: - The rules, shared by every store
@@ -174,7 +185,13 @@ extension FamilyData {
               adventure.placementIDs.count <= Adventure.treasureCount.upperBound else {
             throw FamilyStoreError.adventureFull
         }
+        if let hiddenBy = adventure.hiddenBy, child(hiddenBy) == nil { throw FamilyStoreError.unknownChild }
         upsert(adventure, in: &adventures)
+    }
+
+    mutating func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement, now: Date) throws {
+        try saveAdventure(adventure)
+        try place(placement, now: now)
     }
 
     mutating func place(_ placement: ChestPlacement, now: Date) throws {
@@ -316,6 +333,11 @@ actor LocalFamilyStore: FamilyStore {
     func place(_ placement: ChestPlacement) throws -> FamilyData {
         let now = clock()
         return try change { try $0.place(placement, now: now) }
+    }
+
+    func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement) throws -> FamilyData {
+        let now = clock()
+        return try change { try $0.saveAdventure(adventure, placing: placement, now: now) }
     }
 
     func removePlacement(_ id: ChestPlacement.ID) throws -> FamilyData { try change { try $0.removePlacement(id) } }

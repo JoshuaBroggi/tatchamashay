@@ -140,6 +140,53 @@ final class FamilyModel {
 
     func design(for placement: ChestPlacement) -> TreasureDesign? { data.design(placement.designID) }
 
+    // MARK: Child: inventing and hiding a treasure for the grown-up
+
+    /// Treasures the child invented, newest first.
+    var inventions: [TreasureDesign] {
+        guard let child else { return [] }
+        return data.designs
+            .filter { $0.maker == .child(child.id) && $0.deletedAt == nil }
+            .sorted { $0.current.createdAt > $1.current.createdAt }
+    }
+
+    /// Saves the child's invention: a new design, or a new version of `editing`. Old versions never
+    /// change, so treasures already found keep their look. Returns the saved design, or nil if the
+    /// save failed.
+    func saveInvention(_ look: TreasureLook, editing designID: TreasureDesign.ID? = nil) async -> TreasureDesign? {
+        guard let parent, let child else { return nil }
+        var design: TreasureDesign
+        if let designID, var existing = data.design(designID) {
+            existing.edit(to: look)
+            design = existing
+        } else {
+            design = TreasureDesign(familyID: parent.id, maker: .child(child.id), look: look)
+        }
+        let saved = await tryWrite { try await $0.saveDesign(design) }
+        guard saved else { return nil }
+        design = data.design(design.id) ?? design
+        return design
+    }
+
+    /// Hides one version of the child's invention as a new one-treasure adventure for the grown-up,
+    /// on a spot the parent reviewed on the map. Returns whether it was saved.
+    func hideForGrownUp(design designID: TreasureDesign.ID, version versionID: TreasureVersion.ID,
+                        at spot: Coordinate, hint: String, reviewedAt: Date, guideID: String? = nil) async -> Bool {
+        guard let parent, let child, let look = data.design(designID)?.version(versionID)?.look else { return false }
+        let adventure = Adventure(
+            familyID: parent.id, title: "\(child.pirateName)'s treasure", goal: "Find \(look.name)!",
+            finale: "You found it!", guideID: guideID, hiddenBy: child.id
+        )
+        let placement = ChestPlacement(
+            familyID: parent.id, adventureID: adventure.id, designID: designID, versionID: versionID,
+            spot: spot, hint: hint, placedBy: parent.id, reviewedAt: reviewedAt
+        )
+        return await tryWrite { try await $0.saveAdventure(adventure, placing: placement) }
+    }
+
+    /// The child who hid an adventure's treasure for the grown-up, if a child did.
+    func hiddenBy(_ adventure: Adventure) -> ChildProfile? { adventure.hiddenBy.flatMap { data.child($0) } }
+
     // MARK: The hunt
 
     func startRunIfNeeded() {
@@ -205,6 +252,11 @@ final class FamilyModel {
         } catch {
             errorMessage = "Couldn't save. Please try again."
         }
+    }
+
+    private func tryWrite(_ change: (any FamilyStore) async throws -> FamilyData) async -> Bool {
+        await write(change)
+        return errorMessage == nil
     }
 
     private func restoredRun() -> HuntRun? {
