@@ -34,6 +34,9 @@ final class AppModel {
     let catalog = TreasureCatalog.bundled
     let stories = StoryLibrary.bundled
 
+    /// The hunt's latest guide moment; the guide overlay speaks for it. Set by `Views/Hunt`.
+    var huntMoment: HuntMoment?
+
     init() {
         #if DEBUG
         // UI tests start from an empty family.
@@ -66,6 +69,13 @@ final class AppModel {
         demo = await DemoFamily.make(around: center)
     }
 
+    #if DEBUG
+    /// UI tests and screenshots: plays a ready-made family as Demo mode.
+    func startDemo(with family: FamilyModel) {
+        demo = family
+    }
+    #endif
+
     func endDemo() {
         demo = nil
         demoFix = nil
@@ -93,7 +103,7 @@ struct RootView: View {
                 VStack(spacing: 0) {
                     if app.isDemo { DemoBanner() }
                     TabView {
-                        Tab("Map", systemImage: "map.fill") { HuntView() }
+                        Tab("Map", systemImage: "map.fill") { HuntView().overlay { GuideLayer() } }
                         Tab("My Chest", systemImage: "shippingbox.fill") { ChestScreen() }
                         Tab("Grown-ups", systemImage: "person.2.fill") { ParentView() }
                     }
