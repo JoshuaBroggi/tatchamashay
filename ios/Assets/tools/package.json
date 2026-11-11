@@ -1,0 +1,7 @@
+{
+  "name": "tatchamashay-assets-tools",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs", "sounds": "node sounds.mjs" },
+  "dependencies": { "three": "0.160.0", "fflate": "0.8.2" }
+}

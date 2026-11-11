@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "chest",
+      "displayName": "Treasure Chest",
+      "kind": "chest",
+      "file": "Models/Chest.usdz",
+      "thumbnail": "Thumbnails/chest.png",
+      "heightMeters": 0.492,
+      "tintableParts": [],
+      "idleMotion": "none",
+      "movingParts": [
+        {
+          "part": "Lid",
+          "motion": "hinge",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "openDegrees": -110
+        }
+      ],
+      "namedParts": {
+        "lid": "Lid",
+        "base": "Base",
+        "innerGlow": "InnerGlow",
+        "runes": [
+          "Runes",
+          "LidRunes"
+        ]
+      }
+    },
+    {
+      "id": "octopus",
+      "displayName": "Wobbles the Octopus",
+      "kind": "treasure",
+      "file": "Models/Octopus.usdz",
+      "thumbnail": "Thumbnails/octopus.png",
+      "description": "A giggly octopus with eight curly arms.",
+      "heightMeters": 0.312,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Head",
+        "Arms"
+      ],
+      "defaultColor": "#FF7A9C",
+      "idleMotion": "wiggle",
+      "movingParts": []
+    },
+    {
+      "id": "clam",
+      "displayName": "Glow Shell",
+      "kind": "treasure",
+      "file": "Models/GlowShell.usdz",
+      "thumbnail": "Thumbnails/clam.png",
+      "description": "A scalloped shell that opens to show a glowing pearl.",
+      "heightMeters": 0.283,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "ShellBottom",
+        "ShellTop"
+      ],
+      "defaultColor": "#FF9E7A",
+      "idleMotion": "bob",
+      "movingParts": [
+        {
+          "part": "Top",
+          "motion": "hinge",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "openDegrees": -60
+        }
+      ]
+    },
+    {
+      "id": "parrot",
+      "displayName": "Captain Squawk",
+      "kind": "treasure",
+      "file": "Models/Parrot.usdz",
+      "thumbnail": "Thumbnails/parrot.png",
+      "description": "A chatty pirate parrot in a three-cornered hat.",
+      "heightMeters": 0.277,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Body",
+        "Head",
+        "Tail",
+        "WingLeftFeathers",
+        "WingRightFeathers"
+      ],
+      "defaultColor": "#3CC46B",
+      "idleMotion": "flap",
+      "movingParts": [
+        {
+          "part": "WingLeft",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": -35
+        },
+        {
+          "part": "WingRight",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": 35
+        }
+      ]
+    },
+    {
+      "id": "crown",
+      "displayName": "Sparkle Crown",
+      "kind": "treasure",
+      "file": "Models/Crown.usdz",
+      "thumbnail": "Thumbnails/crown.png",
+      "description": "A jewelled crown fit for a pirate king or queen.",
+      "heightMeters": 0.2,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Band",
+        "Points",
+        "Rim"
+      ],
+      "defaultColor": "#F2C14E",
+      "idleMotion": "spin",
+      "movingParts": []
+    },
+    {
+      "id": "star-compass",
+      "displayName": "Star Compass",
+      "kind": "treasure",
+      "file": "Models/StarCompass.usdz",
+      "thumbnail": "Thumbnails/star-compass.png",
+      "description": "A shining star with a compass that always points to adventure.",
+      "heightMeters": 0.342,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Star"
+      ],
+      "defaultColor": "#FFC93C",
+      "idleMotion": "spin",
+      "movingParts": []
+    },
+    {
+      "id": "potion",
+      "displayName": "Giggle Potion",
+      "kind": "treasure",
+      "file": "Models/Potion.usdz",
+      "thumbnail": "Thumbnails/potion.png",
+      "description": "A fizzy potion that makes everyone giggle.",
+      "heightMeters": 0.329,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Liquid"
+      ],
+      "defaultColor": "#9B6BFF",
+      "idleMotion": "bob",
+      "movingParts": []
+    },
+    {
+      "id": "dragon-egg",
+      "displayName": "Dragon Egg",
+      "kind": "treasure",
+      "file": "Models/DragonEgg.usdz",
+      "thumbnail": "Thumbnails/dragon-egg.png",
+      "description": "A warm, wobbly egg. Something inside is about to say hello!",
+      "heightMeters": 0.275,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Shell"
+      ],
+      "defaultColor": "#4FC48A",
+      "idleMotion": "wiggle",
+      "idleMotionPart": "Egg",
+      "movingParts": []
+    },
+    {
+      "id": "turtle",
+      "displayName": "Tumble the Sea Turtle",
+      "kind": "treasure",
+      "file": "Models/Turtle.usdz",
+      "thumbnail": "Thumbnails/turtle.png",
+      "description": "A friendly sea turtle who loves to paddle.",
+      "heightMeters": 0.198,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Shell"
+      ],
+      "defaultColor": "#2FB5A6",
+      "idleMotion": "flap",
+      "movingParts": [
+        {
+          "part": "FlipperFrontLeft",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": 25
+        },
+        {
+          "part": "FlipperFrontRight",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": -25
+        },
+        {
+          "part": "FlipperBackLeft",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": 15
+        },
+        {
+          "part": "FlipperBackRight",
+          "motion": "flap",
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "degrees": -15
+        }
+      ]
+    },
+    {
+      "id": "doubloon",
+      "displayName": "Lucky Doubloon",
+      "kind": "treasure",
+      "file": "Models/Doubloon.usdz",
+      "thumbnail": "Thumbnails/doubloon.png",
+      "description": "A lucky golden coin. Flip it for a wish!",
+      "heightMeters": 0.264,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Face",
+        "Rim",
+        "Stamp"
+      ],
+      "defaultColor": "#F5B83D",
+      "idleMotion": "spin",
+      "movingParts": []
+    }
+  ],
+  "sounds": [
+    {
+      "id": "dig",
+      "file": "Sounds/dig.m4a",
+      "use": "Each tap of Dig!"
+    },
+    {
+      "id": "chest_creak",
+      "file": "Sounds/chest_creak.m4a",
+      "use": "The chest lid opening"
+    },
+    {
+      "id": "reveal_sparkle",
+      "file": "Sounds/reveal_sparkle.m4a",
+      "use": "The treasure rising out of the chest"
+    },
+    {
+      "id": "finale_fanfare",
+      "file": "Sounds/finale_fanfare.m4a",
+      "use": "The last treasure of an adventure is found"
+    }
+  ]
+}
