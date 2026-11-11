@@ -9,7 +9,9 @@ enum GuideRehearsal {
     static var isOn: Bool { ProcessInfo.processInfo.arguments.contains("-guideRehearsal") }
 
     static let storyID = "moon-pebbles"
-    static let center = Coordinate(latitude: 37.7694, longitude: -122.4862)
+    /// About 4 km from the spots the other UI tests stand on, so a simulator left at one of them
+    /// doesn't put a rehearsal treasure in Dig! range.
+    static let center = Coordinate(latitude: 37.8050, longitude: -122.4500)
 
     /// Emmanuel and Dad with the starter adventure hidden on three made-up spots. In-memory only,
     /// shown under the Demo banner.

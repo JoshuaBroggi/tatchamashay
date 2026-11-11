@@ -229,6 +229,7 @@ final class GuideDirector {
             guard [.digReady, .weFoundIt, .reveal, .finale].contains(moment.moment) else { return }
             openingDoneAt = nil
             phase = .hunting
+            silence()
         case .holdingForReveal:
             if Priority(moment.moment) > .chatter { pending.append(moment) }
             return

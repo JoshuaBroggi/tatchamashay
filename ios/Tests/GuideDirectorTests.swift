@@ -158,6 +158,17 @@ struct GuideDirectorTests {
         #expect(voice.overlaps == 0)
     }
 
+    @Test("Arriving at a treasure during the opening cuts it short and says Dig at once")
+    func digDuringOpening() {
+        let director = director()
+        director.begin(run: run, script: script(), foundCount: 0, isComplete: false)
+        director.handle(event(.digReady, 0))
+        #expect(director.phase == .hunting)
+        #expect(voice.spoken.count == 2)
+        #expect(director.bubble?.contains("Dig") == true)
+        #expect(voice.overlaps == 0)
+    }
+
     @Test("Nothing talks over the reveal; what came meanwhile plays after")
     func quietReveal() {
         let director = director()
