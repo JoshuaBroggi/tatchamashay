@@ -41,6 +41,7 @@ final class AppModel {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
             UserDefaults.standard.removeObject(forKey: "playingChild")
+            UserDefaults.standard.removeObject(forKey: RevealMemory.key)
         }
         // UI tests of the hunt start from a ready 3-treasure adventure.
         if ProcessInfo.processInfo.arguments.contains("-huntFixture") {
@@ -62,6 +63,10 @@ final class AppModel {
         sounds = BundledSoundEffects(catalog: .bundled, settings: settings)
         voice = SpeechGuideVoice(settings: settings)
     }
+
+    /// True while the chest reveal is on screen, from the sealed chest until the child closes it.
+    /// The spoken guide waits for it to turn false so it never talks over the reveal.
+    var isRevealing = false
 
     /// The family the screens show: the demo one while Demo mode is on, otherwise the real one.
     var family: FamilyModel { demo ?? real }

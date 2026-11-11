@@ -103,6 +103,11 @@ Shared pieces to use instead of writing your own:
 - **Where a hunt happens:** `Adventure.playArea` (center, radius, the parent's name for it). A
   placement from a starter story keeps the parent's blank in `ChestPlacement.hintBlank`; `hint` is
   already filled.
+- **Chest reveal:** `ChestOpeningView(look:foundAgain:hiddenBy:onDone:)` plays the reveal for a find
+  that is already saved; `onDone` runs once, when the child taps **Into my chest**. While it is on
+  screen `AppModel.isRevealing` is true: the guide waits for it to turn false before speaking (it is
+  set on appear and cleared on close). The reveal becomes skippable once a whole one has been seen
+  on this phone (`RevealMemory`, cleared by `-resetFamily`).
 
 ## Rules that the code enforces
 
@@ -138,3 +143,11 @@ Every record carries `syncState`; local records stay `waitingToSync` until a ser
 The simulator stops sending location updates while the location doesn't change, so after about
 10 seconds standing still the hunt turns foggy. A real phone keeps reporting. Nudge the location
 (`xcrun simctl location <udid> set …`) to get a fresh fix.
+
+On a simulator that has never run the app, grant location first
+(`xcrun simctl privacy <udid> grant location com.tatchamashay.app`). Otherwise the hide flow's map
+starts zoomed out and the walkthrough fails at "the map should be detailed enough to review".
+
+After the walkthrough restarts the app, the replay's 3D reveal sometimes stops drawing on the
+simulator: the text moves on but the chest picture freezes. The scene keeps running underneath, and
+`main`'s older reveal showed no model at all at the same step. Check the replay on a real phone.
