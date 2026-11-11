@@ -20,13 +20,14 @@ import {
 import { DOG_TOE_COUNT } from '../demodog/rig';
 
 /**
- * Procedural Vine Dog from Stranger Things: Tales from '85: a four-legged creature woven out
+ * Procedural Vine Dog from Stranger Things: Tales from '85: a six-legged creature woven out
  * of black vines, with glowing yellow-green slits, leaf-blade thorns down its back, spindly
  * vine legs ending in leaf-blade feet, and a tail that curls over its back into a pair of
  * leaf blades. Its head is a long closed snout that splits into five red, toothed jaws around
  * a ringed throat with a glowing yellow centre.
  *
- * It shares the Demodog's quadruped bone names, so the same baked clips drive it. Units are
+ * It has SIX legs: it shares the Demodog's front and rear bone names, plus a middle pair
+ * (humerusM, radiusM, pawM, toeM) that the shared clips drive via a tripod gait. Units are
  * metres, it faces +Z, Y is up. The bind pose has the jaws CLOSED; rotating a petal bone about
  * its local +X opens it.
  */
@@ -106,6 +107,14 @@ const frontLeg = (side: 1 | -1) => ({
     ball: V(0.3 * side, 0.035, 0.72),
 });
 
+/** The middle pair, attached to the mid-spine. Moves like the front legs, hence the shared shape. */
+const midLeg = (side: 1 | -1) => ({
+    hip: V(0.22 * side, 0.76, 0.14),
+    knee: V(0.38 * side, 0.5, 0.06),
+    wrist: V(0.33 * side, 0.25, 0.22),
+    ball: V(0.33 * side, 0.035, 0.34),
+});
+
 const rearLeg = (side: 1 | -1) => ({
     hip: V(0.22 * side, 0.7, -0.42),
     knee: V(0.34 * side, 0.46, -0.18),
@@ -165,6 +174,12 @@ const buildSkeleton = (): SkeletonBuilder => {
         sk.add(`radius${S}`, `humerus${S}`, f.elbow);
         sk.add(`pawF${S}`, `radius${S}`, f.wrist);
         for (let k = 0; k < DOG_TOE_COUNT; k++) sk.add(`toeF${k}${S}`, `pawF${S}`, toeJoints(f.ball, side, k, 0.17).base);
+
+        const m = midLeg(side);
+        sk.add(`humerusM${S}`, 'spine2', m.hip);
+        sk.add(`radiusM${S}`, `humerusM${S}`, m.knee);
+        sk.add(`pawM${S}`, `radiusM${S}`, m.wrist);
+        for (let k = 0; k < DOG_TOE_COUNT; k++) sk.add(`toeM${k}${S}`, `pawM${S}`, toeJoints(m.ball, side, k, 0.16).base);
 
         const r = rearLeg(side);
         sk.add(`femur${S}`, 'hips', r.hip);
@@ -310,6 +325,25 @@ const buildLegs = (mb: MeshBuilder) => {
             color: (s, _phi, p) => vineSkin(p, smoothstep(1.6, 3, s) * 0.7),
         });
 
+        const m = midLeg(side);
+        mb.tube({
+            joints: [m.hip, m.knee, m.wrist, m.ball],
+            bones: [`humerusM${S}`, `radiusM${S}`, `pawM${S}`],
+            prev: 'spine2',
+            ringsPerSegment: 12,
+            sides: 14,
+            radius: profile([
+                [0, 0.09, 0.09],
+                [0.5, 0.068, 0.068],
+                [1, 0.047, 0.047],
+                [1.5, 0.043, 0.043],
+                [2, 0.032, 0.032],
+                [3, 0.034, 0.034],
+            ]),
+            shape: legTwist,
+            color: (s, _phi, p) => vineSkin(p, smoothstep(1.6, 3, s) * 0.7),
+        });
+
         const r = rearLeg(side);
         mb.tube({
             joints: [r.hip, r.knee, r.hock, r.ball],
@@ -332,6 +366,7 @@ const buildLegs = (mb: MeshBuilder) => {
         // Feet: three broad leaf blades each, tips lifting slightly.
         const feet: [string, THREE.Vector3, number][] = [
             ['F', f.ball, 0.17],
+            ['M', m.ball, 0.16],
             ['R', r.ball, 0.15],
         ];
         for (const [kind, ball, len] of feet) {
@@ -341,7 +376,7 @@ const buildLegs = (mb: MeshBuilder) => {
                 mb.tube({
                     joints: [t.base, t.mid, t.tip],
                     bones: [bone, bone],
-                    prev: kind === 'F' ? `pawF${S}` : `metaR${S}`,
+                    prev: kind === 'F' ? `pawF${S}` : kind === 'M' ? `pawM${S}` : `metaR${S}`,
                     ringsPerSegment: 8,
                     sides: 10,
                     ref: V(1, 0, 0),

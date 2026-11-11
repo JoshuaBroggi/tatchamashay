@@ -16,7 +16,7 @@ const jaws = (p: Pose, open: number, curl: number, t = 0, wobble = 0) => {
     }
 };
 
-export const VINE_DOG_JAWS: JawStyle = { petals: jaws, rest: 0.04, coil: 0.4, wide: 1.1, snap: 0, recover: 0.2 };
+export const VINE_DOG_JAWS: JawStyle = { petals: jaws, rest: 0.04, coil: 0.4, wide: 1.1, snap: 0, recover: 0.2, middleLegs: true };
 
 /** Bakes Idle, Walk, Attack and Roar clips for a rig produced by buildVineDogRig. */
 export const buildVineDogClips = (rig: DemogorgonRig): THREE.AnimationClip[] => buildQuadrupedClips(rig, VINE_DOG_JAWS);

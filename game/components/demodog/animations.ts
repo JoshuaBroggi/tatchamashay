@@ -35,6 +35,8 @@ export interface JawStyle {
     wide: number;
     snap: number;
     recover: number;
+    /** The skeleton has a middle pair of legs (humerusM/radiusM/pawM/toeM) that walk in a tripod gait. */
+    middleLegs?: boolean;
 }
 
 /** The Demodog's petals are bind-posed flat, so openness counts up toward a flat flower. */
@@ -45,10 +47,12 @@ const WALK_DURATION = 1;
 const ATTACK_DURATION = 1.6;
 const ROAR_DURATION = 3.2;
 
-const FOOT_BONES = ['L', 'R'].flatMap(S => [
-    ...Array.from({ length: DOG_TOE_COUNT }, (_, k) => `toeF${k}${S}`),
-    ...Array.from({ length: DOG_TOE_COUNT }, (_, k) => `toeR${k}${S}`),
-]);
+const footBones = (rig: DemogorgonRig): string[] =>
+    ['L', 'R']
+        .flatMap(S =>
+            ['F', 'M', 'R'].flatMap(kind => Array.from({ length: DOG_TOE_COUNT }, (_, k) => `toe${kind}${k}${S}`)),
+        )
+        .filter(name => name in rig.bones);
 
 const tail = (p: Pose, lift: number, swayDegrees: number, ph: number) => {
     // Each tail segment lags the one before it, so the sway travels down the tail like a whip.
@@ -84,9 +88,29 @@ const flatPaws = (pose: Pose): Pose => {
         const hum = pose.rot[`humerus${S}`]?.[0] ?? 0;
         const rad = pose.rot[`radius${S}`]?.[0] ?? 0;
         rotate(pose, `pawF${S}`, -(hum + rad));
+        const humM = pose.rot[`humerusM${S}`]?.[0] ?? 0;
+        const radM = pose.rot[`radiusM${S}`]?.[0] ?? 0;
+        if (humM || radM) rotate(pose, `pawM${S}`, -(humM + radM));
         const fem = pose.rot[`femur${S}`]?.[0] ?? 0;
         const tib = pose.rot[`tibia${S}`]?.[0] ?? 0;
         rotate(pose, `metaR${S}`, -(fem + tib));
+    }
+    return pose;
+};
+
+/**
+ * Middle legs mimic the front leg on the opposite side, so each side always has a mix of
+ * planted and swinging legs (a tripod gait).
+ */
+const copyMiddle = (pose: Pose): Pose => {
+    for (const S of ['L', 'R']) {
+        const O = S === 'L' ? 'R' : 'L';
+        const pairs: [string, string][] = [['humerusM', 'humerus'], ['radiusM', 'radius']];
+        for (let k = 0; k < DOG_TOE_COUNT; k++) pairs.push([`toeM${k}`, `toeF${k}`]);
+        for (const [mid, front] of pairs) {
+            const r = pose.rot[`${front}${O}`];
+            if (r) pose.rot[`${mid}${S}`] = [r[0], -r[1], -r[2]];
+        }
     }
     return pose;
 };
@@ -261,19 +285,21 @@ export const buildQuadrupedClips = (rig: DemogorgonRig, st: JawStyle): THREE.Ani
     resetPose(rig);
     rig.root.updateMatrixWorld(true);
     const v = new THREE.Vector3();
-    const groundY = FOOT_BONES.reduce((lowest, name) => {
+    const feet = footBones(rig);
+    const prepare = st.middleLegs ? (pose: Pose) => flatPaws(copyMiddle(pose)) : flatPaws;
+    const groundY = feet.reduce((lowest, name) => {
         rig.bones[name].getWorldPosition(v);
         return Math.min(lowest, v.y);
     }, Infinity);
-    const ground = { y: groundY, bones: FOOT_BONES };
+    const ground = { y: groundY, bones: feet };
 
     const attack = attackKeys(st);
     const roar = roarKeys(st);
     const clips = [
-        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, t => idlePose(t, st), ground, flatPaws),
-        bake(rig, CLIP_NAMES.walk, WALK_DURATION, t => walkPose(t, st), ground, flatPaws),
-        bake(rig, CLIP_NAMES.attack, ATTACK_DURATION, t => sampleKeys(attack, t), ground, flatPaws),
-        bake(rig, CLIP_NAMES.roar, ROAR_DURATION, t => roarPose(roar, t), ground, flatPaws),
+        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, t => idlePose(t, st), ground, prepare),
+        bake(rig, CLIP_NAMES.walk, WALK_DURATION, t => walkPose(t, st), ground, prepare),
+        bake(rig, CLIP_NAMES.attack, ATTACK_DURATION, t => sampleKeys(attack, t), ground, prepare),
+        bake(rig, CLIP_NAMES.roar, ROAR_DURATION, t => roarPose(roar, t), ground, prepare),
     ];
 
     resetPose(rig);
