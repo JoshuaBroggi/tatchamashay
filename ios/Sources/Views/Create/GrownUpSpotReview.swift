@@ -2,7 +2,7 @@ import MapKit
 import SwiftUI
 
 /// The grown-up confirms where the child's treasure goes, under the same rules as the parent's own
-/// `ReviewSpotView` (`Views/Parent`): a detailed map zoomed in to `ReviewSpotView.detailedDistance`,
+/// `ReviewSpotView` (`Views/Parent`): a detailed map zoomed in to `MapReview.spotDistance`,
 /// a crosshair, and the grown-up's confirmation that they checked the spot.
 ///
 /// `ReviewSpotView` saves a new parent-made treasure into the newest adventure, so it can't hide an
@@ -26,7 +26,7 @@ struct GrownUpSpotReview: View {
     @State private var blank = ""
     @State private var saving = false
 
-    private var isDetailed: Bool { cameraDistance <= ReviewSpotView.detailedDistance }
+    private var isDetailed: Bool { MapReview.isDetailedForSpot(cameraDistance: cameraDistance) }
     private var canConfirm: Bool { isDetailed && checked && center != nil && !saving }
 
     /// The clue the hunt shows: the template with the grown-up's words, or their words alone.
