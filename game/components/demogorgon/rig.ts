@@ -549,7 +549,7 @@ const PETAL_LENGTH = 0.31;
 
 /** Half-width of a petal at t in [0, 1]: broad kite shape tapering to a point. */
 const petalHalfWidth = (t: number) =>
-    t < 0.35 ? 0.1 + 0.06 * smoothstep(0, 0.35, t) : 0.16 * Math.pow(Math.max(0, 1 - (t - 0.35) / 0.65), 0.85);
+    t < 0.35 ? 0.062 + 0.058 * smoothstep(0, 0.35, t) : 0.12 * Math.pow(Math.max(0, 1 - (t - 0.35) / 0.65), 0.9);
 
 // ------------------------------------------------------------------
 // Skeleton definition

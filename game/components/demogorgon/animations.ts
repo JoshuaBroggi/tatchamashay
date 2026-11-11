@@ -167,7 +167,7 @@ const idlePose = (t: number): Pose => {
     }
 
     rotate(p, 'hips', 0, 0, 1.4 * Math.sin(ph));
-    petals(p, 1.05 + 0.08 * Math.sin(ph * 2), 0.04, t / IDLE_DURATION, 0.05);
+    petals(p, 0.8 + 0.08 * Math.sin(ph * 2), 0.04, t / IDLE_DURATION, 0.05);
     return p;
 };
 
@@ -201,14 +201,14 @@ const walkPose = (t: number): Pose => {
     lean(p, 6);
     rotate(p, 'neck2', 2 * Math.sin(ph * 2), -4 * Math.sin(ph + 0.4));
     rotate(p, 'head', 3 * Math.sin(ph * 2 + 0.5), 5 * Math.cos(ph), 2 * Math.sin(ph));
-    petals(p, 1.1 + 0.08 * Math.sin(ph * 2), 0.05, t / WALK_DURATION, 0.05);
+    petals(p, 0.85 + 0.08 * Math.sin(ph * 2), 0.05, t / WALK_DURATION, 0.05);
     return p;
 };
 
 const ATTACK_DURATION = 1.8;
 const attackKeys = (): { t: number; pose: Pose }[] => {
     const ready = rest();
-    petals(ready, 1.05, 0.04);
+    petals(ready, 0.8, 0.04);
 
     // Coil back, petals begin to part.
     const wind = rest();
@@ -219,7 +219,7 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     both(wind, 'foreArm', -28);
     both(wind, 'thigh', -14);
     both(wind, 'shin', 22);
-    petals(wind, 1.25, 0.2);
+    petals(wind, 1.1, 0.2);
     move(wind, 'root', 0, 0, -0.14);
 
     // Lunge: petals blown fully open, arms thrust forward, one leg driving.
@@ -271,11 +271,11 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     const recover = rest();
     lean(recover, 12);
     both(recover, 'upperArm', -22, 0, 8);
-    petals(recover, 0.9, 0.05);
+    petals(recover, 0.7, 0.05);
     move(recover, 'root', 0, 0, 0.2);
 
     const end = rest();
-    petals(end, 1.05, 0.04);
+    petals(end, 0.8, 0.04);
 
     return [
         { t: 0, pose: ready },
@@ -291,7 +291,7 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
 const ROAR_DURATION = 3.2;
 const roarKeys = (): { t: number; pose: Pose }[] => {
     const ready = rest();
-    petals(ready, 1.05, 0.04);
+    petals(ready, 0.8, 0.04);
 
     const inhale = rest();
     lean(inhale, -10);
@@ -301,7 +301,7 @@ const roarKeys = (): { t: number; pose: Pose }[] => {
     both(inhale, 'foreArm', -24);
     both(inhale, 'thigh', -10);
     both(inhale, 'shin', 16);
-    petals(inhale, 1.25, 0.15);
+    petals(inhale, 1.1, 0.15);
 
     const roar = rest();
     lean(roar, -18);
@@ -318,10 +318,10 @@ const roarKeys = (): { t: number; pose: Pose }[] => {
 
     const relax = rest();
     lean(relax, 4);
-    petals(relax, 1.0, 0.08);
+    petals(relax, 0.8, 0.08);
 
     const end = rest();
-    petals(end, 1.05, 0.04);
+    petals(end, 0.8, 0.04);
 
     return [
         { t: 0, pose: ready },
