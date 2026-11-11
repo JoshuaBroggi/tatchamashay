@@ -232,6 +232,8 @@ struct AdventureStory: Decodable, Identifiable, Hashable, Sendable {
         let id: String
         let order: Int
         let name: String
+        /// The `model:` id as written, a `BuiltInModel` raw value. Nil if the file has none.
+        let modelID: String?
         /// A brief for the art track. Not shown to the child.
         let looksLike: String?
         /// Spoken after the guide's `reveal` line.
@@ -244,6 +246,7 @@ struct AdventureStory: Decodable, Identifiable, Hashable, Sendable {
 
         enum CodingKeys: String, CodingKey {
             case id, order, name, reveal
+            case modelID = "model"
             case looksLike = "looks_like"
             case hintTemplate = "hint_template"
             case blankAsks = "blank_asks"
@@ -255,12 +258,17 @@ struct AdventureStory: Decodable, Identifiable, Hashable, Sendable {
             id = try c.decode(String.self, forKey: .id)
             order = try c.decode(Int.self, forKey: .order)
             name = try c.decode(String.self, forKey: .name)
+            modelID = try c.decodeIfPresent(String.self, forKey: .modelID)
             looksLike = try c.decodeIfPresent(String.self, forKey: .looksLike)
             reveal = try c.decode(String.self, forKey: .reveal)
             hintTemplate = try c.decode(String.self, forKey: .hintTemplate)
             blankAsks = try c.decodeIfPresent(String.self, forKey: .blankAsks)
             blankIdeas = try c.decodeIfPresent([String].self, forKey: .blankIdeas) ?? []
         }
+
+        /// The built-in treasure that plays this one, or nil if `model:` is missing or unknown. An
+        /// unknown id doesn't stop the library loading; a test checks the bundled ones.
+        var model: BuiltInModel? { modelID.flatMap(BuiltInModel.init(savedID:)) }
 
         /// The hint with the parent's words in the blank, or nil if they left it empty.
         func hint(blank: String) -> String? { StoryContext(blank: blank).fill(hintTemplate) }

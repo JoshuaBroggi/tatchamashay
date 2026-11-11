@@ -8,6 +8,7 @@ minutes: 15
 goal: "It's Nib's birthday! But the party things are lost."
 treasures:
   - id: party-drum
+    model: clam
     order: 1
     name: The Boom-Boom Clam Drum
     looks_like: A little drum made from a clam shell, with a wavy pink stripe.
@@ -16,6 +17,7 @@ treasures:
     blank_asks: a thing you can see there
     blank_ideas: [table, bench, bush, porch chair]
   - id: party-hat
+    model: crown
     order: 2
     name: The Wobbly Starfish Hat
     looks_like: A tiny party hat shaped like a starfish, with a bobble on top.
@@ -24,6 +26,7 @@ treasures:
     blank_asks: a thing you can see there
     blank_ideas: [watering can, swing, big rock, fence post]
   - id: party-cake
+    model: potion
     order: 3
     name: The Sea Foam Cupcake
     looks_like: A cupcake with fluffy sea foam frosting and one shell candle.
