@@ -354,7 +354,8 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
     };
 
     const loop = (periodSeconds: number, tick: () => void) => {
-        tick();
+        // While the browser still has audio locked, skip ticks so sounds don't pile up and burst out together.
+        if (ctx?.state === 'running') tick();
         timers.push(window.setTimeout(() => loop(periodSeconds, tick), periodSeconds * 1000));
     };
 

@@ -82,7 +82,8 @@ export const DemogorgonPreview: React.FC = () => {
     const navigate = useNavigate();
     const [animation, setAnimation] = useState<DemogorgonAnimation>('idle');
     const [exporting, setExporting] = useState(false);
-    const [sound, setSound] = useState(false);
+    // Browsers keep audio locked until the first click, so the first button press unlocks it.
+    const [sound, setSound] = useState(true);
     const buildRef = useRef<DemogorgonBuild | null>(null);
 
     const handleBuilt = useCallback((b: DemogorgonBuild) => {
