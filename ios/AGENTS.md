@@ -81,6 +81,11 @@ Shared pieces to use instead of writing your own:
 - **Adventures:** `Adventure.readiness`, `Adventure.isFull`, `FamilyModel.progress` (`HuntProgress`:
   `next`, `nextNumber`, `step(afterFinding:)` → `.next` or `.finale`). A starter adventure sets
   `Adventure.storyID`/`guideID` and `ChestPlacement.storyTreasureID`.
+- **Chest reveal:** `ChestOpeningView(look:foundAgain:hiddenBy:onDone:)` plays the reveal for a find
+  that is already saved; `onDone` runs once, when the child taps **Into my chest**. While it is on
+  screen `AppModel.isRevealing` is true: the guide waits for it to turn false before speaking (it is
+  set on appear and cleared on close). The reveal becomes skippable once a whole one has been seen
+  on this phone (`RevealMemory`, cleared by `-resetFamily`).
 - UI tests launch with `-silent` so nothing speaks.
 
 ## Rules that the code enforces

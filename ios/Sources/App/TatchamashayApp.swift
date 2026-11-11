@@ -40,6 +40,7 @@ final class AppModel {
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
+            UserDefaults.standard.removeObject(forKey: RevealMemory.key)
         }
         #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
@@ -57,6 +58,10 @@ final class AppModel {
         sounds = BundledSoundEffects(catalog: .bundled, settings: settings)
         voice = SpeechGuideVoice(settings: settings)
     }
+
+    /// True while the chest reveal is on screen, from the sealed chest until the child closes it.
+    /// The spoken guide waits for it to turn false so it never talks over the reveal.
+    var isRevealing = false
 
     /// The family the screens show: the demo one while Demo mode is on, otherwise the real one.
     var family: FamilyModel { demo ?? real }
