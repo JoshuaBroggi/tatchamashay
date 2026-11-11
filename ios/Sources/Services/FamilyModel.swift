@@ -112,14 +112,20 @@ final class FamilyModel {
         return record.firstRunID == run.id || record.foundAgainRunIDs.contains(run.id)
     }
 
-    /// The next treasure to look for in this run.
-    var nextPlacement: ChestPlacement? {
-        adventurePlacements.first { !isFoundThisRun($0) }
+    /// Where this run stands: found so far, the next treasure, and whether it's time for the finale.
+    var progress: HuntProgress {
+        guard let adventure, let child, let run = currentRun else {
+            return HuntProgress(order: adventurePlacements.map(\.id), foundThisRun: [])
+        }
+        return data.progress(of: adventure, child: child.id, run: run.id)
     }
 
-    var isRunComplete: Bool {
-        !adventurePlacements.isEmpty && nextPlacement == nil
+    /// The next treasure to look for in this run.
+    var nextPlacement: ChestPlacement? {
+        progress.next.flatMap { data.placement($0) }
     }
+
+    var isRunComplete: Bool { progress.isComplete }
 
     /// Puts the treasure in the child's chest. Safe to call any number of times for the same run.
     func recordFind(_ placement: ChestPlacement, method: FindMethod) async -> CollectResult? {

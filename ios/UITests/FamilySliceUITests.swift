@@ -17,7 +17,7 @@ final class FamilySliceUITests: XCTestCase {
     @MainActor
     func testHideFindOpenAndKeepAfterRestart() throws {
         app = XCUIApplication()
-        app.launchArguments = ["-resetFamily"]
+        app.launchArguments = ["-resetFamily", "-silent"]
         app.launch()
 
         // Setup
@@ -92,6 +92,9 @@ final class FamilySliceUITests: XCTestCase {
         snap("chest-igniting")
         let done = app.buttons["revealDone"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let model = app.descendants(matching: .any)["treasureModel"]
+        let real = expectation(for: NSPredicate(format: "value == 'usdz'"), evaluatedWith: model)
+        wait(for: [real], timeout: 10)   // the real USDZ model, not the drawn stand-in
         sleep(2)
         snap("chest-revealed")
         done.tap()
@@ -104,7 +107,7 @@ final class FamilySliceUITests: XCTestCase {
 
         // Restart
         app.terminate()
-        app.launchArguments = []
+        app.launchArguments = ["-silent"]
         app.launch()
         app.tabBars.buttons["My Chest"].tap()
         XCTAssertTrue(app.staticTexts["1 treasure"].waitForExistence(timeout: 5), "still there after restart")

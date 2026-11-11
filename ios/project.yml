@@ -11,11 +11,33 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     CODE_SIGNING_ALLOWED: NO
+packages:
+  Yams:
+    url: https://github.com/jpsim/Yams
+    from: 6.2.0
 targets:
   Tatchamashay:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources:
+      - Sources
+      # Folder references keep the manifest's relative paths (Models/…, Sounds/…) in the bundle.
+      - path: Assets/manifest.json
+        buildPhase: resources
+      - path: Assets/Models
+        type: folder
+        buildPhase: resources
+      - path: Assets/Sounds
+        type: folder
+        buildPhase: resources
+      - path: Assets/Thumbnails
+        type: folder
+        buildPhase: resources
+      - path: Content/Stories
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: Yams
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.app

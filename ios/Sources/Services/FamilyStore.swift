@@ -51,6 +51,8 @@ enum FamilyStoreError: Error, Equatable {
     case unknownTreasure
     /// A placement must record when the parent reviewed the spot, and that can't be in the future.
     case unreviewedSpot
+    /// An adventure holds at most `Adventure.treasureCount.upperBound` treasures, each once.
+    case adventureFull
 }
 
 /// Where the family's records live. On-device for now; milestone 3 swaps in a backend that keeps
@@ -117,6 +119,10 @@ extension FamilyData {
         guard adventure.placementIDs.allSatisfy({ placement($0)?.adventureID == adventure.id }) else {
             throw FamilyStoreError.unknownPlacement
         }
+        guard Set(adventure.placementIDs).count == adventure.placementIDs.count,
+              adventure.placementIDs.count <= Adventure.treasureCount.upperBound else {
+            throw FamilyStoreError.adventureFull
+        }
         upsert(adventure, in: &adventures)
     }
 
@@ -131,8 +137,10 @@ extension FamilyData {
             throw FamilyStoreError.unknownTreasure
         }
         try requireFamily(design.familyID)
+        let isNew = !adventures[adventureIndex].placementIDs.contains(placement.id)
+        if isNew && adventures[adventureIndex].isFull { throw FamilyStoreError.adventureFull }
         upsert(placement, in: &placements)
-        if !adventures[adventureIndex].placementIDs.contains(placement.id) {
+        if isNew {
             adventures[adventureIndex].placementIDs.append(placement.id)
         }
     }

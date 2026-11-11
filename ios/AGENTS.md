@@ -38,12 +38,50 @@ To try it by hand: boot a simulator, set its location as above, install
 | `Sources/Rules/FindRules.swift` | GPS rules: freshness, accuracy, Dig! radius with hysteresis, warm/cold |
 | `Sources/Services/FamilyStore.swift` | `FamilyStore` protocol, the shared record rules (`FamilyData` extension), and the on-device `LocalFamilyStore` |
 | `Sources/Services/FamilyModel.swift` | Observable app state over a store; Demo mode's separate in-memory family |
+| `Sources/Rules/AdventureRules.swift` | 3–5 treasures per adventure, `HuntProgress` (next treasure, finale) |
+| `Sources/Services/TreasureCatalog.swift` | `Assets/manifest.json` as types: treasures, chest, sounds |
+| `Sources/Services/TreasureEntities.swift` | Loads USDZ models, tints them, plays idle motions; the chest with its lid |
+| `Sources/Services/StoryLibrary.swift` | `Content/Stories/` front matter as types; placeholder filling |
+| `Sources/Services/GuideVoice.swift`, `SoundEffects.swift`, `PlaySettings.swift` | Spoken guide, sound effects, and the grown-up's sound/voice/motion switches |
 | `Sources/Views/Hunt`, `Chest`, `Parent`, `Shared` | Screens, by milestone-2 track |
+| `Assets/` | Built-in models, thumbnails and sounds (bundled: `manifest.json`, `Models/`, `Sounds/`, `Thumbnails/`) |
+| `Content/Stories/` | Guide, starter adventures, hide flow (bundled as `Stories/`) |
 | `Tests/` | Unit tests (Swift Testing) |
 | `UITests/` | The end-to-end walkthrough |
 
-Sibling work owns `Content/Stories/` (story content) and `Assets/` (3D models). Add them to
-`project.yml` as resources when they land.
+The one third-party dependency is [Yams](https://github.com/jpsim/Yams) (MIT, via Swift Package
+Manager in `project.yml`), for the stories' YAML.
+
+## Milestone 2 ownership
+
+Five tracks build milestone 2 in parallel. Each owns its folders; nobody edits another track's
+folders. Shared files change only additively (new types, cases, optional fields, methods), each
+change with tests, so another track's code keeps compiling.
+
+| Track | Owns |
+|---|---|
+| A. Parent setup | `Views/Parent/`, offline **Get ready** |
+| B. The hunt | `Views/Hunt/`, `LocationService` |
+| C. Guide and story | `Views/Guide/`, how `StoryLibrary` and `GuideVoice` are used in screens |
+| D. Chest and reveal | `Views/Chest/` |
+| E. Child creation | `Views/Create/` |
+| Shared (additive only, with tests) | `Records.swift`, `FamilyStore`, `FamilyModel`, `Theme`, `AdventureRules`, `TreasureCatalog`, `TreasureEntities`, `TreasureModelView`, `StoryLibrary`, `GuideVoice`, `SoundEffects`, `PlaySettings` |
+
+Shared pieces to use instead of writing your own:
+
+- **Models:** `TreasureCatalog.bundled` (entries, thumbnails, sound files), `TreasureModelView(look:)`
+  for a treasure on screen, `TreasureEntities.treasure(_:)` / `.chest()` for your own RealityKit
+  scene. `ChestEntity` has `lid`, `innerGlow`, `runes`, `setLidOpen(_:)` and `setRuneGlow(_:)`.
+- **Stories:** `StoryLibrary.bundled` → `GuideStory`, `AdventureStory`, `HideFlowStory`. Fill lines
+  with `StoryContext` (`guide.lines(for: .greeting, context:)`); lines it can't fill are dropped.
+- **Sound and voice:** `AppModel.sounds.play(.dig)`, `AppModel.voice.speak(lines, as: guide)`. Both
+  check `PlaySettings`; tests use `SilentSoundEffects` and `SilentGuideVoice`.
+- **Motion:** read `PlaySettings.reducesMotion(system:)` with SwiftUI's `accessibilityReduceMotion`
+  before any big animation. `PlaySettings` is in the environment.
+- **Adventures:** `Adventure.readiness`, `Adventure.isFull`, `FamilyModel.progress` (`HuntProgress`:
+  `next`, `nextNumber`, `step(afterFinding:)` → `.next` or `.finale`). A starter adventure sets
+  `Adventure.storyID`/`guideID` and `ChestPlacement.storyTreasureID`.
+- UI tests launch with `-silent` so nothing speaks.
 
 ## Rules that the code enforces
 
@@ -52,6 +90,10 @@ Sibling work owns `Content/Stories/` (story content) and `Assets/` (3D models). 
   so a retry behaves like the first try.
 - A collection stores a saved copy (`TreasureLook`) of the version found. The chest only reads
   saved copies; editing a design adds a version and deleting it never touches chests.
+- An adventure holds at most 5 treasures, each once, in play order; 3 makes it ready. The hunt
+  looks for the first one not yet found this run, and the last find leads to the finale.
+- Built-in treasure ids are the manifest's. Looks saved with milestone 1 ids (`gem`, `orb`) load as
+  the nearest new treasure; never rename an id.
 - Placements must belong to the family and carry a review time that isn't in the future. Only the
   parent's hide flow creates them, after zooming in to a detailed map and confirming the spot.
 - GPS: fixes older than 10 s or worse than 30 m are ignored. Dig! appears within 40 m and hides
