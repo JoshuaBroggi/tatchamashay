@@ -40,6 +40,7 @@ final class AppModel {
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
+            UserDefaults.standard.removeObject(forKey: "playingChild")
         }
         #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))

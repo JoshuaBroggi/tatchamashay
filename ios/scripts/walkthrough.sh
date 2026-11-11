@@ -8,6 +8,7 @@ xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b >/dev/null
 # Stand at the treasure spot the walkthrough uses (Golden Gate Park, San Francisco).
 xcrun simctl location "$UDID" set 37.7694,-122.4862
+xcrun simctl privacy "$UDID" grant location com.tatchamashay.app 2>/dev/null || true
 SHOTS="$PWD/build/screenshots"
 rm -rf "$SHOTS" && mkdir -p "$SHOTS" build
 xcodegen generate --quiet

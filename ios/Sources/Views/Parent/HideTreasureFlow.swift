@@ -69,9 +69,6 @@ struct ReviewSpotView: View {
 
     @Environment(FamilyModel.self) private var family
 
-    /// Zoomed in at least this far (camera distance in meters) before a spot can be chosen.
-    static let detailedDistance: Double = 1_200
-
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var center: Coordinate?
     @State private var cameraDistance: Double = .infinity
@@ -80,37 +77,12 @@ struct ReviewSpotView: View {
     @State private var hint = ""
     @State private var saving = false
 
-    private var isDetailed: Bool { cameraDistance <= Self.detailedDistance }
+    private var isDetailed: Bool { MapReview.isDetailedForSpot(cameraDistance: cameraDistance) }
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Map(position: $camera) {
-                    UserAnnotation()
-                    ForEach(family.adventurePlacements) { placement in
-                        Annotation("", coordinate: placement.spot.clCoordinate) { XMark(found: false, isNext: false) }
-                    }
-                }
-                .mapStyle(satellite
-                          ? .hybrid(elevation: .flat, pointsOfInterest: .all)
-                          : .standard(elevation: .flat, pointsOfInterest: .all))
-                .environment(\.colorScheme, .light)
-                .mapControls {
-                    MapUserLocationButton()
-                    MapCompass()
-                    MapScaleView()
-                }
-                .onMapCameraChange(frequency: .continuous) { context in
-                    center = Coordinate(context.camera.centerCoordinate)
-                    cameraDistance = context.camera.distance
-                }
-
-                Text("✕")
-                    .font(Typeface.mapScript(44))
-                    .foregroundStyle(Palette.mapRed)
-                    .shadow(color: .white, radius: 2)
-                    .allowsHitTesting(false)
-            }
+            SpotMap(camera: $camera, center: $center, cameraDistance: $cameraDistance, satellite: satellite,
+                    marks: family.adventurePlacements.map(\.spot))
 
             Form {
                 Section {
@@ -130,7 +102,7 @@ struct ReviewSpotView: View {
                 }
                 Section {
                     Button(saving ? "Hiding…" : "Hide it here") { save() }
-                        .disabled(!isDetailed || !checked || center == nil || saving)
+                        .disabled(!MapReview.canConfirmSpot(cameraDistance: cameraDistance, center: center, checked: checked) || saving)
                         .accessibilityIdentifier("hideHere")
                 }
             }
@@ -143,7 +115,7 @@ struct ReviewSpotView: View {
     }
 
     private func save() {
-        guard let center, isDetailed, checked else { return }
+        guard let center, MapReview.canConfirmSpot(cameraDistance: cameraDistance, center: center, checked: checked) else { return }
         saving = true
         Task {
             await family.hideTreasure(look, at: center, hint: hint.trimmed, reviewedAt: .now)

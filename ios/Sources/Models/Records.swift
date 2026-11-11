@@ -23,6 +23,15 @@ struct ParentAccount: Identifiable, Codable, Hashable, Sendable {
     /// The Sign in with Apple user identifier, once the parent signs in (milestone 3).
     var appleUserID: String?
     var createdAt = Date()
+    /// What the child calls this grown-up ("Dad", "Mom", "Auntie Jo"), for the guide's `{grown_up}`.
+    /// Nil until the parent says; `grownUpName` falls back to `displayName`.
+    var childCallsMe: String?
+
+    /// The word the guide says for `{grown_up}`.
+    var grownUpName: String {
+        let called = childCallsMe?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return called.isEmpty ? displayName : called
+    }
 }
 
 /// A child's pirate profile. No email, no login, no public name. It lives inside the parent's account.
@@ -267,6 +276,19 @@ struct ChestPlacement: Identifiable, Codable, Hashable, Sendable {
     /// The starter adventure's treasure this placement plays (`treasures[].id` in its story file),
     /// for its reveal line. Nil for treasures the family made.
     var storyTreasureID: String?
+    /// The parent's words for the story hint's `{blank}`; `hint` already has them filled in.
+    /// Nil for hints the parent wrote whole.
+    var hintBlank: String?
+}
+
+/// The familiar place a hunt happens in, chosen by the parent on a detailed map. Spot review starts
+/// there, and **Get ready** checks its map.
+struct PlayArea: Codable, Hashable, Sendable {
+    var center: Coordinate
+    /// Roughly how far the hunt reaches from `center`, in meters.
+    var radiusMeters: Double = 250
+    /// The parent's name for it: "Our backyard", "Golden Gate Park".
+    var name: String = ""
 }
 
 /// A hunt: a guide, a goal, 3–5 placements in play order, and a finale.
@@ -286,6 +308,8 @@ struct Adventure: Identifiable, Codable, Hashable, Sendable {
     /// The starter adventure this was made from (`id:` in its story file), whose goal, reveal and
     /// finale lines the guide speaks. Nil for an adventure the parent wrote.
     var storyID: String?
+    /// Where the hunt happens. Nil for milestone 1 adventures.
+    var playArea: PlayArea?
     var createdAt = Date()
     var syncState: SyncState = .waitingToSync
     var publication: PublicationState = .private
