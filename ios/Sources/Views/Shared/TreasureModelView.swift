@@ -1,9 +1,9 @@
 import RealityKit
 import SwiftUI
 
-/// Shows a treasure's 3D model, slowly spinning and bobbing, and plays any animations a creator's file contains.
+/// Shows a built-in treasure in 3D, slowly spinning and bobbing, in its chosen color with its sparkles.
 struct TreasureModelView: View {
-    let model: TreasureModel
+    let look: TreasureLook
 
     @State private var spinner = Spinner()
 
@@ -12,7 +12,7 @@ struct TreasureModelView: View {
             content.camera = .virtual
 
             let pivot = Entity()
-            let treasure = await Self.makeEntity(for: model)
+            let treasure = Self.makeEntity(for: look)
             Self.fit(treasure, size: 0.4)
             pivot.addChild(treasure)
             content.add(pivot)
@@ -58,30 +58,33 @@ struct TreasureModelView: View {
     }
 
     @MainActor
-    static func makeEntity(for model: TreasureModel) async -> Entity {
-        switch model {
-        case .builtIn(let builtIn):
-            return builtInEntity(builtIn)
-        case .usdz(let fileName):
-            let url = TreasureStore.modelsDirectory.appending(path: fileName)
-            guard let entity = try? await Entity(contentsOf: url) else {
-                return builtInEntity(.orb)
-            }
-            for animation in entity.availableAnimations {
-                entity.playAnimation(animation.repeat())
-            }
-            return entity
+    static func makeEntity(for look: TreasureLook) -> Entity {
+        let root = builtInEntity(look.model, tint: look.color)
+        let count = switch look.sparkles {
+        case .none: 0
+        case .some: 6
+        case .lots: 14
         }
+        let spark = material(UIColor(red: 1, green: 0.97, blue: 0.85, alpha: 1), metallic: 0, glow: 1)
+        for i in 0..<count {
+            let angle = Float(i) / Float(max(count, 1)) * 2 * .pi
+            let dot = ModelEntity(mesh: .generateSphere(radius: 0.008), materials: [spark])
+            dot.position = [cos(angle) * 0.24, sin(angle * 3) * 0.08, sin(angle) * 0.24]
+            root.addChild(dot)
+        }
+        return root
     }
 
     // MARK: - Built-in treasures
 
     @MainActor
-    private static func builtInEntity(_ model: BuiltInModel) -> Entity {
+    private static func builtInEntity(_ model: BuiltInModel, tint: TreasureColor) -> Entity {
         let root = Entity()
+        let c = tint.rgb
+        let chosen = UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
         switch model {
         case .gem:
-            let glass = material(UIColor(red: 0.2, green: 0.85, blue: 0.95, alpha: 1), metallic: 0.1, glow: 0.6)
+            let glass = material(chosen, metallic: 0.1, glow: 0.6)
             let top = ModelEntity(mesh: .generateCone(height: 0.12, radius: 0.12), materials: [glass])
             top.position.y = 0.06
             let bottom = ModelEntity(mesh: .generateCone(height: 0.22, radius: 0.12), materials: [glass])
@@ -91,7 +94,7 @@ struct TreasureModelView: View {
             root.addChild(bottom)
 
         case .doubloon:
-            let gold = material(UIColor(red: 1, green: 0.78, blue: 0.2, alpha: 1), metallic: 0.8, glow: 0.15)
+            let gold = material(chosen, metallic: 0.8, glow: 0.15)
             let coin = ModelEntity(mesh: .generateCylinder(height: 0.025, radius: 0.15), materials: [gold])
             coin.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             let stamp = ModelEntity(mesh: .generateBox(width: 0.07, height: 0.07, depth: 0.04, cornerRadius: 0.01),
@@ -101,7 +104,7 @@ struct TreasureModelView: View {
             root.addChild(stamp)
 
         case .crown:
-            let gold = material(UIColor(red: 1, green: 0.8, blue: 0.25, alpha: 1), metallic: 0.8, glow: 0.15)
+            let gold = material(chosen, metallic: 0.8, glow: 0.15)
             let ruby = material(UIColor(red: 0.9, green: 0.1, blue: 0.15, alpha: 1), metallic: 0.1, glow: 0.5)
             let band = ModelEntity(mesh: .generateCylinder(height: 0.08, radius: 0.13), materials: [gold])
             root.addChild(band)
@@ -116,7 +119,7 @@ struct TreasureModelView: View {
             }
 
         case .potion:
-            let liquid = material(UIColor(red: 0.95, green: 0.3, blue: 0.7, alpha: 1), metallic: 0, glow: 0.7)
+            let liquid = material(chosen, metallic: 0, glow: 0.7)
             let glass = material(UIColor(red: 0.8, green: 0.9, blue: 0.95, alpha: 1), metallic: 0.2, glow: 0.1)
             let cork = material(UIColor(red: 0.55, green: 0.35, blue: 0.18, alpha: 1), metallic: 0, glow: 0)
             let bulb = ModelEntity(mesh: .generateSphere(radius: 0.11), materials: [liquid])
@@ -129,7 +132,7 @@ struct TreasureModelView: View {
             root.addChild(stopper)
 
         case .orb:
-            let storm = material(UIColor(red: 0.45, green: 0.3, blue: 0.95, alpha: 1), metallic: 0.2, glow: 0.8)
+            let storm = material(chosen, metallic: 0.2, glow: 0.8)
             let spark = material(UIColor(red: 0.9, green: 0.95, blue: 1, alpha: 1), metallic: 0, glow: 1)
             root.addChild(ModelEntity(mesh: .generateSphere(radius: 0.12), materials: [storm]))
             for i in 0..<3 {
