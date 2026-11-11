@@ -2,42 +2,52 @@ import CoreLocation
 import Observation
 
 /// Tracks where the phone is. Location stays on the phone; nothing here is sent anywhere.
+///
+/// Uses continuous updates with no distance filter and no automatic pausing, so a child standing
+/// still at the spot keeps getting fresh fixes and the 10-second freshness rule doesn't fog the map.
 @MainActor
 @Observable
-final class LocationService {
+final class LocationService: NSObject, CLLocationManagerDelegate {
     private(set) var latestFix: LocationFix?
     private(set) var isDenied = false
-    /// The system pauses updates while the phone stays put. The last fix is still where we are.
-    private(set) var isStationary = false
 
-    /// The fix to judge right now. While the system reports the phone hasn't moved, the last fix
-    /// counts as current; its accuracy is still checked.
-    func currentFix(now: Date) -> LocationFix? {
-        guard var fix = latestFix else { return nil }
-        if isStationary { fix.timestamp = max(fix.timestamp, now) }
-        return fix
+    private let manager = CLLocationManager()
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.distanceFilter = kCLDistanceFilterNone
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.activityType = .fitness
     }
 
-    private var task: Task<Void, Never>?
-    private var session: CLServiceSession?
-
     func start() {
-        guard task == nil else { return }
-        session = CLServiceSession(authorization: .whenInUse)
-        task = Task { [weak self] in
-            do {
-                for try await update in CLLocationUpdate.liveUpdates(.fitness) {
-                    guard let self else { return }
-                    self.isDenied = update.authorizationDenied || update.authorizationDeniedGlobally
-                    self.isStationary = update.stationary
-                    if let location = update.location {
-                        self.latestFix = LocationFix(location)
-                    }
-                }
-            } catch {
-                // The stream ended; the hunt falls back to the foggy-map message and We found it.
+        manager.requestWhenInUseAuthorization()
+        manager.startUpdatingLocation()
+    }
+
+    /// The fix to judge right now.
+    func currentFix(now: Date) -> LocationFix? { latestFix }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        MainActor.assumeIsolated {
+            isDenied = status == .denied || status == .restricted
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                self.manager.startUpdatingLocation()
             }
         }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let last = locations.last else { return }
+        let fix = LocationFix(last)
+        MainActor.assumeIsolated { latestFix = fix }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
+        // Keep the last fix; it goes stale on its own and the hunt shows the foggy-map message.
     }
 }
 

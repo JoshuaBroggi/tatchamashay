@@ -87,6 +87,7 @@ struct ChestOpeningView: View {
                     .font(Typeface.body(14)).foregroundStyle(Palette.textSecondary)
                 Button("Tap to open", action: open)
                     .buttonStyle(GoldButtonStyle())
+                    .accessibilityIdentifier("openChest")
                     .padding(.top, 6)
             case .igniting:
                 Text("Hold steady…").font(Typeface.headline(40))

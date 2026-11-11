@@ -35,11 +35,23 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.tests
+  TatchamashayUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Tatchamashay
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.uitests
+        TEST_TARGET_NAME: Tatchamashay
 schemes:
   Tatchamashay:
     build:
       targets:
         Tatchamashay: all
         TatchamashayTests: [test]
+        TatchamashayUITests: [test]
     test:
-      targets: [TatchamashayTests]
+      targets: [TatchamashayTests, TatchamashayUITests]

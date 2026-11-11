@@ -94,6 +94,7 @@ struct ReviewSpotView: View {
                 .mapStyle(satellite
                           ? .hybrid(elevation: .flat, pointsOfInterest: .all)
                           : .standard(elevation: .flat, pointsOfInterest: .all))
+                .environment(\.colorScheme, .light)
                 .mapControls {
                     MapUserLocationButton()
                     MapCompass()
@@ -134,7 +135,7 @@ struct ReviewSpotView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .frame(height: 300)
+            .frame(height: 340)
         }
         .background(Palette.ground1.ignoresSafeArea())
         .navigationTitle("Pick the spot")

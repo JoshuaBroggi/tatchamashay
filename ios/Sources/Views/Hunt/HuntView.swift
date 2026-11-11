@@ -22,7 +22,10 @@ struct HuntView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
-        .onAppear { family.startRunIfNeeded() }
+        .onAppear {
+            family.startRunIfNeeded()
+            frameNextSpot()
+        }
         .task {
             while !Task.isCancelled {
                 tick()
@@ -30,7 +33,11 @@ struct HuntView: View {
             }
         }
         .onChange(of: location.latestFix) { tick() }
-        .onChange(of: family.nextPlacement?.id) { tracker = nil; tick() }
+        .onChange(of: family.nextPlacement?.id) {
+            tracker = nil
+            tick()
+            frameNextSpot()
+        }
         .fullScreenCover(item: $reveal) { reveal in
             ChestOpeningView(look: reveal.record.savedCopy, foundAgain: reveal.foundAgain,
                              hiddenBy: family.parent?.displayName) {
@@ -68,6 +75,8 @@ struct HuntView: View {
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
+        // Light map tiles keep streets and water readable outdoors, whatever the phone's appearance.
+        .environment(\.colorScheme, .light)
         // A light parchment tint. Streets, water and buildings stay readable.
         .colorMultiply(Color(hex: 0xF6EBD0))
         .overlay {
@@ -193,6 +202,12 @@ struct HuntView: View {
     }
 
     // MARK: Logic
+
+    /// Opens the map at street level around the next X, so roads and paths nearby are visible.
+    private func frameNextSpot() {
+        guard let next = family.nextPlacement else { return }
+        camera = .camera(MapCamera(centerCoordinate: next.spot.clCoordinate, distance: 700))
+    }
 
     private func tick() {
         guard let next = family.nextPlacement else { return }

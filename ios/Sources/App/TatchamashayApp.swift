@@ -27,6 +27,13 @@ final class AppModel {
     private(set) var demo: FamilyModel?
 
     init() {
+        #if DEBUG
+        // UI tests start from an empty family.
+        if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
+            try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
+            UserDefaults.standard.removeObject(forKey: "currentHuntRun")
+        }
+        #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
         real = FamilyModel(store: store)
     }
@@ -113,6 +120,7 @@ struct WelcomeView: View {
                 }
             }
             .buttonStyle(GoldButtonStyle())
+            .accessibilityIdentifier("startAdventure")
             .disabled(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty || saving)
             .opacity(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty ? 0.5 : 1)
         }
