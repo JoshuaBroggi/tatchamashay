@@ -109,49 +109,106 @@ struct TreasureLook: Codable, Hashable, Sendable {
     var story: String = ""
 }
 
-/// Built-in treasures drawn in code. Real models from the art track replace these later.
+/// The built-in treasures. Raw values are the ids in `Assets/manifest.json`; `TreasureCatalog` has
+/// each one's files and parts. Never rename a raw value: saved looks store it.
 enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
-    case gem, doubloon, crown, potion, orb
+    case octopus, clam, parrot, crown
+    case starCompass = "star-compass"
+    case potion
+    case dragonEgg = "dragon-egg"
+    case turtle, doubloon
 
     var id: String { rawValue }
 
+    /// Ids saved before the real models arrived (milestone 1), mapped to the nearest new treasure.
+    static let legacyIDs: [String: BuiltInModel] = ["gem": .clam, "orb": .starCompass]
+
+    /// Reads a current id or a milestone 1 id.
+    init?(savedID: String) {
+        guard let model = BuiltInModel(rawValue: savedID) ?? Self.legacyIDs[savedID] else { return nil }
+        self = model
+    }
+
+    init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        guard let model = BuiltInModel(savedID: raw) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Unknown built-in treasure \(raw)"))
+        }
+        self = model
+    }
+
+    /// Matches the manifest's `displayName`; a test keeps them in step.
     var displayName: String {
         switch self {
-        case .gem: "Sea Gem"
-        case .doubloon: "Gold Doubloon"
-        case .crown: "Sunken Crown"
-        case .potion: "Mermaid's Potion"
-        case .orb: "Storm Orb"
+        case .octopus: "Wobbles the Octopus"
+        case .clam: "Glow Shell"
+        case .parrot: "Captain Squawk"
+        case .crown: "Sparkle Crown"
+        case .starCompass: "Star Compass"
+        case .potion: "Giggle Potion"
+        case .dragonEgg: "Dragon Egg"
+        case .turtle: "Tumble the Sea Turtle"
+        case .doubloon: "Lucky Doubloon"
         }
     }
 
+    /// The short word the guide says for the `{object}` placeholder: "Ooh, a shell!"
+    var spokenName: String {
+        switch self {
+        case .octopus: "octopus"
+        case .clam: "shell"
+        case .parrot: "parrot"
+        case .crown: "crown"
+        case .starCompass: "star"
+        case .potion: "potion"
+        case .dragonEgg: "dragon egg"
+        case .turtle: "turtle"
+        case .doubloon: "coin"
+        }
+    }
+
+    /// An SF Symbol for small lists, where a 3D model would be too heavy.
     var symbol: String {
         switch self {
-        case .gem: "diamond.fill"
-        case .doubloon: "circle.circle.fill"
+        case .octopus: "drop.fill"
+        case .clam: "seal.fill"
+        case .parrot: "bird.fill"
         case .crown: "crown.fill"
+        case .starCompass: "star.fill"
         case .potion: "flask.fill"
-        case .orb: "globe.americas.fill"
+        case .dragonEgg: "oval.portrait.fill"
+        case .turtle: "tortoise.fill"
+        case .doubloon: "circle.circle.fill"
         }
     }
 
+    /// The closest `TreasureColor` to the manifest's `defaultColor`.
     var defaultColor: TreasureColor {
         switch self {
-        case .gem: .sea
-        case .doubloon: .gold
-        case .crown: .gold
-        case .potion: .coral
-        case .orb: .storm
+        case .octopus: .pink
+        case .clam: .coral
+        case .parrot: .green
+        case .crown, .doubloon: .gold
+        case .starCompass: .yellow
+        case .potion: .purple
+        case .dragonEgg: .moss
+        case .turtle: .sea
         }
     }
 }
 
+/// Milestone 1's colors, then the eight the hide-for-parent flow offers (`hide-for-parent.md`).
 enum TreasureColor: String, Codable, CaseIterable, Identifiable, Sendable {
     case gold, sea, coral, storm, moss, ruby
+    case red, orange, yellow, green, blue, purple, pink
 
     var id: String { rawValue }
 
     var displayName: String { rawValue.capitalized }
+
+    /// The word the guide says for the `{color}` placeholder.
+    var spokenName: String { rawValue }
 
     /// sRGB components, so both SwiftUI and RealityKit can use them.
     var rgb: (red: Double, green: Double, blue: Double) {
@@ -162,17 +219,27 @@ enum TreasureColor: String, Codable, CaseIterable, Identifiable, Sendable {
         case .storm: (0.55, 0.45, 0.95)
         case .moss: (0.45, 0.75, 0.40)
         case .ruby: (0.85, 0.15, 0.20)
+        case .red: (0.90, 0.20, 0.20)
+        case .orange: (0.98, 0.55, 0.15)
+        case .yellow: (1.00, 0.82, 0.20)
+        case .green: (0.25, 0.77, 0.42)
+        case .blue: (0.20, 0.50, 0.95)
+        case .purple: (0.60, 0.42, 1.00)
+        case .pink: (1.00, 0.48, 0.61)
         }
     }
 }
 
 enum Sparkles: String, Codable, CaseIterable, Identifiable, Sendable {
-    case none, some, lots
+    case none, some, lots, rainbow
     var id: String { rawValue }
 }
 
+/// The treasure's own sound. `chime`, `fanfare` and `giggle` came first; the rest are the
+/// hide-for-parent flow's choices. Only the manifest's `sounds` have files so far.
 enum TreasureSound: String, Codable, CaseIterable, Identifiable, Sendable {
     case chime, fanfare, giggle
+    case boing, toot, splash, ding, snore
     var id: String { rawValue }
 }
 
@@ -197,17 +264,28 @@ struct ChestPlacement: Identifiable, Codable, Hashable, Sendable {
     var reviewedAt: Date
     var syncState: SyncState = .waitingToSync
     var publication: PublicationState = .private
+    /// The starter adventure's treasure this placement plays (`treasures[].id` in its story file),
+    /// for its reveal line. Nil for treasures the family made.
+    var storyTreasureID: String?
 }
 
-/// A hunt: a guide, a goal, placements in order, and a finale.
+/// A hunt: a guide, a goal, 3–5 placements in play order, and a finale.
+/// `AdventureRules.swift` has the size rules and `HuntProgress`, which walks a run through them.
 struct Adventure: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var familyID: ParentAccount.ID
     var title: String
-    var guideName: String = "Captain Barnacle"
+    var guideName: String = "Captain Tumblebeard"
     var goal: String
+    /// Play order. The hunt always looks for the first one not yet found this run.
     var placementIDs: [ChestPlacement.ID] = []
+    /// The closing line shown when the last treasure is found ("Back to the ship!").
     var finale: String = "Back to the ship!"
+    /// The guide's id in `Content/Stories` (`guide:` in an adventure file). Nil before milestone 2.
+    var guideID: String?
+    /// The starter adventure this was made from (`id:` in its story file), whose goal, reveal and
+    /// finale lines the guide speaks. Nil for an adventure the parent wrote.
+    var storyID: String?
     var createdAt = Date()
     var syncState: SyncState = .waitingToSync
     var publication: PublicationState = .private

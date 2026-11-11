@@ -13,7 +13,7 @@ struct SavedCopyTests {
         _ = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: UUID(), method: .dig, at: .now)
 
         var edited = f.design
-        let newVersion = edited.edit(to: TreasureLook(model: .orb, color: .storm, name: "Renamed", story: "Changed."))
+        let newVersion = edited.edit(to: TreasureLook(model: .starCompass, color: .storm, name: "Renamed", story: "Changed."))
         let data = try await store.saveDesign(edited)
 
         #expect(newVersion.number == 2)
@@ -57,7 +57,7 @@ struct SavedCopyTests {
     func findUsesPlacedVersion() async throws {
         let store = try await f.makeStore()
         var edited = f.design
-        edited.edit(to: TreasureLook(model: .gem, color: .sea, name: "Newer"))
+        edited.edit(to: TreasureLook(model: .clam, color: .sea, name: "Newer"))
         _ = try await store.saveDesign(edited)
 
         let (result, _) = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: UUID(), method: .dig, at: .now)

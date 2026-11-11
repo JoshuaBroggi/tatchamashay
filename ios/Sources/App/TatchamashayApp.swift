@@ -9,6 +9,7 @@ struct TatchamashayApp: App {
         WindowGroup {
             RootView()
                 .environment(app)
+                .environment(app.settings)
                 .environment(location)
                 .task {
                     location.start()
@@ -26,6 +27,13 @@ final class AppModel {
     let real: FamilyModel
     private(set) var demo: FamilyModel?
 
+    /// The grown-up's sound, voice and motion switches, shared by every screen.
+    let settings: PlaySettings
+    let sounds: any SoundEffects
+    let voice: any GuideVoice
+    let catalog = TreasureCatalog.bundled
+    let stories = StoryLibrary.bundled
+
     init() {
         #if DEBUG
         // UI tests start from an empty family.
@@ -36,6 +44,18 @@ final class AppModel {
         #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
         real = FamilyModel(store: store)
+        let settings = PlaySettings()
+        self.settings = settings
+        #if DEBUG
+        // UI tests run quietly.
+        if ProcessInfo.processInfo.arguments.contains("-silent") {
+            sounds = SilentSoundEffects(settings: settings)
+            voice = SilentGuideVoice(settings: settings)
+            return
+        }
+        #endif
+        sounds = BundledSoundEffects(catalog: .bundled, settings: settings)
+        voice = SpeechGuideVoice(settings: settings)
     }
 
     /// The family the screens show: the demo one while Demo mode is on, otherwise the real one.

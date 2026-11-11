@@ -4,7 +4,7 @@ import SwiftUI
 /// The parent picks a built-in treasure, then puts it on a spot they've checked on a detailed map.
 struct HideTreasureFlow: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var look = TreasureLook(model: .gem, color: BuiltInModel.gem.defaultColor, name: "Sea Gem")
+    @State private var look = TreasureLook(model: .crown, color: BuiltInModel.crown.defaultColor, name: BuiltInModel.crown.displayName)
 
     var body: some View {
         NavigationStack {
