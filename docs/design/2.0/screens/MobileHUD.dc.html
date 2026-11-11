@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone overlay</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&amp;family=Inter:wght@400;600&amp;display=swap">
+<style>body{margin:0}.scene{background:linear-gradient(rgba(8,17,11,0.25),rgba(8,17,11,0) 30%,rgba(8,17,11,0) 70%,rgba(8,17,11,0.45)),url(../assets/forest-ruins-reference.webp) center/cover}</style>
+</helmet>
+<div class="scene" style="width: 844px; height: 390px; position: relative; overflow: hidden; font-family: Inter, sans-serif; color: #F8FAEF">
+  <div style="position: absolute; left: 56px; top: 16px; display: flex; flex-direction: column; gap: 6px; background: rgba(8,17,11,0.7); padding: 10px 12px; width: 190px">
+    <span style="font-size: 12px">Jade idol · <span style="color: #C3D5B6">2 / 6</span></span>
+    <span style="height: 5px; background: #2E5236"><span style="display: block; width: 72%; height: 5px; background: #6FCF97"></span></span>
+    <span style="height: 5px; background: #2E5236"><span style="display: block; width: 40%; height: 5px; background: #7FE3F0"></span></span>
+  </div>
+  <div style="position: absolute; right: 56px; top: 16px; display: flex; gap: 8px">
+    <span style="background: rgba(8,17,11,0.7); padding: 8px 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: #D4A24C">4,250</span>
+    <button aria-label="Pause" style="width: 44px; height: 44px; border: 1px solid #4E7A4A; background: rgba(8,17,11,0.7); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3v12M13 3v12" stroke="#F8FAEF" stroke-width="2.5" fill="none"></path></svg></button>
+  </div>
+  <div style="position: absolute; left: 56px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(245,236,215,0.35); background: rgba(8,17,11,0.4); display: flex; align-items: center; justify-content: center"><span style="width: 48px; height: 48px; border-radius: 50%; background: rgba(245,236,215,0.5)"></span></div>
+  <div style="position: absolute; right: 56px; bottom: 24px; display: flex; gap: 12px; align-items: flex-end">
+    <button style="width: 56px; height: 56px; border-radius: 50%; border: 1px solid #4E7A4A; background: rgba(8,17,11,0.7); color: #F8FAEF; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer">Tool</button>
+    <button style="width: 80px; height: 80px; border-radius: 50%; border: 0; background: #D4A24C; color: #0E1A12; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Open</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>

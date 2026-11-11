@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Real-world hunt</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&amp;family=Inter:wght@400;600&amp;display=swap">
+<style>body{margin:0}.cam{background:linear-gradient(rgba(8,17,11,0.35),rgba(8,17,11,0) 25%,rgba(8,17,11,0) 60%,rgba(8,17,11,0.85)),url(../assets/forest-ruins-reference.webp) 62% center/cover}</style>
+</helmet>
+<div class="cam" style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: Inter, sans-serif; color: #F8FAEF">
+  <div style="position: absolute; left: 16px; right: 16px; top: 16px; display: flex; justify-content: space-between; align-items: center">
+    <span style="font-size: 11px; font-weight: 600; letter-spacing: 2px; background: rgba(8,17,11,0.7); padding: 6px 10px">LIVE CAMERA</span>
+    <a href="PirateMap.dc.html" style="font-size: 13px; font-weight: 600; color: #F8FAEF; background: rgba(8,17,11,0.7); padding: 6px 10px">Map</a>
+  </div>
+  <div style="position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px">
+    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26" stroke="#F8FAEF" stroke-width="1.5" fill="rgba(8,17,11,0.5)"></circle><path d="M28 8 L35 32 L28 28 L21 32 Z" fill="#D4A24C"></path></svg>
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800">38 m</span>
+    <span style="font-size: 13px; color: #C3D5B6">north-east · past the stone gate</span>
+  </div>
+  <div style="position: absolute; left: 225px; top: 400px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #7FE3F0; box-shadow: 0 0 30px 8px rgba(127,227,240,0.55); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #7FE3F0">RUNE</div>
+  <div style="position: absolute; left: 16px; right: 16px; bottom: 24px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; gap: 6px; align-items: center">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 2px; color: #C3D5B6; width: 52px">SIGNAL</span>
+      <span style="flex-grow: 1; height: 8px; background: linear-gradient(90deg, #5DA3C8, #7FE3F0 50%, #D4A24C)"></span>
+      <span style="font-size: 12px; font-weight: 600; color: #D4A24C">Warm</span>
+    </div>
+    <p style="margin: 0; font-size: 14px; color: #C3D5B6">Follow the glowing rune. It burns brighter the closer you get.</p>
+    <div style="display: flex; gap: 10px">
+      <button style="flex: 1; height: 52px; border: 1px solid #4E7A4A; background: rgba(8,17,11,0.7); color: #F8FAEF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Hint (2 left)</button>
+      <a href="MagicReveal.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 52px; background: #D4A24C; color: #0E1A12; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-decoration: none">DIG HERE</a>
+    </div>
+    <span style="font-size: 11px; color: #86A07E; text-align: center">Stay on paths · play with a grown-up nearby</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>
