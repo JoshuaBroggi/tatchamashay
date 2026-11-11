@@ -308,11 +308,12 @@ final class GuideDirector {
     }
 
     /// Roughly how long the lines take to say, so the bubble stays up even with a silent voice.
-    /// About 2.5 words a second at normal speed, plus the pause between lines.
+    /// About 2.5 words a second at normal speed, plus the pause between lines and a moment for a
+    /// grown-up to finish reading.
     static func estimatedDuration(of lines: [String], rate: Double) -> TimeInterval {
         let words = lines.reduce(0) { $0 + $1.split(separator: " ").count }
         let speed = 2.5 * max(rate, 0.1) / 0.5
-        return Double(words) / speed + 0.4 * Double(lines.count) + 0.6
+        return Double(words) / speed + 0.4 * Double(lines.count) + 2
     }
 }
 
