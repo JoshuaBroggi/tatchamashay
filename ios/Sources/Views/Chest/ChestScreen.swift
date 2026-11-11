@@ -198,8 +198,23 @@ struct SpinnableTreasure: View {
     @State private var spinner = Spinner()
     @State private var lastDrag: CGFloat = 0
     @State private var shown = "loading"
+    /// Off while another tab is showing, so a hidden 3D view never competes with the chest reveal.
+    @State private var onScreen = false
 
     var body: some View {
+        ZStack {
+            if onScreen { stage }
+        }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        .accessibilityElement()
+        .accessibilityLabel(look.name)
+        .accessibilityValue(shown)
+        .accessibilityHint("Drag sideways to spin it")
+        .accessibilityIdentifier("spinTreasure")
+    }
+
+    private var stage: some View {
         RealityView { content in
             content.camera = .virtual
             let loaded = await TreasureEntities.treasure(look, catalog: catalog)
@@ -240,11 +255,6 @@ struct SpinnableTreasure: View {
                     lastDrag = 0
                 }
         )
-        .accessibilityElement()
-        .accessibilityLabel(look.name)
-        .accessibilityValue(shown)
-        .accessibilityHint("Drag sideways to spin it")
-        .accessibilityIdentifier("spinTreasure")
     }
 
     /// The spin angle, with a little coasting after the finger lifts.

@@ -117,3 +117,11 @@ Every record carries `syncState`; local records stay `waitingToSync` until a ser
 The simulator stops sending location updates while the location doesn't change, so after about
 10 seconds standing still the hunt turns foggy. A real phone keeps reporting. Nudge the location
 (`xcrun simctl location <udid> set …`) to get a fresh fix.
+
+On a simulator that has never run the app, grant location first
+(`xcrun simctl privacy <udid> grant location com.tatchamashay.app`). Otherwise the hide flow's map
+starts zoomed out and the walkthrough fails at "the map should be detailed enough to review".
+
+After the walkthrough restarts the app, the replay's 3D reveal sometimes stops drawing on the
+simulator: the text moves on but the chest picture freezes. The scene keeps running underneath, and
+`main`'s older reveal showed no model at all at the same step. Check the replay on a real phone.

@@ -30,6 +30,7 @@ struct ChestOpeningView: View {
                     .padding(.top, 24)
                 stage
                 caption
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -99,7 +100,9 @@ struct ChestOpeningView: View {
                 .accessibilityIdentifier("treasureModel")
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 420)
+        // A fixed size: resizing the 3D view mid-animation can stall its drawing.
+        .frame(maxWidth: .infinity)
+        .frame(height: 360)
     }
 
     @ViewBuilder

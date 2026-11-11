@@ -35,6 +35,7 @@ final class ChestRevealScene {
     /// Seconds since the tap; nil while sealed.
     @ObservationIgnored private var opening: TimeInterval?
     @ObservationIgnored private var subscription: EventSubscription?
+    @ObservationIgnored private var isBuilt = false
 
     init(look: TreasureLook, calm: Bool, catalog: TreasureCatalog = .bundled) {
         self.look = look
@@ -44,21 +45,24 @@ final class ChestRevealScene {
     }
 
     /// Builds the scene inside a `RealityView`. The chest shows as soon as it loads; the treasure
-    /// keeps loading in the background.
+    /// keeps loading in the background. If SwiftUI makes the view again, the same scene moves over
+    /// as it is, mid-animation, instead of starting a second chest.
     func make(_ content: inout RealityViewCameraContent) async {
         content.camera = .virtual
         content.add(root)
-        root.addChild(chestHolder)
-        root.addChild(treasureHolder)
-        treasureHolder.isEnabled = false
-
-        await addChest()
-        addBeamAndSparkles()
+        if !isBuilt {
+            isBuilt = true
+            root.addChild(chestHolder)
+            root.addChild(treasureHolder)
+            treasureHolder.isEnabled = false
+            await addChest()
+            addBeamAndSparkles()
+            Task { await loadTreasure() }
+        }
         addCameraAndLights(to: &content)
         subscription = content.subscribe(to: SceneEvents.Update.self) { [weak self] event in
             self?.update(by: event.deltaTime)
         }
-        Task { await loadTreasure() }
     }
 
     /// The child tapped: start the opening.
@@ -112,7 +116,7 @@ final class ChestRevealScene {
         guard !calm else { return }
         let gold = UIColor(red: 1, green: 0.85, blue: 0.5, alpha: 1)
         var light = UnlitMaterial(color: gold)
-        light.blending = .transparent(opacity: 0.55)
+        light.blending = .transparent(opacity: 0.4)
         let beam = ModelEntity(mesh: .generateCylinder(height: 1.4, radius: 0.13), materials: [light])
         beam.position.y = chestTop + 0.7
         beam.components.set(OpacityComponent(opacity: 0))
@@ -132,7 +136,7 @@ final class ChestRevealScene {
     private func addCameraAndLights(to content: inout RealityViewCameraContent) {
         let camera = PerspectiveCamera()
         camera.camera.fieldOfViewInDegrees = 40
-        let focus: SIMD3<Float> = [0, (chestTop + 0.45) / 2, 0]
+        let focus: SIMD3<Float> = [0, (chestTop + Self.riseAbove + 0.2) / 2, 0]
         camera.look(at: focus, from: focus + [0, 0.25, 1.35], relativeTo: nil)
         content.add(camera)
 
@@ -208,7 +212,7 @@ final class ChestRevealScene {
             treasureHolder.isEnabled = true
             if !isRising { isRising = true }
         }
-        let low = chestTop * 0.5, high = chestTop + 0.25
+        let low = chestTop * 0.5, high = chestTop + Self.riseAbove
         treasureHolder.position.y = low + (high - low) * rise
         treasureHolder.scale = .init(repeating: 0.35 + 0.65 * rise)
         if rise >= 1 {
@@ -216,6 +220,9 @@ final class ChestRevealScene {
             idle?.update(time: t - timing.rise.upperBound)
         }
     }
+
+    /// How far above the chest the treasure floats, clear of the open lid.
+    private static let riseAbove: Float = 0.3
 
     /// Short shakes with pauses, as if something inside wants out. None in the calm version.
     private func rattle() {
@@ -228,10 +235,10 @@ final class ChestRevealScene {
     private func animateBeam(_ t: Double, _ range: ClosedRange<Double>) {
         let grow = RevealTiming.progress(t, in: range.lowerBound...(range.lowerBound + 0.4))
         let settle = RevealTiming.progress(t, in: (range.upperBound - 0.6)...range.upperBound)
-        beam?.components.set(OpacityComponent(opacity: grow * (1 - 0.6 * settle)))
+        beam?.components.set(OpacityComponent(opacity: grow * (1 - settle)))
         beam?.scale = [1, max(grow, 0.01), 1]
 
-        let active = t >= range.lowerBound
+        let active = t >= range.lowerBound && t <= range.upperBound
         for (i, dot) in sparkles.enumerated() {
             dot.isEnabled = active
             guard active else { continue }
