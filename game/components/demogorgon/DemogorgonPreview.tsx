@@ -5,6 +5,14 @@ import { Environment, Lightformer, OrbitControls } from '@react-three/drei';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { useNavigate } from 'react-router-dom';
 import { Demogorgon, DemogorgonAnimation, DemogorgonBuild } from './Demogorgon';
+import { Demodog } from '../demodog/Demodog';
+
+export type CreatureKind = 'demogorgon' | 'demodog';
+
+const CREATURES: { id: CreatureKind; label: string; path: string }[] = [
+    { id: 'demogorgon', label: 'Demogorgon', path: '/demogorgon' },
+    { id: 'demodog', label: 'Demodog', path: '/demodog' },
+];
 
 const ANIMATIONS: { id: DemogorgonAnimation; label: string }[] = [
     { id: 'idle', label: 'Idle' },
@@ -49,11 +57,12 @@ const Spores: React.FC<{ count?: number }> = ({ count = 400 }) => {
 };
 
 const Stage: React.FC<{
+    creature: CreatureKind;
     animation: DemogorgonAnimation;
     onFinished: (a: DemogorgonAnimation) => void;
     onBuilt: (b: DemogorgonBuild) => void;
     sound: boolean;
-}> = ({ animation, onFinished, onBuilt, sound }) => (
+}> = ({ creature, animation, onFinished, onBuilt, sound }) => (
     <>
         <color attach="background" args={['#0b0507']} />
         <fog attach="fog" args={['#12070a', 6, 20]} />
@@ -72,14 +81,19 @@ const Stage: React.FC<{
             <meshStandardMaterial color="#1a0d0f" roughness={0.9} />
         </mesh>
 
-        <Demogorgon animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
+        {creature === 'demodog' ? (
+            <Demodog key="demodog" animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
+        ) : (
+            <Demogorgon key="demogorgon" animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
+        )}
         <Spores />
-        <OrbitControls target={[0, 1.2, 0.2]} minDistance={1.5} maxDistance={9} maxPolarAngle={Math.PI / 2 - 0.02} />
+        <OrbitControls key={creature} target={creature === 'demodog' ? [0, 0.6, 0] : [0, 1.2, 0.2]} minDistance={1.5} maxDistance={9} maxPolarAngle={Math.PI / 2 - 0.02} />
     </>
 );
 
-export const DemogorgonPreview: React.FC = () => {
+export const DemogorgonPreview: React.FC<{ initial?: CreatureKind }> = ({ initial = 'demogorgon' }) => {
     const navigate = useNavigate();
+    const creature = initial;
     const [animation, setAnimation] = useState<DemogorgonAnimation>('idle');
     const [exporting, setExporting] = useState(false);
     // Browsers keep audio locked until the first click, so the first button press unlocks it.
@@ -103,7 +117,7 @@ export const DemogorgonPreview: React.FC = () => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'demogorgon.glb';
+                a.download = `${creature}.glb`;
                 a.click();
                 URL.revokeObjectURL(url);
                 setExporting(false);
@@ -114,13 +128,13 @@ export const DemogorgonPreview: React.FC = () => {
             },
             { binary: true, animations: build.clips },
         );
-    }, []);
+    }, [creature]);
 
     return (
         <div className="relative w-full h-screen bg-black">
             <Canvas shadows camera={{ position: [3.2, 1.8, 4.2], fov: 42 }} gl={{ antialias: true }}>
                 <Suspense fallback={null}>
-                    <Stage animation={animation} onFinished={handleFinished} onBuilt={handleBuilt} sound={sound} />
+                    <Stage creature={creature} animation={animation} onFinished={handleFinished} onBuilt={handleBuilt} sound={sound} />
                 </Suspense>
             </Canvas>
 
@@ -131,7 +145,16 @@ export const DemogorgonPreview: React.FC = () => {
                 >
                     Home
                 </button>
-                <h1 className="text-lg font-black tracking-widest text-red-400">DEMOGORGON</h1>
+                <h1 className="text-lg font-black tracking-widest text-red-400">{creature === 'demodog' ? 'DEMODOG' : 'DEMOGORGON'}</h1>
+                {CREATURES.map(c => (
+                    <button
+                        key={c.id}
+                        onClick={() => navigate(c.path)}
+                        className={`px-3 py-1.5 rounded text-sm ${creature === c.id ? 'bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
+                    >
+                        {c.label}
+                    </button>
+                ))}
             </div>
 
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 bg-black/60 backdrop-blur px-3 py-2 rounded-xl border border-white/10">

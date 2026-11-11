@@ -31,16 +31,16 @@ export const ONE_SHOT: Record<DemogorgonAnimation, boolean> = {
 
 type Euler3 = [number, number, number];
 
-interface Pose {
+export interface Pose {
     rot: Record<string, Euler3>;
     pos: Record<string, Euler3>;
 }
 
-const TAU = Math.PI * 2;
-const FPS = 30;
-const deg = (rad: number) => (rad * 180) / Math.PI;
+export const TAU = Math.PI * 2;
+export const FPS = 30;
+export const deg = (rad: number) => (rad * 180) / Math.PI;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smooth = (a: number, b: number, x: number) => {
+export const smooth = (a: number, b: number, x: number) => {
     const t = clamp01((x - a) / (b - a));
     return t * t * (3 - 2 * t);
 };
@@ -49,16 +49,16 @@ const smooth = (a: number, b: number, x: number) => {
 // Pose helpers
 // ------------------------------------------------------------------
 
-const newPose = (): Pose => ({ rot: {}, pos: {} });
+export const newPose = (): Pose => ({ rot: {}, pos: {} });
 
-const rotate = (p: Pose, bone: string, x = 0, y = 0, z = 0) => {
+export const rotate = (p: Pose, bone: string, x = 0, y = 0, z = 0) => {
     const e = (p.rot[bone] ??= [0, 0, 0]);
     e[0] += x;
     e[1] += y;
     e[2] += z;
 };
 
-const move = (p: Pose, bone: string, x = 0, y = 0, z = 0) => {
+export const move = (p: Pose, bone: string, x = 0, y = 0, z = 0) => {
     const e = (p.pos[bone] ??= [0, 0, 0]);
     e[0] += x;
     e[1] += y;
@@ -66,7 +66,7 @@ const move = (p: Pose, bone: string, x = 0, y = 0, z = 0) => {
 };
 
 /** Apply to the left bone as given and to the right bone mirrored. */
-const both = (p: Pose, name: string, x = 0, y = 0, z = 0) => {
+export const both = (p: Pose, name: string, x = 0, y = 0, z = 0) => {
     rotate(p, `${name}L`, x, y, z);
     rotate(p, `${name}R`, x, -y, -z);
 };
@@ -81,7 +81,7 @@ const fingers = (p: Pose, curlBase: number, curlTip: number, splay = 0) => {
     }
 };
 
-const petals = (p: Pose, open: number, curl: number, t = 0, wobble = 0) => {
+export const petals = (p: Pose, open: number, curl: number, t = 0, wobble = 0) => {
     for (let i = 0; i < PETAL_COUNT; i++) {
         const w = wobble * Math.sin(TAU * (t * 2.5 + i / PETAL_COUNT));
         rotate(p, `petal${i}_base`, deg(open - PETAL_FLAT + w), 0, 0);
@@ -127,7 +127,7 @@ const lerpRecord = (a: Record<string, Euler3>, b: Record<string, Euler3>, u: num
 };
 
 /** Eased interpolation through a list of keyframe poses. */
-const sampleKeys = (keys: { t: number; pose: Pose }[], t: number): Pose => {
+export const sampleKeys = (keys: { t: number; pose: Pose }[], t: number): Pose => {
     if (t <= keys[0].t) return { rot: cloneRecord(keys[0].pose.rot), pos: cloneRecord(keys[0].pose.pos) };
     for (let i = 1; i < keys.length; i++) {
         if (t <= keys[i].t) {
@@ -367,7 +367,7 @@ const applyPose = (rig: DemogorgonRig, pose: Pose) => {
     }
 };
 
-const resetPose = (rig: DemogorgonRig) => applyPose(rig, newPose());
+export const resetPose = (rig: DemogorgonRig) => applyPose(rig, newPose());
 
 const TOE_BONES = ['L', 'R'].flatMap(S => Array.from({ length: TOE_COUNT }, (_, k) => `toe${k}${S}`));
 
@@ -382,12 +382,12 @@ const flatFeet = (pose: Pose): Pose => {
 };
 
 /** Lifts or lowers the whole body so the lowest foot always rests on the ground. */
-const planted = (rig: DemogorgonRig, pose: Pose, groundY: number): Pose => {
+const planted = (rig: DemogorgonRig, pose: Pose, groundY: number, footBones: string[]): Pose => {
     applyPose(rig, pose);
     rig.root.updateMatrixWorld(true);
     const v = new THREE.Vector3();
     let lowest = Infinity;
-    for (const name of TOE_BONES) {
+    for (const name of footBones) {
         rig.bones[name].getWorldPosition(v);
         lowest = Math.min(lowest, v.y);
     }
@@ -395,12 +395,17 @@ const planted = (rig: DemogorgonRig, pose: Pose, groundY: number): Pose => {
     return pose;
 };
 
-const bake = (
+/**
+ * Bakes a pose function into an AnimationClip. `ground` names the bones that must rest on the floor
+ * (the lowest one is pinned to `ground.y` each frame); `prepare` post-processes every sampled pose.
+ */
+export const bake = (
     rig: DemogorgonRig,
     name: string,
     duration: number,
     poseAt: (t: number) => Pose,
-    groundY: number,
+    ground: { y: number; bones: string[] },
+    prepare: (pose: Pose) => Pose = pose => pose,
 ): THREE.AnimationClip => {
     const frames = Math.round(duration * FPS);
     const times: number[] = [];
@@ -408,7 +413,7 @@ const bake = (
     for (let f = 0; f <= frames; f++) {
         const t = (f / frames) * duration;
         times.push(t);
-        poses.push(planted(rig, flatFeet(poseAt(t)), groundY));
+        poses.push(planted(rig, prepare(poseAt(t)), ground.y, ground.bones));
     }
 
     const rotBones = new Set<string>();
@@ -456,13 +461,14 @@ export const buildDemogorgonClips = (rig: DemogorgonRig): THREE.AnimationClip[] 
         return Math.min(acc, v.y);
     }, Infinity);
 
+    const ground = { y: groundY, bones: TOE_BONES };
     const attack = attackKeys();
     const roar = roarKeys();
     const clips = [
-        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, idlePose, groundY),
-        bake(rig, CLIP_NAMES.walk, WALK_DURATION, walkPose, groundY),
-        bake(rig, CLIP_NAMES.attack, ATTACK_DURATION, t => sampleKeys(attack, t), groundY),
-        bake(rig, CLIP_NAMES.roar, ROAR_DURATION, t => roarPose(roar, t), groundY),
+        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, idlePose, ground, flatFeet),
+        bake(rig, CLIP_NAMES.walk, WALK_DURATION, walkPose, ground, flatFeet),
+        bake(rig, CLIP_NAMES.attack, ATTACK_DURATION, t => sampleKeys(attack, t), ground, flatFeet),
+        bake(rig, CLIP_NAMES.roar, ROAR_DURATION, t => roarPose(roar, t), ground, flatFeet),
     ];
 
     resetPose(rig);

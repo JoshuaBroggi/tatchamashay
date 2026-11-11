@@ -14,7 +14,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  * the flower fully open (flat); closing a petal is a negative rotation about its local X.
  */
 
-const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+export const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
 // ------------------------------------------------------------------
 // Public types
@@ -44,20 +44,20 @@ export interface DemogorgonRig {
 // Small maths helpers
 // ------------------------------------------------------------------
 
-const smoothstep = (a: number, b: number, x: number) => {
+export const smoothstep = (a: number, b: number, x: number) => {
     const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
 };
 
-const gauss = (x: number, centre: number, width: number) => Math.exp(-Math.pow((x - centre) / width, 2));
+export const gauss = (x: number, centre: number, width: number) => Math.exp(-Math.pow((x - centre) / width, 2));
 
-const hash3 = (x: number, y: number, z: number) => {
+export const hash3 = (x: number, y: number, z: number) => {
     const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
     return h - Math.floor(h);
 };
 
 /** Trilinear value noise in [0, 1]. */
-const noise3 = (x: number, y: number, z: number) => {
+export const noise3 = (x: number, y: number, z: number) => {
     const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
     const xf = x - xi, yf = y - yi, zf = z - zi;
     const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
@@ -70,7 +70,7 @@ const noise3 = (x: number, y: number, z: number) => {
 };
 
 /** Piecewise profile through [s, rx, rz] keys with smooth blending. */
-const profile = (keys: [number, number, number][]) => (s: number): [number, number] => {
+export const profile = (keys: [number, number, number][]) => (s: number): [number, number] => {
     if (s <= keys[0][0]) return [keys[0][1], keys[0][2]];
     for (let i = 1; i < keys.length; i++) {
         if (s <= keys[i][0]) {
@@ -89,22 +89,22 @@ const profile = (keys: [number, number, number][]) => (s: number): [number, numb
 // Skin colouring
 // ------------------------------------------------------------------
 
-const C = (hex: number) => new THREE.Color(hex);
-const SKIN_LIGHT = C(0xcdbfb4);
-const SKIN_GREY = C(0xa89b93);
-const SKIN_PINK = C(0xc2968f);
-const SKIN_BROWN = C(0x8d7565);
-const SKIN_VEIN = C(0x7c6f86);
-const SKIN_VEIN_RED = C(0x9a5650);
-const FLESH_RED = C(0x8a2c27);
-const FLESH_DEEP = C(0x3a0b0b);
-const PETAL_DARK = C(0x2e0a09);
-const PETAL_RED = C(0x8c2a21);
-const PETAL_TAN = C(0xb87762);
-const HORN = C(0xd2bf96);
-const HORN_BASE = C(0x7d6a52);
-const TEETH = C(0xe6d8b6);
-const TEETH_BASE = C(0xa06c5c);
+export const C = (hex: number) => new THREE.Color(hex);
+export const SKIN_LIGHT = C(0xcdbfb4);
+export const SKIN_GREY = C(0xa89b93);
+export const SKIN_PINK = C(0xc2968f);
+export const SKIN_BROWN = C(0x8d7565);
+export const SKIN_VEIN = C(0x7c6f86);
+export const SKIN_VEIN_RED = C(0x9a5650);
+export const FLESH_RED = C(0x8a2c27);
+export const FLESH_DEEP = C(0x3a0b0b);
+export const PETAL_DARK = C(0x2e0a09);
+export const PETAL_RED = C(0x8c2a21);
+export const PETAL_TAN = C(0xb87762);
+export const HORN = C(0xd2bf96);
+export const HORN_BASE = C(0x7d6a52);
+export const TEETH = C(0xe6d8b6);
+export const TEETH_BASE = C(0xa06c5c);
 
 /**
  * Pale, mottled, leathery skin: grey-beige with pink flushes, darker browning toward the
@@ -127,7 +127,7 @@ const skinColor = (p: THREE.Vector3): THREE.Color => {
 // Skin textures (tileable creases + pores), shared height and albedo
 // ------------------------------------------------------------------
 
-const makeSkinTextures = (): { bump: THREE.Texture; albedo: THREE.Texture } => {
+export const makeSkinTextures = (): { bump: THREE.Texture; albedo: THREE.Texture } => {
     const N = 512;
     let seed = 1337;
     const rand = () => {
@@ -199,7 +199,7 @@ const makeSkinTextures = (): { bump: THREE.Texture; albedo: THREE.Texture } => {
 // Skeleton builder
 // ------------------------------------------------------------------
 
-class SkeletonBuilder {
+export class SkeletonBuilder {
     readonly list: THREE.Bone[] = [];
     readonly byName = new Map<string, THREE.Bone>();
     readonly worldPos = new Map<string, THREE.Vector3>();
@@ -293,7 +293,7 @@ const gridNormals = (grid: THREE.Vector3[][], cols: number): THREE.Vector3[][] =
     );
 };
 
-interface TubeOptions {
+export interface TubeOptions {
     /** Bind-pose joint positions the tube flows through. */
     joints: THREE.Vector3[];
     /** bones[i] drives the stretch joints[i] -> joints[i + 1]. */
@@ -315,9 +315,9 @@ interface TubeOptions {
     capStart?: boolean;
 }
 
-const BUMP_UNIT = 0.45; // metres per skin-texture repeat
+export const BUMP_UNIT = 0.45; // metres per skin-texture repeat
 
-class MeshBuilder {
+export class MeshBuilder {
     readonly parts: THREE.BufferGeometry[] = [];
 
     constructor(private readonly skeleton: SkeletonBuilder) {}
@@ -482,11 +482,24 @@ class MeshBuilder {
 // Anatomy (bind pose)
 // ------------------------------------------------------------------
 
-/** Centre of the flower face and the direction it looks. */
-const FACE_CENTER = V(0, 1.93, 0.36);
-const FACE_AXIS = V(0, 0.12, 1).normalize();
-const FACE_E1 = V(1, 0, 0);
-const FACE_E2 = new THREE.Vector3().crossVectors(FACE_AXIS, FACE_E1).normalize();
+/** A petal-flower face: where it sits, which way it looks, how big, and which bone carries it. */
+export interface FaceSpec {
+    center: THREE.Vector3;
+    axis: THREE.Vector3;
+    e1: THREE.Vector3;
+    e2: THREE.Vector3;
+    /** Uniform size multiplier relative to the Demogorgon's face. */
+    scale: number;
+    parent: string;
+}
+
+export const makeFace = (center: THREE.Vector3, axis: THREE.Vector3, scale = 1, parent = 'head'): FaceSpec => {
+    const a = axis.clone().normalize();
+    const e1 = V(1, 0, 0);
+    return { center, axis: a, e1, e2: new THREE.Vector3().crossVectors(a, e1).normalize(), scale, parent };
+};
+
+const DEMOGORGON_FACE = makeFace(V(0, 1.93, 0.36), V(0, 0.12, 1));
 
 /** The torso tube starts below the hips so the pelvis closes around the tops of the thighs. */
 const PELVIS_BOTTOM = V(0, 0.93, -0.01);
@@ -536,12 +549,12 @@ const toeJoints = (side: 1 | -1, k: number) => {
     };
 };
 
-const sideName = (side: 1 | -1) => (side === 1 ? 'L' : 'R');
+export const sideName = (side: 1 | -1) => (side === 1 ? 'L' : 'R');
 
 /** Direction (in world bind space) from the face axis out to petal i. */
-const petalRadial = (i: number): THREE.Vector3 => {
+export const petalRadial = (face: FaceSpec, i: number): THREE.Vector3 => {
     const theta = Math.PI / 2 + (i * Math.PI * 2) / PETAL_COUNT;
-    return FACE_E1.clone().multiplyScalar(Math.cos(theta)).addScaledVector(FACE_E2, Math.sin(theta)).normalize();
+    return face.e1.clone().multiplyScalar(Math.cos(theta)).addScaledVector(face.e2, Math.sin(theta)).normalize();
 };
 
 const PETAL_START = 0.14; // radius where a petal leaves the fleshy lip
@@ -550,6 +563,25 @@ const PETAL_LENGTH = 0.31;
 /** Half-width of a petal at t in [0, 1]: broad kite shape tapering to a point. */
 const petalHalfWidth = (t: number) =>
     t < 0.35 ? 0.062 + 0.058 * smoothstep(0, 0.35, t) : 0.12 * Math.pow(Math.max(0, 1 - (t - 0.35) / 0.65), 0.9);
+
+/**
+ * Petal bones: local X = hinge tangent, local Y = along the petal, local Z = back away from the face.
+ * Rotating about local +X bends the petal back; negative closes it toward the bud.
+ */
+export const addPetalBones = (sk: SkeletonBuilder, face: FaceSpec) => {
+    for (let i = 0; i < PETAL_COUNT; i++) {
+        const radial = petalRadial(face, i);
+        const hinge = new THREE.Vector3().crossVectors(face.axis, radial).normalize();
+        const basis = new THREE.Matrix4().makeBasis(hinge, radial, face.axis.clone().negate());
+        const q = new THREE.Quaternion().setFromRotationMatrix(basis);
+        sk.add(`petal${i}_base`, face.parent, face.center.clone().addScaledVector(radial, PETAL_START * face.scale), q);
+        sk.add(
+            `petal${i}_tip`,
+            `petal${i}_base`,
+            face.center.clone().addScaledVector(radial, (PETAL_START + PETAL_LENGTH * 0.45) * face.scale),
+        );
+    }
+};
 
 // ------------------------------------------------------------------
 // Skeleton definition
@@ -566,16 +598,7 @@ const buildSkeleton = (): SkeletonBuilder => {
     sk.add('neck2', 'neck1', TORSO_JOINTS[5]);
     sk.add('head', 'neck2', TORSO_JOINTS[6]);
 
-    // Petals: local X = hinge tangent, local Y = along the petal, local Z = back away from the face.
-    // Rotating about local +X bends the petal back; negative closes it toward the bud.
-    for (let i = 0; i < PETAL_COUNT; i++) {
-        const radial = petalRadial(i);
-        const hinge = new THREE.Vector3().crossVectors(FACE_AXIS, radial).normalize();
-        const basis = new THREE.Matrix4().makeBasis(hinge, radial, FACE_AXIS.clone().negate());
-        const q = new THREE.Quaternion().setFromRotationMatrix(basis);
-        sk.add(`petal${i}_base`, 'head', FACE_CENTER.clone().addScaledVector(radial, PETAL_START), q);
-        sk.add(`petal${i}_tip`, `petal${i}_base`, FACE_CENTER.clone().addScaledVector(radial, PETAL_START + PETAL_LENGTH * 0.45));
-    }
+    addPetalBones(sk, DEMOGORGON_FACE);
 
     for (const side of [1, -1] as const) {
         const S = sideName(side);
@@ -798,7 +821,9 @@ const buildLegs = (mb: MeshBuilder) => {
 };
 
 /** The flower face: fleshy lip, black toothed throat, and five scaled, serrated petals. */
-const buildHead = (mb: MeshBuilder, sk: SkeletonBuilder) => {
+export const buildFace = (mb: MeshBuilder, sk: SkeletonBuilder, face: FaceSpec) => {
+    const FACE_CENTER = face.center, FACE_AXIS = face.axis, FACE_E1 = face.e1, FACE_E2 = face.e2;
+    const firstPart = mb.parts.length;
     const ringPoint = (theta: number, radius: number, along: number) =>
         FACE_CENTER.clone()
             .addScaledVector(FACE_AXIS, along)
@@ -806,7 +831,7 @@ const buildHead = (mb: MeshBuilder, sk: SkeletonBuilder) => {
             .addScaledVector(FACE_E2, Math.sin(theta) * radius);
 
     // Lip and throat: a swollen red rim, then a funnel falling into black.
-    mb.revolve('head', FACE_CENTER, FACE_AXIS, FACE_E1, FACE_E2, [
+    mb.revolve(face.parent, FACE_CENTER, FACE_AXIS, FACE_E1, FACE_E2, [
         { r: 0.17, a: -0.004, color: PETAL_TAN },
         { r: 0.155, a: 0.016, color: PETAL_RED },
         { r: 0.125, a: 0.04, color: FLESH_RED },
@@ -832,7 +857,7 @@ const buildHead = (mb: MeshBuilder, sk: SkeletonBuilder) => {
             const base = ringPoint(theta, ring.radius, ring.along);
             const radialDir = FACE_E1.clone().multiplyScalar(Math.cos(theta)).addScaledVector(FACE_E2, Math.sin(theta));
             const dir = radialDir.negate().multiplyScalar(ring.inward).addScaledVector(FACE_AXIS, ring.forward);
-            mb.spike('head', base, dir, ring.length * (0.8 + 0.4 * hash3(t, ri, 3)), ring.thick);
+            mb.spike(face.parent, base, dir, ring.length * (0.8 + 0.4 * hash3(t, ri, 3)), ring.thick);
         }
     });
 
@@ -841,7 +866,7 @@ const buildHead = (mb: MeshBuilder, sk: SkeletonBuilder) => {
     const GRID_S = 20;
     const STRIPES = 21;
     for (let i = 0; i < PETAL_COUNT; i++) {
-        const radial = petalRadial(i);
+        const radial = petalRadial(face, i);
         const tangent = new THREE.Vector3().crossVectors(FACE_AXIS, radial).normalize();
         const baseIdx = sk.indexOf(`petal${i}_base`);
         const tipIdx = sk.indexOf(`petal${i}_tip`);
@@ -951,6 +976,23 @@ const buildHead = (mb: MeshBuilder, sk: SkeletonBuilder) => {
             );
         }
     }
+
+    // The face is modelled at Demogorgon size; resize every part added here about its centre.
+    if (face.scale !== 1) {
+        const c = face.center;
+        for (let i = firstPart; i < mb.parts.length; i++) {
+            const pos = mb.parts[i].getAttribute('position') as THREE.BufferAttribute;
+            for (let v = 0; v < pos.count; v++) {
+                pos.setXYZ(
+                    v,
+                    c.x + (pos.getX(v) - c.x) * face.scale,
+                    c.y + (pos.getY(v) - c.y) * face.scale,
+                    c.z + (pos.getZ(v) - c.z) * face.scale,
+                );
+            }
+            pos.needsUpdate = true;
+        }
+    }
 };
 
 // ------------------------------------------------------------------
@@ -962,7 +1004,7 @@ export const buildDemogorgonRig = (): DemogorgonRig => {
     const mb = new MeshBuilder(sk);
 
     buildTorso(mb);
-    buildHead(mb, sk);
+    buildFace(mb, sk, DEMOGORGON_FACE);
     buildArms(mb);
     buildLegs(mb);
 

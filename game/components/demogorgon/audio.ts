@@ -52,7 +52,39 @@ const makeImpulse = (ctx: AudioContext, seconds: number, decay: number): AudioBu
     return buffer;
 };
 
-export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
+/** Tunes the shared voice engine to a particular creature. */
+export interface VoiceProfile {
+    /** Multiplier on growl pitch (below 1 is deeper). */
+    pitch: number;
+    /** Multiplier on scream pitch. */
+    screamPitch: number;
+    /** Multiplier on formant and rasp frequencies (below 1 sounds bigger and darker). */
+    formant: number;
+    /** Level of the sub-bass chest boom under the roar (0 for none). */
+    sub: number;
+    /** Seconds into the attack clip when the strike lands. */
+    strikeAt: number;
+    /** Length of the walk/run clip and the footfall offsets inside it, in seconds. */
+    walkPeriod: number;
+    steps: number[];
+    /** Footfall level and thump frequency (lower sounds heavier). */
+    stepLevel: number;
+    reverbSeconds: number;
+}
+
+export const DEMOGORGON_VOICE: VoiceProfile = {
+    pitch: 1,
+    screamPitch: 1,
+    formant: 1,
+    sub: 0,
+    strikeAt: 0.58,
+    walkPeriod: 1.3,
+    steps: [0.05, 0.7],
+    stepLevel: 0.5,
+    reverbSeconds: 2.4,
+};
+
+export const createCreatureAudio = (profile: VoiceProfile, initialVolume = 0.8): DemogorgonAudio => {
     let ctx: AudioContext | null = null;
     let master: GainNode;
     let dry: GainNode;
@@ -79,7 +111,7 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         master.gain.value = volume;
         dry = ctx.createGain();
         const reverb = ctx.createConvolver();
-        reverb.buffer = makeImpulse(ctx, 2.4, 3);
+        reverb.buffer = makeImpulse(ctx, profile.reverbSeconds, 3);
         const wet = ctx.createGain();
         wet.gain.value = 0.32;
 
@@ -117,6 +149,8 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
 
     /** Low throat growl: formant-filtered, distorted saw with a rattling 30 Hz amplitude flutter. */
     const growl = (c: AudioContext, bus: GainNode, t0: number, dur: number, f0: number, f1: number, level: number) => {
+        f0 *= profile.pitch;
+        f1 *= profile.pitch;
         const osc = c.createOscillator();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(f0, t0);
@@ -165,8 +199,8 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
             const bp = c.createBiquadFilter();
             bp.type = 'bandpass';
             bp.Q.value = formant.q;
-            bp.frequency.setValueAtTime(formant.f[0], t0);
-            bp.frequency.linearRampToValueAtTime(formant.f[1], t0 + dur);
+            bp.frequency.setValueAtTime(formant.f[0] * profile.formant, t0);
+            bp.frequency.linearRampToValueAtTime(formant.f[1] * profile.formant, t0 + dur);
             const g = c.createGain();
             g.gain.value = formant.g;
             shaper.connect(bp).connect(g).connect(rattleGain);
@@ -181,6 +215,8 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
 
     /** Screech: a wobbling, jittery saw pushed through heavy distortion and bright formants. */
     const scream = (c: AudioContext, bus: GainNode, t0: number, dur: number, f0: number, peak: number, level: number) => {
+        f0 *= profile.screamPitch;
+        peak *= profile.screamPitch;
         const osc = c.createOscillator();
         osc.type = 'sawtooth';
         const osc2 = c.createOscillator();
@@ -218,7 +254,7 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         hp.frequency.value = 350;
         const bright = c.createBiquadFilter();
         bright.type = 'peaking';
-        bright.frequency.value = 2600;
+        bright.frequency.value = 2600 * profile.formant;
         bright.gain.value = 8;
         bright.Q.value = 1.2;
         const out = c.createGain();
@@ -233,7 +269,7 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         const rasp = noiseSource(c, t0, dur);
         const raspBp = c.createBiquadFilter();
         raspBp.type = 'bandpass';
-        raspBp.frequency.value = 3200;
+        raspBp.frequency.value = 3200 * profile.formant;
         raspBp.Q.value = 0.9;
         const raspGain = c.createGain();
         raspGain.gain.setValueAtTime(0.0001, t0);
@@ -298,8 +334,49 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         }
     };
 
+    /** Chest-shaking sub-bass: a swelling sine plus a distorted, low-passed saw, with a slow tremor. */
+    const subBass = (c: AudioContext, bus: GainNode, t0: number, dur: number, level: number) => {
+        const sine = c.createOscillator();
+        sine.frequency.setValueAtTime(44, t0);
+        sine.frequency.linearRampToValueAtTime(52, t0 + dur * 0.35);
+        sine.frequency.linearRampToValueAtTime(34, t0 + dur);
+        const saw = c.createOscillator();
+        saw.type = 'sawtooth';
+        saw.frequency.setValueAtTime(44, t0);
+        saw.frequency.linearRampToValueAtTime(58, t0 + dur * 0.35);
+        saw.frequency.linearRampToValueAtTime(38, t0 + dur);
+        const shaper = c.createWaveShaper();
+        shaper.curve = makeDistortion(8);
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 150;
+        lp.Q.value = 0.8;
+        const sawGain = c.createGain();
+        sawGain.gain.value = 0.55;
+        const tremor = c.createOscillator();
+        tremor.frequency.value = 7;
+        const tremorDepth = c.createGain();
+        tremorDepth.gain.value = 0.25;
+        const tremorGain = c.createGain();
+        tremorGain.gain.value = 0.75;
+        tremor.connect(tremorDepth).connect(tremorGain.gain);
+        const out = c.createGain();
+        out.gain.setValueAtTime(0.0001, t0);
+        out.gain.exponentialRampToValueAtTime(level, t0 + Math.min(0.35, dur * 0.3));
+        out.gain.setValueAtTime(level, t0 + dur * 0.65);
+        out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        sine.connect(tremorGain);
+        saw.connect(shaper).connect(lp).connect(sawGain).connect(tremorGain);
+        tremorGain.connect(out).connect(bus);
+        [sine, saw, tremor].forEach(o => {
+            o.start(t0);
+            o.stop(t0 + dur + 0.1);
+        });
+    };
+
     /** A heavy, wet footfall: sub thump plus a squelch of noise. */
     const footstep = (c: AudioContext, bus: GainNode, t: number, level: number) => {
+        level *= profile.stepLevel / 0.5;
         const thump = c.createOscillator();
         thump.frequency.setValueAtTime(95, t);
         thump.frequency.exponentialRampToValueAtTime(38, t + 0.16);
@@ -373,25 +450,24 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
 
     const walkCycle = (c: AudioContext, bus: GainNode) => {
         const t = c.currentTime + 0.05;
-        // The walk clip is 1.3 s long with a footfall every half cycle.
-        footstep(c, bus, t + 0.05, 0.5);
-        footstep(c, bus, t + 0.7, 0.5);
-        growl(c, bus, t, 1.3, 58, 72, 0.14);
-        breath(c, bus, t + 0.1, 0.5, 0.07, 500, 900);
-        breath(c, bus, t + 0.75, 0.5, 0.07, 900, 500);
-        if (Math.random() < 0.6) clicks(c, bus, t + rand(0.1, 1), Math.floor(rand(4, 10)), 0.05, 0.07);
+        profile.steps.forEach(offset => footstep(c, bus, t + offset, 0.5));
+        growl(c, bus, t, profile.walkPeriod, 58, 72, 0.14);
+        profile.steps.forEach((offset, i) => breath(c, bus, t + offset + 0.05, 0.5, 0.07, i % 2 ? 900 : 500, i % 2 ? 500 : 900));
+        if (Math.random() < 0.6) clicks(c, bus, t + rand(0.1, 0.8), Math.floor(rand(4, 10)), 0.05, 0.07);
     };
 
     const attackOnce = (c: AudioContext, bus: GainNode) => {
         const t = c.currentTime + 0.03;
-        breath(c, bus, t, 0.4, 0.14, 500, 1400); // sharp intake while the body coils
+        const k = profile.strikeAt;
+        breath(c, bus, t, k - 0.18, 0.14, 500, 1400); // sharp intake while the body coils
         growl(c, bus, t + 0.1, 0.5, 70, 110, 0.18);
-        scream(c, bus, t + 0.42, 0.85, 520, 1500, 0.2); // the lunge lands at 0.58 s
-        growl(c, bus, t + 0.45, 1.0, 62, 98, 0.32);
-        footstep(c, bus, t + 0.6, 0.7);
-        snap(c, bus, t + 0.98, 0.35); // petals clap shut
-        growl(c, bus, t + 1.1, 0.7, 75, 55, 0.14);
-        breath(c, bus, t + 1.2, 0.5, 0.08, 900, 500);
+        scream(c, bus, t + k - 0.16, 0.85, 520, 1500, 0.2);
+        growl(c, bus, t + k - 0.13, 1.0, 62, 98, 0.32);
+        if (profile.sub > 0) subBass(c, bus, t + k - 0.12, 0.9, 0.5 * profile.sub);
+        footstep(c, bus, t + k + 0.02, 0.7);
+        snap(c, bus, t + k + 0.4, 0.35); // petals clap shut
+        growl(c, bus, t + k + 0.52, 0.7, 75, 55, 0.14);
+        breath(c, bus, t + k + 0.62, 0.5, 0.08, 900, 500);
     };
 
     const roarOnce = (c: AudioContext, bus: GainNode) => {
@@ -400,6 +476,7 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         growl(c, bus, t + 0.3, 0.6, 48, 70, 0.12);
         // Peak of the roar between 1.0 s and 2.3 s, with the petals blown wide open.
         growl(c, bus, t + 0.85, 1.6, 58, 92, 0.42);
+        if (profile.sub > 0) subBass(c, bus, t + 0.8, 1.8, 0.75 * profile.sub);
         scream(c, bus, t + 0.9, 1.4, 620, 1700, 0.24);
         scream(c, bus, t + 0.95, 1.3, 430, 1100, 0.14);
         growl(c, bus, t + 1.0, 1.2, 150, 210, 0.1);
@@ -433,7 +510,7 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
                     loop(4, () => idleCycle(c, bus));
                     break;
                 case 'walk':
-                    loop(1.3, () => walkCycle(c, bus));
+                    loop(profile.walkPeriod, () => walkCycle(c, bus));
                     break;
                 case 'attack':
                     attackOnce(c, bus);
@@ -455,3 +532,6 @@ export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio => {
         },
     };
 };
+
+export const createDemogorgonAudio = (initialVolume = 0.8): DemogorgonAudio =>
+    createCreatureAudio(DEMOGORGON_VOICE, initialVolume);

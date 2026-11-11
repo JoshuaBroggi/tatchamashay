@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GroupProps, useFrame } from '@react-three/fiber';
 import { buildDemogorgonRig, DemogorgonRig } from './rig';
 import { buildDemogorgonClips, CLIP_NAMES, DemogorgonAnimation, ONE_SHOT } from './animations';
-import { createDemogorgonAudio } from './audio';
+import { createDemogorgonAudio, DemogorgonAudio } from './audio';
 
 export type { DemogorgonAnimation } from './animations';
 
@@ -19,9 +19,9 @@ export const createDemogorgon = (): DemogorgonBuild => {
     return { rig, clips };
 };
 
-interface DemogorgonProps extends Omit<GroupProps, 'ref'> {
+export interface CreatureProps extends Omit<GroupProps, 'ref'> {
     animation?: DemogorgonAnimation;
-    /** Standing height in world units. Defaults to the 2.5 m the model is authored at. */
+    /** Height in world units. Defaults to the size the model is authored at. */
     height?: number;
     timeScale?: number;
     /** Plays the creature's voice: growls, screams, clicks and footfalls synced to the animation. */
@@ -36,7 +36,15 @@ interface DemogorgonProps extends Omit<GroupProps, 'ref'> {
 
 const FADE_SECONDS = 0.25;
 
-export const Demogorgon: React.FC<DemogorgonProps> = ({
+interface CreatureActorProps extends CreatureProps {
+    create: () => DemogorgonBuild;
+    createAudio: (volume: number) => DemogorgonAudio;
+}
+
+/** Plays a built creature's clips and voice. Shared by the Demogorgon and the Demodog. */
+export const CreatureActor: React.FC<CreatureActorProps> = ({
+    create,
+    createAudio,
     animation = 'idle',
     height,
     timeScale = 1,
@@ -46,7 +54,7 @@ export const Demogorgon: React.FC<DemogorgonProps> = ({
     onBuilt,
     ...groupProps
 }) => {
-    const build = useMemo(createDemogorgon, []);
+    const build = useMemo(create, []); // eslint-disable-line react-hooks/exhaustive-deps
     const mixer = useMemo(() => new THREE.AnimationMixer(build.rig.root), [build]);
     const actions = useMemo(() => {
         const map = {} as Record<DemogorgonAnimation, THREE.AnimationAction>;
@@ -64,7 +72,7 @@ export const Demogorgon: React.FC<DemogorgonProps> = ({
         return map;
     }, [build, mixer]);
 
-    const audio = useMemo(() => createDemogorgonAudio(volume), []); // eslint-disable-line react-hooks/exhaustive-deps
+    const audio = useMemo(() => createAudio(volume), []); // eslint-disable-line react-hooks/exhaustive-deps
     const currentRef = useRef<THREE.AnimationAction | null>(null);
     const finishedCallbackRef = useRef(onAnimationFinished);
     finishedCallbackRef.current = onAnimationFinished;
@@ -121,3 +129,7 @@ export const Demogorgon: React.FC<DemogorgonProps> = ({
         </group>
     );
 };
+
+export const Demogorgon: React.FC<CreatureProps> = props => (
+    <CreatureActor {...props} create={createDemogorgon} createAudio={createDemogorgonAudio} />
+);
