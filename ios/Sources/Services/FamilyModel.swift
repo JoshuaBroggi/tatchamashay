@@ -15,16 +15,29 @@ final class FamilyModel {
 
     private let store: any FamilyStore
     private let runDefaultsKey: String?
+    private let playingDefaultsKey: String?
+
+    /// The child profile playing now, when the family has more than one. Nil means the first.
+    private(set) var playingChildID: ChildProfile.ID?
 
     init(store: any FamilyStore, isDemo: Bool = false) {
         self.store = store
         self.isDemo = isDemo
         runDefaultsKey = isDemo ? nil : "currentHuntRun"
+        playingDefaultsKey = isDemo ? nil : "playingChild"
+        if let playingDefaultsKey, let saved = UserDefaults.standard.string(forKey: playingDefaultsKey) {
+            playingChildID = UUID(uuidString: saved)
+        }
     }
 
     var parent: ParentAccount? { data.parent }
-    /// Milestone 1 has one child profile.
-    var child: ChildProfile? { data.children.first }
+    /// The child playing: the one the grown-up picked, or the first profile.
+    var child: ChildProfile? {
+        playingChildID.flatMap { data.child($0) } ?? data.children.first
+    }
+    var children: [ChildProfile] { data.children }
+    /// What the child calls the grown-up, for the guide's `{grown_up}`.
+    var grownUpName: String? { parent?.grownUpName }
     /// Milestone 1 plays the newest adventure.
     var adventure: Adventure? { data.adventures.max { $0.createdAt < $1.createdAt } }
 
@@ -61,6 +74,45 @@ final class FamilyModel {
         await write { try await $0.saveChild(child) }
     }
 
+    /// Sets what the child calls the grown-up. Empty goes back to the grown-up's own name.
+    func setGrownUpName(_ name: String) async {
+        guard var parent else { return }
+        parent.childCallsMe = name.isEmpty ? nil : name
+        await write { try await $0.saveParent(parent) }
+    }
+
+    func addChild(pirateName: String, avatar: PirateAvatar = .parrot) async {
+        guard let parent else { return }
+        await write { try await $0.saveChild(ChildProfile(parentID: parent.id, pirateName: pirateName, avatar: avatar)) }
+    }
+
+    func saveChild(_ child: ChildProfile) async {
+        await write { try await $0.saveChild(child) }
+    }
+
+    /// Removes a profile and its chest. The last profile stays.
+    func removeChild(_ child: ChildProfile) async {
+        await write { try await $0.removeChild(child.id) }
+        if playingChildID == child.id { choosePlayingChild(nil) }
+    }
+
+    /// Picks who plays. A different child starts their own run.
+    func choosePlayingChild(_ id: ChildProfile.ID?) {
+        playingChildID = id
+        guard let playingDefaultsKey else { return }
+        if let id { UserDefaults.standard.set(id.uuidString, forKey: playingDefaultsKey) }
+        else { UserDefaults.standard.removeObject(forKey: playingDefaultsKey) }
+    }
+
+    // MARK: Parent: setting up a hunt
+
+    /// Saves a new hunt in one go; it becomes the adventure the hunt plays. Returns whether it saved.
+    @discardableResult
+    func saveHuntSetup(_ adventure: Adventure, designs: [TreasureDesign], placements: [ChestPlacement]) async -> Bool {
+        await write { try await $0.saveHuntSetup(adventure, designs: designs, placements: placements) }
+        return errorMessage == nil && data.adventure(adventure.id) != nil
+    }
+
     // MARK: Parent: hiding treasure
 
     /// Hides one built-in treasure on a spot the parent reviewed on the map.
@@ -87,6 +139,53 @@ final class FamilyModel {
     }
 
     func design(for placement: ChestPlacement) -> TreasureDesign? { data.design(placement.designID) }
+
+    // MARK: Child: inventing and hiding a treasure for the grown-up
+
+    /// Treasures the child invented, newest first.
+    var inventions: [TreasureDesign] {
+        guard let child else { return [] }
+        return data.designs
+            .filter { $0.maker == .child(child.id) && $0.deletedAt == nil }
+            .sorted { $0.current.createdAt > $1.current.createdAt }
+    }
+
+    /// Saves the child's invention: a new design, or a new version of `editing`. Old versions never
+    /// change, so treasures already found keep their look. Returns the saved design, or nil if the
+    /// save failed.
+    func saveInvention(_ look: TreasureLook, editing designID: TreasureDesign.ID? = nil) async -> TreasureDesign? {
+        guard let parent, let child else { return nil }
+        var design: TreasureDesign
+        if let designID, var existing = data.design(designID) {
+            existing.edit(to: look)
+            design = existing
+        } else {
+            design = TreasureDesign(familyID: parent.id, maker: .child(child.id), look: look)
+        }
+        let saved = await tryWrite { try await $0.saveDesign(design) }
+        guard saved else { return nil }
+        design = data.design(design.id) ?? design
+        return design
+    }
+
+    /// Hides one version of the child's invention as a new one-treasure adventure for the grown-up,
+    /// on a spot the parent reviewed on the map. Returns whether it was saved.
+    func hideForGrownUp(design designID: TreasureDesign.ID, version versionID: TreasureVersion.ID,
+                        at spot: Coordinate, hint: String, reviewedAt: Date, guideID: String? = nil) async -> Bool {
+        guard let parent, let child, let look = data.design(designID)?.version(versionID)?.look else { return false }
+        let adventure = Adventure(
+            familyID: parent.id, title: "\(child.pirateName)'s treasure", goal: "Find \(look.name)!",
+            finale: "You found it!", guideID: guideID, hiddenBy: child.id
+        )
+        let placement = ChestPlacement(
+            familyID: parent.id, adventureID: adventure.id, designID: designID, versionID: versionID,
+            spot: spot, hint: hint, placedBy: parent.id, reviewedAt: reviewedAt
+        )
+        return await tryWrite { try await $0.saveAdventure(adventure, placing: placement) }
+    }
+
+    /// The child who hid an adventure's treasure for the grown-up, if a child did.
+    func hiddenBy(_ adventure: Adventure) -> ChildProfile? { adventure.hiddenBy.flatMap { data.child($0) } }
 
     // MARK: The hunt
 
@@ -153,6 +252,11 @@ final class FamilyModel {
         } catch {
             errorMessage = "Couldn't save. Please try again."
         }
+    }
+
+    private func tryWrite(_ change: (any FamilyStore) async throws -> FamilyData) async -> Bool {
+        await write(change)
+        return errorMessage == nil
     }
 
     private func restoredRun() -> HuntRun? {

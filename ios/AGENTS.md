@@ -24,6 +24,10 @@ Warnings are errors (`SWIFT_TREAT_WARNINGS_AS_ERRORS`). Swift 6 language mode.
 (full size in `build/screenshots`, small JPEGs in `docs/screenshots`). The walkthrough UI test
 (`UITests/FamilySliceUITests.swift`) is milestone 1's definition of done: set up, hide a treasure
 on a reviewed spot, walk up, double-tap Dig!, open the chest, restart, check the chest, replay.
+`UITests/HuntUITests.swift` walks milestone 2's 3-treasure hunt (screenshots `21-…` to `26-…`): far,
+warm, Dig!, foggy GPS and We found it, 2 of 3, finale.
+`UITests/ParentSetupUITests.swift` sets up a 3-chest starter adventure end to end and reaches
+**Get ready**'s Ready! (its screenshots are `setup-*`).
 
 To try it by hand: boot a simulator, set its location as above, install
 `build/Build/Products/Debug-iphonesimulator/Tatchamashay.app`, and grant location with
@@ -39,6 +43,8 @@ To try it by hand: boot a simulator, set its location as above, install
 | `Sources/Services/FamilyStore.swift` | `FamilyStore` protocol, the shared record rules (`FamilyData` extension), and the on-device `LocalFamilyStore` |
 | `Sources/Services/FamilyModel.swift` | Observable app state over a store; Demo mode's separate in-memory family |
 | `Sources/Rules/AdventureRules.swift` | 3–5 treasures per adventure, `HuntProgress` (next treasure, finale) |
+| `Sources/Rules/SetupRules.swift` | Parent setup: `MapReview` (how far to zoom before choosing), `HuntDraft` (a hunt before it's saved) |
+| `Sources/Services/GetReady.swift` | **Get ready**: checks every model, sound and line loads, and warns about the map |
 | `Sources/Services/TreasureCatalog.swift` | `Assets/manifest.json` as types: treasures, chest, sounds |
 | `Sources/Services/TreasureEntities.swift` | Loads USDZ models, tints them, plays idle motions; the chest with its lid |
 | `Sources/Services/StoryLibrary.swift` | `Content/Stories/` front matter as types; placeholder filling |
@@ -81,7 +87,27 @@ Shared pieces to use instead of writing your own:
 - **Adventures:** `Adventure.readiness`, `Adventure.isFull`, `FamilyModel.progress` (`HuntProgress`:
   `next`, `nextNumber`, `step(afterFinding:)` → `.next` or `.finale`). A starter adventure sets
   `Adventure.storyID`/`guideID` and `ChestPlacement.storyTreasureID`.
-- UI tests launch with `-silent` so nothing speaks.
+- **Hunt moments (track B → track C):** the hunt never speaks or shows guide lines. It sets
+  `AppModel.huntMoment: HuntMomentEvent?` (`moment: GuideMoment`, 1-based `treasureNumber`, `total`,
+  `placementID`, `at`) once per event: `.greeting` (hunt start), `.gettingClose`, `.digReady`,
+  `.foggyGPS`, `.reveal` (found by Dig!), `.weFoundIt` (found by the grown-up), `.nextTreasure` and
+  `.finale` (when a reveal closes). Watch it with `.onChange(of: app.huntMoment)` and speak the
+  matching guide lines. `HuntMomentTracker` (`Views/Hunt/HuntMoments.swift`) owns the rules: GPS
+  drift never repeats a moment, and foggy GPS fires again only after 20 s of good signal.
+- UI tests launch with `-silent` so nothing speaks. `-huntFixture` (debug builds) starts from a ready
+  3-treasure adventure in Golden Gate Park (`Views/Hunt/HuntFixture.swift`); `UITests/HuntUITests`
+  walks it.
+- **The grown-up and pirates:** `FamilyModel.grownUpName` fills `{grown_up}` (what the child calls
+  the parent, falling back to their name). `FamilyModel.child` is the pirate playing now
+  (`choosePlayingChild`); `children` lists them all.
+- **Where a hunt happens:** `Adventure.playArea` (center, radius, the parent's name for it). A
+  placement from a starter story keeps the parent's blank in `ChestPlacement.hintBlank`; `hint` is
+  already filled.
+- **Chest reveal:** `ChestOpeningView(look:foundAgain:hiddenBy:onDone:)` plays the reveal for a find
+  that is already saved; `onDone` runs once, when the child taps **Into my chest**. While it is on
+  screen `AppModel.isRevealing` is true: the guide waits for it to turn false before speaking (it is
+  set on appear and cleared on close). The reveal becomes skippable once a whole one has been seen
+  on this phone (`RevealMemory`, cleared by `-resetFamily`).
 
 ## Rules that the code enforces
 
@@ -95,7 +121,12 @@ Shared pieces to use instead of writing your own:
 - Built-in treasure ids are the manifest's. Looks saved with milestone 1 ids (`gem`, `orb`) load as
   the nearest new treasure; never rename an id.
 - Placements must belong to the family and carry a review time that isn't in the future. Only the
-  parent's hide flow creates them, after zooming in to a detailed map and confirming the spot.
+  parent's hide and setup flows create them, after zooming in to a detailed map (`MapReview`) and
+  confirming the spot.
+- A new hunt saves all at once (`saveHuntSetup`): 3–5 placements in play order, or nothing.
+- The family keeps at least one pirate. Removing one removes their chest, after the parent confirms.
+- Get ready is Ready! only when every check passes; the map can only warn, since Apple Maps can't
+  promise offline tiles.
 - GPS: fixes older than 10 s or worse than 30 m are ignored. Dig! appears within 40 m and hides
   only after 4 s beyond 60 m. With no trusted fix the map says it's foggy and points to We found it.
 - Demo mode uses its own in-memory family and is the only place with automatic placement and the
@@ -112,3 +143,11 @@ Every record carries `syncState`; local records stay `waitingToSync` until a ser
 The simulator stops sending location updates while the location doesn't change, so after about
 10 seconds standing still the hunt turns foggy. A real phone keeps reporting. Nudge the location
 (`xcrun simctl location <udid> set …`) to get a fresh fix.
+
+On a simulator that has never run the app, grant location first
+(`xcrun simctl privacy <udid> grant location com.tatchamashay.app`). Otherwise the hide flow's map
+starts zoomed out and the walkthrough fails at "the map should be detailed enough to review".
+
+After the walkthrough restarts the app, the replay's 3D reveal sometimes stops drawing on the
+simulator: the text moves on but the chest picture freezes. The scene keeps running underneath, and
+`main`'s older reveal showed no model at all at the same step. Check the replay on a real phone.

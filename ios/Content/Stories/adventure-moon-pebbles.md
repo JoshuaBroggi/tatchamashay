@@ -8,6 +8,7 @@ minutes: 15
 goal: "My ship's lantern needs three moon pebbles. I dropped them!"
 treasures:
   - id: moon-pebble-blue
+    model: clam
     order: 1
     name: The Sleepy Blue Pebble
     looks_like: A smooth round pebble that glows soft blue, with a tiny sleeping face.
@@ -16,6 +17,7 @@ treasures:
     blank_asks: a thing you can see there
     blank_ideas: [big tree, flower pot, garden bench, back step]
   - id: moon-pebble-gold
+    model: doubloon
     order: 2
     name: The Giggly Gold Pebble
     looks_like: A warm gold pebble that wiggles and giggles when touched.
@@ -24,6 +26,7 @@ treasures:
     blank_asks: a color you can see there
     blank_ideas: [red slide, yellow flowers, green gate, blue bucket]
   - id: moon-pebble-silver
+    model: star-compass
     order: 3
     name: The Twinkly Silver Pebble
     looks_like: A silver pebble that twinkles like a little star.

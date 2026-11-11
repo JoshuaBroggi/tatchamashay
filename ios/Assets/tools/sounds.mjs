@@ -104,6 +104,97 @@ const fanfare = () => render(2.4, (b) => {
   add(b, 1.04, 1.2, (t) => lp(noise()) * env(t, 0.002, 0.35) * 0.6); // cymbal-ish swell
 });
 
+// The treasures' own sounds, which the child picks in the hide-for-parent flow (TreasureSound in
+// the app). Each is short and silly, under a second and a half.
+
+// A spring: a low twang whose pitch wobbles up and down and settles.
+const boing = () => render(0.9, (b) => {
+  let phase = 0;
+  add(b, 0, 0.85, (t) => {
+    const f = 110 + 160 * Math.exp(-t * 4) * (1 + 0.5 * Math.sin(2 * Math.PI * 9 * t));
+    phase += f / SR;
+    const s = Math.sin(2 * Math.PI * phase) + 0.3 * Math.sin(4 * Math.PI * phase);
+    return s * env(t, 0.004, 0.3) * 0.8;
+  });
+});
+
+// Toot toot: two short reedy horn notes.
+const toot = () => render(0.9, (b) => {
+  const horn = (f, dur) => {
+    const lp = lowpass(0.25);
+    return (t) => {
+      let s = 0;
+      for (let h = 1; h <= 6; h++) s += Math.sin(2 * Math.PI * f * h * t) * (h % 2 ? 1 : 0.5) / h;
+      const a = Math.min(1, t / 0.02) * (t > dur - 0.05 ? Math.max(0, (dur - t) / 0.05) : 1);
+      return lp(s) * a * 0.6;
+    };
+  };
+  add(b, 0, 0.26, horn(freq(-2), 0.26));
+  add(b, 0.36, 0.42, horn(freq(-2), 0.42));
+});
+
+// A giggle: quick bubbly chirps that bounce down in pitch, like "hee hee hee".
+const giggle = () => render(1.0, (b) => {
+  for (let i = 0; i < 6; i++) {
+    const f0 = freq(15 - i * 1.5);
+    add(b, i * 0.14, 0.12, (t) => {
+      const f = f0 * (1 + 0.25 * Math.sin(2 * Math.PI * 30 * t));
+      return Math.sin(2 * Math.PI * f * t) * Math.sin(Math.PI * t / 0.12) * 0.5;
+    });
+  }
+});
+
+// A splash: a bright burst of filtered noise with a few falling droplet blips.
+const splash = () => render(1.1, (b) => {
+  const lp = lowpass(0.35);
+  add(b, 0, 0.9, (t) => lp(noise()) * env(t, 0.01, 0.18) * 1.2);
+  for (let i = 0; i < 8; i++) {
+    const at = 0.15 + rand() * 0.6, f0 = 900 + rand() * 900;
+    add(b, at, 0.08, (t) => Math.sin(2 * Math.PI * (f0 + t * 6000) * t) * env(t, 0.002, 0.02) * 0.3);
+  }
+});
+
+// Ding: one clear bell.
+const ding = () => render(1.4, (b) => {
+  const f = freq(12);
+  add(b, 0, 1.4, (t) => (Math.sin(2 * Math.PI * f * t) + 0.5 * Math.sin(2 * Math.PI * f * 2.76 * t) * Math.exp(-t * 6)
+    + 0.25 * Math.sin(2 * Math.PI * f * 5.4 * t) * Math.exp(-t * 12)) * env(t, 0.002, 0.45) * 0.5);
+});
+
+// A snore: a slow rumbly breath in, then a whistly breath out.
+const snore = () => render(1.5, (b) => {
+  const lp = lowpass(0.04);
+  add(b, 0, 0.75, (t) => {
+    const buzz = Math.sign(Math.sin(2 * Math.PI * 38 * t)) * 0.5 + lp(noise()) * 2;
+    return buzz * Math.sin(Math.PI * t / 0.75) * 0.7;
+  });
+  add(b, 0.85, 0.6, (t) => Math.sin(2 * Math.PI * (900 - t * 500) * t) * Math.sin(Math.PI * t / 0.6) * 0.25);
+});
+
+// A chime: three soft rising bell tones.
+const chime = () => render(1.3, (b) => {
+  [7, 11, 14].forEach((n, i) => {
+    const f = freq(n);
+    add(b, i * 0.12, 1.0, (t) => Math.sin(2 * Math.PI * f * t) * env(t, 0.003, 0.3) * 0.4);
+  });
+});
+
+// A tiny fanfare: "ta-daa!"
+const tada = () => render(1.1, (b) => {
+  const brass = (f, dur) => {
+    const lp = lowpass(0.2);
+    return (t) => {
+      let s = 0;
+      for (let h = 1; h <= 7; h++) s += Math.sin(2 * Math.PI * f * h * t) / h;
+      const a = Math.min(1, t / 0.02) * (t > dur - 0.06 ? Math.max(0, (dur - t) / 0.06) : 1);
+      return lp(s) * a * 0.5;
+    };
+  };
+  add(b, 0, 0.14, brass(freq(-2), 0.14));
+  add(b, 0.18, 0.85, brass(freq(3), 0.85));
+  add(b, 0.18, 0.85, brass(freq(-2), 0.85));
+});
+
 function wav(samples) {
   const data = Buffer.alloc(samples.length * 2);
   samples.forEach((v, i) => data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), i * 2));
@@ -120,6 +211,15 @@ const SOUNDS = {
   chest_creak: [creak, 'The chest lid opening'],
   reveal_sparkle: [sparkle, 'The treasure rising out of the chest'],
   finale_fanfare: [fanfare, 'The last treasure of an adventure is found'],
+  // Treasure sounds, after the effects so the effects' random noise stays the same.
+  boing: [boing, 'Treasure sound: Boing!'],
+  toot: [toot, 'Treasure sound: Toot toot!'],
+  giggle: [giggle, 'Treasure sound: Hee hee hee!'],
+  splash: [splash, 'Treasure sound: Splash!'],
+  ding: [ding, 'Treasure sound: Ding!'],
+  snore: [snore, 'Treasure sound: Zzzzz!'],
+  chime: [chime, 'Treasure sound: a soft chime'],
+  fanfare: [tada, 'Treasure sound: ta-daa!'],
 };
 
 fs.mkdirSync(outDir, { recursive: true });

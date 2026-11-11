@@ -40,6 +40,12 @@ final class AppModel {
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
+            UserDefaults.standard.removeObject(forKey: "playingChild")
+            UserDefaults.standard.removeObject(forKey: RevealMemory.key)
+        }
+        // UI tests of the hunt start from a ready 3-treasure adventure.
+        if ProcessInfo.processInfo.arguments.contains("-huntFixture") {
+            HuntFixture.install(at: JSONFilePersistence.defaultURL)
         }
         #endif
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
@@ -58,6 +64,10 @@ final class AppModel {
         voice = SpeechGuideVoice(settings: settings)
     }
 
+    /// True while the chest reveal is on screen, from the sealed chest until the child closes it.
+    /// The spoken guide waits for it to turn false so it never talks over the reveal.
+    var isRevealing = false
+
     /// The family the screens show: the demo one while Demo mode is on, otherwise the real one.
     var family: FamilyModel { demo ?? real }
     var isDemo: Bool { demo != nil }
@@ -66,10 +76,22 @@ final class AppModel {
         demo = await DemoFamily.make(around: center)
     }
 
+    #if DEBUG
+    /// UI tests and screenshots: plays a ready-made family as Demo mode.
+    func startDemo(with family: FamilyModel) {
+        demo = family
+    }
+    #endif
+
     func endDemo() {
         demo = nil
         demoFix = nil
     }
+
+    /// The latest hunt moment (hunt start, getting close, foggy GPS, a find, next treasure, finale),
+    /// set by the hunt screen once per event. The guide watches it to speak and show its lines; the
+    /// hunt itself never speaks. `HuntMomentTracker` documents when each moment fires.
+    var huntMoment: HuntMomentEvent?
 
     /// Demo mode only: a pretend position, so testing doesn't need a walk.
     private(set) var demoFix: LocationFix?
@@ -93,8 +115,9 @@ struct RootView: View {
                 VStack(spacing: 0) {
                     if app.isDemo { DemoBanner() }
                     TabView {
-                        Tab("Map", systemImage: "map.fill") { HuntView() }
+                        Tab("Map", systemImage: "map.fill") { HuntView().overlay { GuideLayer() } }
                         Tab("My Chest", systemImage: "shippingbox.fill") { ChestScreen() }
+                        Tab("Make", systemImage: "wand.and.stars") { CreateView() }
                         Tab("Grown-ups", systemImage: "person.2.fill") { ParentView() }
                     }
                     .tint(Palette.gold)

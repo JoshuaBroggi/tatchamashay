@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// The grown-ups' area: what's hidden, hide a new treasure, the child's pirate name, and Demo mode.
+/// The grown-ups' area: today's hunt, setting up a new one, Get ready, settings, and Demo mode.
 struct ParentView: View {
     @Environment(AppModel.self) private var app
     @Environment(FamilyModel.self) private var family
     @Environment(LocationService.self) private var location
 
     @State private var hiding = false
-    @State private var pirateName = ""
+    @State private var settingUp = false
+    @State private var gettingReady: Adventure.ID?
     @State private var removing: ChestPlacement?
 
     var body: some View {
@@ -29,19 +30,38 @@ struct ParentView: View {
                         } label: {
                             Label("Hide a treasure", systemImage: "mappin.and.ellipse")
                         }
+                        .disabled(family.adventure?.isFull ?? false)
                         .accessibilityIdentifier("hideTreasure")
                     }
                 } header: {
                     Text(family.adventure?.title ?? "Today's Hunt")
                 } footer: {
-                    Text("Only you place treasure, on a spot you've checked on the map. Removing one never takes it out of a chest.")
+                    Text(huntFooter)
                 }
 
-                if !app.isDemo, let child = family.child {
-                    Section("Your pirate") {
-                        TextField("Pirate name", text: $pirateName)
-                            .onAppear { pirateName = child.pirateName }
-                            .onSubmit { Task { await family.renameChild(pirateName.trimmed) } }
+                if !app.isDemo {
+                    Section {
+                        Button {
+                            settingUp = true
+                        } label: {
+                            Label("Set up a new hunt", systemImage: "map")
+                        }
+                        .accessibilityIdentifier("setupHunt")
+                        Button {
+                            gettingReady = family.adventure?.id
+                        } label: {
+                            Label("Get ready to go", systemImage: "checkmark.seal")
+                        }
+                        .disabled(family.adventure == nil)
+                        .accessibilityIdentifier("getReady")
+                        NavigationLink {
+                            GrownUpSettingsView()
+                        } label: {
+                            Label("Settings and pirates", systemImage: "gearshape")
+                        }
+                        .accessibilityIdentifier("grownUpSettings")
+                    } footer: {
+                        Text("A new hunt takes about 5 minutes: pick a place, pick a story, hide 3 to 5 chests.")
                     }
                 }
 
@@ -69,6 +89,10 @@ struct ParentView: View {
             .background(Palette.ground1.ignoresSafeArea())
             .navigationTitle("Grown-ups")
             .sheet(isPresented: $hiding) { HideTreasureFlow() }
+            .sheet(isPresented: $settingUp) { SetupHuntFlow() }
+            .sheet(item: Binding(get: { gettingReady.map(ReadyTarget.init) }, set: { gettingReady = $0?.id })) { target in
+                NavigationStack { GetReadyView(adventureID: target.id) { gettingReady = nil } }
+            }
             .confirmationDialog("Remove this treasure from the hunt?", isPresented: Binding(
                 get: { removing != nil }, set: { if !$0 { removing = nil } }
             ), titleVisibility: .visible) {
@@ -78,6 +102,21 @@ struct ParentView: View {
             } message: {
                 Text("If your pirate already found it, it stays in their chest.")
             }
+        }
+    }
+}
+
+private struct ReadyTarget: Identifiable {
+    let id: Adventure.ID
+}
+
+extension ParentView {
+    fileprivate var huntFooter: String {
+        let rule = "Only you place treasure, on a spot you've checked on the map. Removing one never takes it out of a chest."
+        guard let adventure = family.adventure, !app.isDemo else { return rule }
+        switch adventure.readiness {
+        case .ready: return rule
+        case .needsMore(let n): return "Hide \(n) more for a full hunt. " + rule
         }
     }
 }

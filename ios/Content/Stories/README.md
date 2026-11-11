@@ -57,6 +57,7 @@ becomes a `ChestPlacement` once the parent puts it on the map and fills in the h
 | `goal` | string | `Adventure` goal | Spoken between `goal_before` and `goal_after`. |
 | `treasures` | list | ordered placements | In play order. 3 per adventure for now. |
 | `treasures[].id` | string | `TreasureDesign` id | Stable id for the built-in treasure. |
+| `treasures[].model` | string | `TreasureLook` model | A built-in model id from `Assets/manifest.json` (`clam`, `star-compass`, …) that plays this treasure. |
 | `treasures[].order` | number | placement order | 1, 2, 3. |
 | `treasures[].name` | string | `TreasureDesign` name | Shown in the chest. |
 | `treasures[].looks_like` | string | — | Brief for the art track. Not shown to the child. |

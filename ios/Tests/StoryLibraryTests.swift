@@ -85,6 +85,35 @@ struct StoryLibraryTests {
         #expect(treasure.hint(blank: "") == nil)
     }
 
+    @Test("Every starter treasure names a built-in model")
+    func starterModels() throws {
+        for adventure in library.adventures {
+            for treasure in adventure.treasures {
+                #expect(treasure.model != nil, "\(adventure.id)/\(treasure.id) has model \(treasure.modelID ?? "none")")
+            }
+        }
+        #expect(library.adventure("moon-pebbles")?.treasures.map(\.model) == [.clam, .doubloon, .starCompass])
+    }
+
+    @Test("A missing or unknown model doesn't stop a story loading")
+    func lenientModel() throws {
+        var library = StoryLibrary(guides: [], adventures: [])
+        try library.add(yaml: """
+            kind: adventure
+            id: test
+            title: Test
+            guide: captain-tumblebeard
+            goal: Find it.
+            treasures:
+              - { id: a, order: 1, name: A, model: unicorn, reveal: Hi, hint_template: "Near the {blank}." }
+              - { id: b, order: 2, name: B, model: gem, reveal: Hi, hint_template: "Near the {blank}." }
+              - { id: c, order: 3, name: C, reveal: Hi, hint_template: "Near the {blank}." }
+            """, file: "test.md")
+        let treasures = try #require(library.adventure("test")?.treasures)
+        #expect(treasures.map(\.modelID) == ["unicorn", "gem", nil])
+        #expect(treasures.map(\.model) == [nil, .clam, nil], "milestone 1 ids still map")
+    }
+
     @Test("A made treasure fills object, color and name")
     func lookContext() throws {
         let look = TreasureLook(model: .starCompass, color: .blue, name: "Snorty Muffin")
