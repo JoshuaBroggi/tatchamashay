@@ -66,9 +66,9 @@ final class GuideStoryUITests: XCTestCase {
         back.tap()
 
         // Back on the map, with a goodbye.
-        XCTAssertFalse(element("guideFinale").waitForExistence(timeout: 2))
-        XCTAssertTrue(app.tabBars.buttons["Map"].isSelected)
         expectBubble(matching: ["Bye bye", "waves bye", "See you next time"])
+        XCTAssertFalse(element("guideFinale").exists)
+        XCTAssertTrue(app.tabBars.buttons["Map"].isSelected)
 
         // The finale doesn't play twice.
         drive("finale")
