@@ -10,6 +10,7 @@ import Game3D from './game/Game3D';
 import { useMultiplayer } from './game/multiplayer';
 import { LandingPage } from './game/components/LandingPage';
 import { AboutPage } from './game/components/AboutPage';
+import { DemogorgonPreview } from './game/components/demogorgon/DemogorgonPreview';
 import { getQualitySettings } from './game/world/quality';
 
 // Augment React's JSX namespace to include Three.js elements
@@ -556,6 +557,7 @@ const AppContent: React.FC = () => {
       <Routes>
         <Route path="/" element={<LandingPageRoute />} />
         <Route path="/build" element={<BuildPageRoute />} />
+        <Route path="/demogorgon" element={<DemogorgonPreview />} />
         <Route path="/character-select" element={<CharacterSelectRoute />} />
         <Route path="/level-select" element={<LevelSelectRoute />} />
         <Route path="/lobby" element={<LobbyRoute />} />
