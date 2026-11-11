@@ -34,9 +34,6 @@ final class AppModel {
     let catalog = TreasureCatalog.bundled
     let stories = StoryLibrary.bundled
 
-    /// The hunt's latest guide moment; the guide overlay speaks for it. Set by `Views/Hunt`.
-    var huntMoment: HuntMoment?
-
     init() {
         #if DEBUG
         // UI tests start from an empty family.

@@ -99,7 +99,7 @@ struct GuideLayer: View {
                     .transition(.scale(scale: 0.8, anchor: .leading).combined(with: .opacity))
             }
         }
-        .padding(.top, 66)
+        .padding(.top, 104)
         .padding(.leading, 10)
         .animation(still ? nil : .spring(duration: 0.3), value: director.bubble)
     }
@@ -123,7 +123,8 @@ extension GuideScript {
         self.init(guide: guide, story: story,
                   context: StoryContext(pirateName: child?.pirateName, grownUp: parent?.displayName),
                   goal: adventure.goal, closing: adventure.finale,
-                  hints: placements.map(\.hint), storyTreasureIDs: placements.map(\.storyTreasureID))
+                  hints: placements.map(\.hint), storyTreasureIDs: placements.map(\.storyTreasureID),
+                  placementIDs: placements.map(\.id))
     }
 }
 

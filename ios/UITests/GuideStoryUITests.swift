@@ -6,8 +6,8 @@ import XCTest
 /// Pebbles" as a Demo-mode family and feeds hunt moments in place of a walk.
 final class GuideStoryUITests: XCTestCase {
     private var app: XCUIApplication!
-    /// Screenshots number from 20 so they sort after the milestone 1 walkthrough's.
-    private var step = 19
+    /// Screenshots number from 30 so they sort after the walkthrough's and the hunt's.
+    private var step = 29
 
     override func setUp() {
         continueAfterFailure = false

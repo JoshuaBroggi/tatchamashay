@@ -16,6 +16,8 @@ struct GuideScript: Sendable {
     var hints: [String]
     /// Each treasure's `storyTreasureID`, in play order, for its reveal line.
     var storyTreasureIDs: [String?]
+    /// The placements in play order, to find a hunt moment's treasure.
+    var placementIDs: [ChestPlacement.ID] = []
 
     var rate: Double { guide.voice.ttsRate }
 
@@ -68,8 +70,8 @@ struct GuideScript: Sendable {
 ///
 /// - One utterance at a time. A new line either replaces the current one (stopping the voice first)
 ///   or waits/drops: chatter such as "getting close" never interrupts something more important.
-/// - The reveal silences the guide while the chest bursts open, then says the reveal lines. Moments
-///   that arrive meanwhile wait their turn.
+/// - A find (`reveal` by Dig!, `we_found_it` by the grown-up) silences the guide while the chest
+///   bursts open, then it says the find's lines. Moments that arrive meanwhile wait their turn.
 /// - The finale plays once per run.
 ///
 /// Time comes from `now`, and `tick()` moves things along, so tests run without waiting.
@@ -135,7 +137,8 @@ final class GuideDirector {
     private var lastLines: [String] = []
     private var holdUntil = Date.distantPast
     private var revealIndex = 0
-    private var pending: [HuntMoment] = []
+    private var revealByGrownUp = false
+    private var pending: [Moment] = []
     private var lastHeard: [String: Date] = [:]
     private var finaleRuns: Set<UUID> = []
     private var openingDoneAt: Date?
@@ -189,7 +192,7 @@ final class GuideDirector {
         phase = .hunting
         openingDoneAt = nil
         silence()
-        handle(HuntMoment(moment: .hint, treasureIndex: 0, at: now()))
+        handle(Moment(moment: .hint, treasureIndex: 0))
     }
 
     /// The child taps Back to the ship!: say goodbye and end.
@@ -201,14 +204,30 @@ final class GuideDirector {
 
     // MARK: Moments
 
-    func handle(_ moment: HuntMoment) {
+    /// A moment from the hunt (`AppModel.huntMoment`).
+    func handle(_ event: HuntMomentEvent) {
         guard let script else { return }
+        let index = event.placementID.flatMap { script.placementIDs.firstIndex(of: $0) } ?? event.treasureNumber - 1
+        handle(Moment(moment: event.moment, treasureIndex: index))
+    }
+
+    /// A moment about one treasure, 0-based in play order.
+    struct Moment: Equatable {
+        var moment: GuideMoment
+        var treasureIndex: Int
+    }
+
+    private func handle(_ moment: Moment) {
+        guard let script else { return }
+        // The opening already greeted the child and said the goal.
+        if moment.moment == .greeting { return }
         switch phase {
         case .idle, .ended, .finale:
             return
         case .opening:
             // Only a find (or the end) cuts the opening short; clues come after it.
             guard [.digReady, .weFoundIt, .reveal, .finale].contains(moment.moment) else { return }
+            openingDoneAt = nil
             phase = .hunting
         case .holdingForReveal:
             if Priority(moment.moment) > .chatter { pending.append(moment) }
@@ -218,11 +237,13 @@ final class GuideDirector {
         }
 
         switch moment.moment {
-        case .reveal:
+        case .reveal, .weFoundIt:
+            // The chest is opening, by Dig! or by the grown-up.
             silence()
             phase = .holdingForReveal
             holdUntil = now().addingTimeInterval(revealHold)
             revealIndex = moment.treasureIndex
+            revealByGrownUp = moment.moment == .weFoundIt
         case .finale:
             playFinale()
         default:
@@ -249,7 +270,8 @@ final class GuideDirector {
         if phase == .holdingForReveal {
             guard time >= holdUntil, let script else { return }
             phase = .hunting
-            say(script.lines(for: .reveal, treasure: revealIndex, using: &random), priority: .big, mood: .reveal)
+            let thanks = revealByGrownUp ? script.lines(for: .weFoundIt, treasure: revealIndex, using: &random) : []
+            say(thanks + script.lines(for: .reveal, treasure: revealIndex, using: &random), priority: .big, mood: .reveal)
             return
         }
         if isTalking {

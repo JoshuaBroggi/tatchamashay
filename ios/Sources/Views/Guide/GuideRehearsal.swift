@@ -48,6 +48,7 @@ enum GuideRehearsal {
 struct GuideTestDriver: View {
     let director: GuideDirector
     @Environment(AppModel.self) private var app
+    @Environment(FamilyModel.self) private var family
     @State private var index = 0
 
     private let moments: [(GuideMoment, String)] = [
@@ -60,7 +61,9 @@ struct GuideTestDriver: View {
             ForEach(moments, id: \.0) { moment, label in
                 Button(label) {
                     if moment == .nextTreasure { index += 1 }
-                    app.huntMoment = HuntMoment(moment: moment, treasureIndex: index)
+                    app.huntMoment = HuntMomentEvent(moment: moment, treasureNumber: index + 1,
+                                                     total: family.adventurePlacements.count,
+                                                     placementID: nil, at: .now)
                 }
                 .font(.caption2.monospaced())
                 .padding(.horizontal, 6)

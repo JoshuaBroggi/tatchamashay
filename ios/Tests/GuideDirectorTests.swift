@@ -58,6 +58,11 @@ struct GuideDirectorTests {
         return GuideDirector(voice: voice, sounds: sounds, now: { clock.now }, random: SeededRandom(seed: 3))
     }
 
+    /// A hunt moment about treasure `index` (0-based), as the hunt sends it.
+    func event(_ moment: GuideMoment, _ index: Int, placement: ChestPlacement.ID? = nil) -> HuntMomentEvent {
+        HuntMomentEvent(moment: moment, treasureNumber: index + 1, total: 3, placementID: placement, at: clock.now)
+    }
+
     /// Lets the current line finish and the next one start.
     func finishLine(_ director: GuideDirector) {
         voice.finish()
@@ -133,8 +138,8 @@ struct GuideDirectorTests {
         let opening = voice.spoken.count
 
         // Chatter and clues wait out the opening.
-        director.handle(HuntMoment(moment: .gettingClose, treasureIndex: 0, at: clock.now))
-        director.handle(HuntMoment(moment: .hint, treasureIndex: 0, at: clock.now))
+        director.handle(event(.gettingClose, 0))
+        director.handle(event(.hint, 0))
         #expect(voice.spoken.count == opening)
 
         director.finishOpening()
@@ -142,12 +147,12 @@ struct GuideDirectorTests {
         #expect(voice.spoken.last?.last == "Look near the big tree.")
 
         // Talking about the clue: chatter is dropped.
-        director.handle(HuntMoment(moment: .gettingClose, treasureIndex: 0, at: clock.now))
+        director.handle(event(.gettingClose, 0))
         #expect(voice.spoken.count == opening + 1)
 
         // Dig ready replaces the clue, stopping it first.
         let stops = voice.stops
-        director.handle(HuntMoment(moment: .digReady, treasureIndex: 0, at: clock.now))
+        director.handle(event(.digReady, 0))
         #expect(voice.stops == stops + 1)
         #expect(director.bubble != nil)
         #expect(voice.overlaps == 0)
@@ -160,15 +165,15 @@ struct GuideDirectorTests {
         #expect(director.phase == .hunting, "a run under way picks up without the opening")
         #expect(voice.spoken.isEmpty)
 
-        director.handle(HuntMoment(moment: .digReady, treasureIndex: 1, at: clock.now))
-        director.handle(HuntMoment(moment: .reveal, treasureIndex: 1, at: clock.now))
+        director.handle(event(.digReady, 1))
+        director.handle(event(.reveal, 1))
         #expect(director.phase == .holdingForReveal)
         #expect(director.bubble == nil)
         #expect(!voice.isSpeaking, "the voice stops for the reveal")
         let before = voice.spoken.count
 
-        director.handle(HuntMoment(moment: .foggyGPS, treasureIndex: 1, at: clock.now))
-        director.handle(HuntMoment(moment: .nextTreasure, treasureIndex: 2, at: clock.now))
+        director.handle(event(.foggyGPS, 1))
+        director.handle(event(.nextTreasure, 2))
         clock.advance(1)
         director.tick()
         director.repeatLast()
@@ -187,19 +192,51 @@ struct GuideDirectorTests {
         #expect(voice.overlaps == 0)
     }
 
+    @Test("We found it holds like a reveal, then thanks the grown-up before the treasure's line")
+    func grownUpFind() {
+        let director = director()
+        director.begin(run: run, script: script(), foundCount: 1, isComplete: false)
+        director.handle(event(.foggyGPS, 1))
+        director.handle(event(.weFoundIt, 1))
+        #expect(director.phase == .holdingForReveal)
+        #expect(director.bubble == nil)
+        clock.advance(director.revealHold)
+        director.tick()
+        let lines = voice.spoken.last ?? []
+        #expect(lines.first == "Dad spotted it! Hooray!" || lines.first == "Great eyes, crew! Let's open it!")
+        #expect(lines.last == "A gold moon pebble! It's giggling. Hee hee!")
+        #expect(voice.overlaps == 0)
+    }
+
+    @Test("The hunt's greeting doesn't repeat the opening, and a placement id picks the treasure")
+    func greetingAndPlacement() {
+        let director = director()
+        var script = script()
+        let ids = [UUID(), UUID(), UUID()]
+        script.placementIDs = ids
+        director.begin(run: run, script: script, foundCount: 0, isComplete: false)
+        director.handle(event(.greeting, 0))
+        #expect(voice.spoken.count == 1, "only the opening")
+        director.finishOpening()
+        // The number says treasure 1, but the placement id says the third: the id wins.
+        director.handle(event(.nextTreasure, 0, placement: ids[2]))
+        finishLine(director)
+        #expect(voice.spoken.last?.last == "Look where you swing high.")
+    }
+
     @Test("The same chatter isn't repeated for a while")
     func chatterCooldown() {
         let director = director()
         director.begin(run: run, script: script(), foundCount: 1, isComplete: false)
-        director.handle(HuntMoment(moment: .foggyGPS, treasureIndex: 1, at: clock.now))
+        director.handle(event(.foggyGPS, 1))
         voice.finish()
         clock.advance(10)
         director.tick()
         #expect(director.bubble == nil)
-        director.handle(HuntMoment(moment: .foggyGPS, treasureIndex: 1, at: clock.now))
+        director.handle(event(.foggyGPS, 1))
         #expect(voice.spoken.count == 1)
         clock.advance(director.chatterCooldown - 10)
-        director.handle(HuntMoment(moment: .foggyGPS, treasureIndex: 1, at: clock.now))
+        director.handle(event(.foggyGPS, 1))
         #expect(voice.spoken.count == 2)
     }
 
@@ -223,7 +260,7 @@ struct GuideDirectorTests {
     func repeatLine() {
         let director = director()
         director.begin(run: run, script: script(), foundCount: 1, isComplete: false)
-        director.handle(HuntMoment(moment: .digReady, treasureIndex: 1, at: clock.now))
+        director.handle(event(.digReady, 1))
         finishLine(director)
         director.repeatLast()
         #expect(voice.spoken.count == 2 && voice.spoken[0] == voice.spoken[1])
@@ -236,8 +273,8 @@ struct GuideDirectorTests {
     func finaleOnce() {
         let director = director()
         director.begin(run: run, script: script(), foundCount: 2, isComplete: false)
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
+        director.handle(event(.finale, 2))
+        director.handle(event(.finale, 2))
         #expect(director.phase == .finale)
         #expect(sounds.played == [.finaleFanfare])
         #expect(voice.all.filter { $0 == "Back to the ship!" }.count == 1)
@@ -245,7 +282,7 @@ struct GuideDirectorTests {
         director.finishFinale()
         #expect(director.phase == .ended)
         #expect(voice.spoken.count == 2, "goodbye")
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
+        director.handle(event(.finale, 2))
         director.begin(run: run, script: script(), foundCount: 3, isComplete: true)
         #expect(sounds.played == [.finaleFanfare])
         #expect(director.phase == .ended)
@@ -253,7 +290,7 @@ struct GuideDirectorTests {
         // A replay is a new run with its own finale.
         director.begin(run: UUID(), script: script(), foundCount: 0, isComplete: false)
         #expect(director.phase == .opening)
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
+        director.handle(event(.finale, 2))
         #expect(sounds.played == [.finaleFanfare, .finaleFanfare])
     }
 
@@ -261,8 +298,8 @@ struct GuideDirectorTests {
     func finaleAfterReveal() {
         let director = director()
         director.begin(run: run, script: script(), foundCount: 2, isComplete: false)
-        director.handle(HuntMoment(moment: .reveal, treasureIndex: 2, at: clock.now))
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
+        director.handle(event(.reveal, 2))
+        director.handle(event(.finale, 2))
         #expect(sounds.played.isEmpty)
         clock.advance(director.revealHold)
         director.tick()
@@ -277,7 +314,7 @@ struct GuideDirectorTests {
     func finishedRun() {
         let director = director()
         director.begin(run: run, script: script(), foundCount: 3, isComplete: true)
-        director.handle(HuntMoment(moment: .finale, treasureIndex: 2, at: clock.now))
+        director.handle(event(.finale, 2))
         #expect(director.phase == .ended)
         #expect(sounds.played.isEmpty && voice.spoken.isEmpty)
     }
