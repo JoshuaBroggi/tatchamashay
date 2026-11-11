@@ -559,6 +559,7 @@ const AppContent: React.FC = () => {
         <Route path="/build" element={<BuildPageRoute />} />
         <Route path="/demogorgon" element={<DemogorgonPreview key="demogorgon" initial="demogorgon" />} />
         <Route path="/demodog" element={<DemogorgonPreview key="demodog" initial="demodog" />} />
+        <Route path="/vinedog" element={<DemogorgonPreview key="vinedog" initial="vinedog" />} />
         <Route path="/character-select" element={<CharacterSelectRoute />} />
         <Route path="/level-select" element={<LevelSelectRoute />} />
         <Route path="/lobby" element={<LobbyRoute />} />

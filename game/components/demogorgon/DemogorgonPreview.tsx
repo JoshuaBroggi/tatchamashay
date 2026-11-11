@@ -6,12 +6,14 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { useNavigate } from 'react-router-dom';
 import { Demogorgon, DemogorgonAnimation, DemogorgonBuild } from './Demogorgon';
 import { Demodog } from '../demodog/Demodog';
+import { VineDog } from '../vinedog/VineDog';
 
-export type CreatureKind = 'demogorgon' | 'demodog';
+export type CreatureKind = 'demogorgon' | 'demodog' | 'vinedog';
 
 const CREATURES: { id: CreatureKind; label: string; path: string }[] = [
     { id: 'demogorgon', label: 'Demogorgon', path: '/demogorgon' },
     { id: 'demodog', label: 'Demodog', path: '/demodog' },
+    { id: 'vinedog', label: 'Vine Dog', path: '/vinedog' },
 ];
 
 const ANIMATIONS: { id: DemogorgonAnimation; label: string }[] = [
@@ -81,13 +83,15 @@ const Stage: React.FC<{
             <meshStandardMaterial color="#1a0d0f" roughness={0.9} />
         </mesh>
 
-        {creature === 'demodog' ? (
+        {creature === 'vinedog' ? (
+            <VineDog key="vinedog" animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
+        ) : creature === 'demodog' ? (
             <Demodog key="demodog" animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
         ) : (
             <Demogorgon key="demogorgon" animation={animation} onAnimationFinished={onFinished} onBuilt={onBuilt} sound={sound} />
         )}
         <Spores />
-        <OrbitControls key={creature} target={creature === 'demodog' ? [0, 0.6, 0] : [0, 1.2, 0.2]} minDistance={1.5} maxDistance={9} maxPolarAngle={Math.PI / 2 - 0.02} />
+        <OrbitControls key={creature} target={creature === 'demogorgon' ? [0, 1.2, 0.2] : [0, 0.7, 0.1]} minDistance={1.5} maxDistance={9} maxPolarAngle={Math.PI / 2 - 0.02} />
     </>
 );
 
@@ -145,7 +149,7 @@ export const DemogorgonPreview: React.FC<{ initial?: CreatureKind }> = ({ initia
                 >
                     Home
                 </button>
-                <h1 className="text-lg font-black tracking-widest text-red-400">{creature === 'demodog' ? 'DEMODOG' : 'DEMOGORGON'}</h1>
+                <h1 className="text-lg font-black tracking-widest text-red-400">{CREATURES.find(c => c.id === creature)!.label.toUpperCase()}</h1>
                 {CREATURES.map(c => (
                     <button
                         key={c.id}

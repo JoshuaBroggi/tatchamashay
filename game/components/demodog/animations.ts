@@ -27,6 +27,19 @@ import { DOG_TOE_COUNT } from './rig';
  *   Petals: `petals(open)` as for the Demogorgon, 1.5 is a flat flower, smaller closes it.
  */
 
+/** How a quadruped's petal head moves: how to pose the jaws and the openness values to use. */
+export interface JawStyle {
+    petals: (p: Pose, open: number, curl: number, t?: number, wobble?: number) => void;
+    rest: number;
+    coil: number;
+    wide: number;
+    snap: number;
+    recover: number;
+}
+
+/** The Demodog's petals are bind-posed flat, so openness counts up toward a flat flower. */
+export const DEMODOG_JAWS: JawStyle = { petals, rest: 0.8, coil: 1.1, wide: 1.63, snap: 0.2, recover: 0.65 };
+
 const IDLE_DURATION = 4;
 const WALK_DURATION = 1;
 const ATTACK_DURATION = 1.6;
@@ -78,7 +91,7 @@ const flatPaws = (pose: Pose): Pose => {
     return pose;
 };
 
-const idlePose = (t: number): Pose => {
+const idlePose = (t: number, st: JawStyle): Pose => {
     const ph = (t / IDLE_DURATION) * TAU;
     const p = rest();
     const breath = Math.sin(ph);
@@ -91,11 +104,11 @@ const idlePose = (t: number): Pose => {
     rotate(p, 'head', 2 * Math.sin(ph * 2), 8 * Math.sin(ph + 1), 3 * Math.sin(ph * 2 + 2));
     tail(p, 0, 9, ph);
     both(p, 'humerus', 1.5 * Math.sin(ph + 2));
-    petals(p, 0.8 + 0.08 * Math.sin(ph * 2), 0.05, t / IDLE_DURATION, 0.06);
+    st.petals(p, st.rest + 0.08 * Math.sin(ph * 2), 0.05, t / IDLE_DURATION, 0.06);
     return p;
 };
 
-const walkPose = (t: number): Pose => {
+const walkPose = (t: number, st: JawStyle): Pose => {
     const ph = (t / WALK_DURATION) * TAU;
     const p = rest();
 
@@ -121,13 +134,13 @@ const walkPose = (t: number): Pose => {
     rotate(p, 'neck2', 3 * Math.sin(ph * 2 + 0.5), 7 * Math.cos(ph));
     rotate(p, 'head', 3 * Math.sin(ph * 2), -4 * Math.cos(ph));
     tail(p, 4, 14, ph);
-    petals(p, 0.85 + 0.08 * Math.sin(ph * 2), 0.05, t / WALK_DURATION, 0.06);
+    st.petals(p, st.rest + 0.05 + 0.08 * Math.sin(ph * 2), 0.05, t / WALK_DURATION, 0.06);
     return p;
 };
 
-const attackKeys = (): { t: number; pose: Pose }[] => {
+const attackKeys = (st: JawStyle): { t: number; pose: Pose }[] => {
     const ready = rest();
-    petals(ready, 0.8, 0.04);
+    st.petals(ready, st.rest, 0.04);
 
     // Sink onto the haunches, head cocked back, petals starting to part.
     const coil = rest();
@@ -139,7 +152,7 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     rotate(coil, 'head', -8);
     rotate(coil, 'tail1', 12);
     move(coil, 'root', 0, 0, -0.14);
-    petals(coil, 1.1, 0.2);
+    st.petals(coil, st.coil, 0.2);
 
     // Pounce: legs stretched out, body flat, petals blown wide open.
     const pounce = rest();
@@ -154,7 +167,7 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     rotate(pounce, 'neck2', 6);
     rotate(pounce, 'tail1', 16);
     move(pounce, 'root', 0, 0, 0.8);
-    petals(pounce, 1.62, 0.55);
+    st.petals(pounce, st.wide, 0.55);
 
     // Land and snap the petals shut on the target.
     const bite = rest();
@@ -164,15 +177,15 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     rotate(bite, 'neck2', 8);
     rotate(bite, 'head', 6);
     move(bite, 'root', 0, 0, 0.85);
-    petals(bite, 0.2, 0);
+    st.petals(bite, st.snap, 0);
 
     const recover = rest();
     crouch(recover, 12, 18);
     move(recover, 'root', 0, 0, 0.4);
-    petals(recover, 0.65, 0.05);
+    st.petals(recover, st.recover, 0.05);
 
     const end = rest();
-    petals(end, 0.8, 0.04);
+    st.petals(end, st.rest, 0.04);
 
     return [
         { t: 0, pose: ready },
@@ -184,9 +197,9 @@ const attackKeys = (): { t: number; pose: Pose }[] => {
     ];
 };
 
-const roarKeys = (): { t: number; pose: Pose }[] => {
+const roarKeys = (st: JawStyle): { t: number; pose: Pose }[] => {
     const ready = rest();
-    petals(ready, 0.8, 0.04);
+    st.petals(ready, st.rest, 0.04);
 
     // Rear up on the front legs and rock the head back.
     const inhale = rest();
@@ -197,7 +210,7 @@ const roarKeys = (): { t: number; pose: Pose }[] => {
     rotate(inhale, 'neck1', -16);
     rotate(inhale, 'head', -10);
     rotate(inhale, 'tail1', 14);
-    petals(inhale, 1.1, 0.15);
+    st.petals(inhale, st.coil, 0.15);
 
     const roar = rest();
     crouch(roar, 4, 34);
@@ -209,13 +222,13 @@ const roarKeys = (): { t: number; pose: Pose }[] => {
     rotate(roar, 'head', -12);
     rotate(roar, 'tail1', 22);
     rotate(roar, 'tail2', 10);
-    petals(roar, 1.65, 0.6);
+    st.petals(roar, st.wide, 0.6);
 
     const relax = rest();
-    petals(relax, 0.8, 0.08);
+    st.petals(relax, st.rest, 0.08);
 
     const end = rest();
-    petals(end, 0.8, 0.04);
+    st.petals(end, st.rest, 0.04);
 
     return [
         { t: 0, pose: ready },
@@ -243,8 +256,8 @@ const roarPose = (keys: { t: number; pose: Pose }[], t: number): Pose => {
     return p;
 };
 
-/** Bakes Idle, Walk, Attack and Roar clips for a rig produced by buildDemodogRig. */
-export const buildDemodogClips = (rig: DemogorgonRig): THREE.AnimationClip[] => {
+/** Bakes Idle, Walk, Attack and Roar clips for any rig that shares the quadruped bone names. */
+export const buildQuadrupedClips = (rig: DemogorgonRig, st: JawStyle): THREE.AnimationClip[] => {
     resetPose(rig);
     rig.root.updateMatrixWorld(true);
     const v = new THREE.Vector3();
@@ -254,11 +267,11 @@ export const buildDemodogClips = (rig: DemogorgonRig): THREE.AnimationClip[] => 
     }, Infinity);
     const ground = { y: groundY, bones: FOOT_BONES };
 
-    const attack = attackKeys();
-    const roar = roarKeys();
+    const attack = attackKeys(st);
+    const roar = roarKeys(st);
     const clips = [
-        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, idlePose, ground, flatPaws),
-        bake(rig, CLIP_NAMES.walk, WALK_DURATION, walkPose, ground, flatPaws),
+        bake(rig, CLIP_NAMES.idle, IDLE_DURATION, t => idlePose(t, st), ground, flatPaws),
+        bake(rig, CLIP_NAMES.walk, WALK_DURATION, t => walkPose(t, st), ground, flatPaws),
         bake(rig, CLIP_NAMES.attack, ATTACK_DURATION, t => sampleKeys(attack, t), ground, flatPaws),
         bake(rig, CLIP_NAMES.roar, ROAR_DURATION, t => roarPose(roar, t), ground, flatPaws),
     ];
@@ -267,3 +280,6 @@ export const buildDemodogClips = (rig: DemogorgonRig): THREE.AnimationClip[] => 
     rig.root.updateMatrixWorld(true);
     return clips;
 };
+
+/** Bakes Idle, Walk, Attack and Roar clips for a rig produced by buildDemodogRig. */
+export const buildDemodogClips = (rig: DemogorgonRig): THREE.AnimationClip[] => buildQuadrupedClips(rig, DEMODOG_JAWS);

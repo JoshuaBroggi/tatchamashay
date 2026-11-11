@@ -232,7 +232,7 @@ export class SkeletonBuilder {
 // Geometry accumulation
 // ------------------------------------------------------------------
 
-interface PartBuffers {
+export interface PartBuffers {
     pos: number[];
     nrm: number[];
     uv: number[];
@@ -242,9 +242,9 @@ interface PartBuffers {
     index: number[];
 }
 
-const newPart = (): PartBuffers => ({ pos: [], nrm: [], uv: [], col: [], skinIdx: [], skinW: [], index: [] });
+export const newPart = (): PartBuffers => ({ pos: [], nrm: [], uv: [], col: [], skinIdx: [], skinW: [], index: [] });
 
-const partToGeometry = (p: PartBuffers, computeNormals = false): THREE.BufferGeometry => {
+export const partToGeometry = (p: PartBuffers, computeNormals = false): THREE.BufferGeometry => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(p.pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(p.uv, 2));
@@ -257,7 +257,7 @@ const partToGeometry = (p: PartBuffers, computeNormals = false): THREE.BufferGeo
     return g;
 };
 
-const pushVertex = (
+export const pushVertex = (
     p: PartBuffers,
     pos: THREE.Vector3,
     nrm: THREE.Vector3,
