@@ -40,6 +40,7 @@ final class AppModel {
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
             try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
+            UserDefaults.standard.removeObject(forKey: "playingChild")
         }
         // UI tests of the hunt start from a ready 3-treasure adventure.
         if ProcessInfo.processInfo.arguments.contains("-huntFixture") {

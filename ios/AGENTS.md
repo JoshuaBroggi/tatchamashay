@@ -26,6 +26,8 @@ Warnings are errors (`SWIFT_TREAT_WARNINGS_AS_ERRORS`). Swift 6 language mode.
 on a reviewed spot, walk up, double-tap Dig!, open the chest, restart, check the chest, replay.
 `UITests/HuntUITests.swift` walks milestone 2's 3-treasure hunt (screenshots `21-…` to `26-…`): far,
 warm, Dig!, foggy GPS and We found it, 2 of 3, finale.
+`UITests/ParentSetupUITests.swift` sets up a 3-chest starter adventure end to end and reaches
+**Get ready**'s Ready! (its screenshots are `setup-*`).
 
 To try it by hand: boot a simulator, set its location as above, install
 `build/Build/Products/Debug-iphonesimulator/Tatchamashay.app`, and grant location with
@@ -41,6 +43,8 @@ To try it by hand: boot a simulator, set its location as above, install
 | `Sources/Services/FamilyStore.swift` | `FamilyStore` protocol, the shared record rules (`FamilyData` extension), and the on-device `LocalFamilyStore` |
 | `Sources/Services/FamilyModel.swift` | Observable app state over a store; Demo mode's separate in-memory family |
 | `Sources/Rules/AdventureRules.swift` | 3–5 treasures per adventure, `HuntProgress` (next treasure, finale) |
+| `Sources/Rules/SetupRules.swift` | Parent setup: `MapReview` (how far to zoom before choosing), `HuntDraft` (a hunt before it's saved) |
+| `Sources/Services/GetReady.swift` | **Get ready**: checks every model, sound and line loads, and warns about the map |
 | `Sources/Services/TreasureCatalog.swift` | `Assets/manifest.json` as types: treasures, chest, sounds |
 | `Sources/Services/TreasureEntities.swift` | Loads USDZ models, tints them, plays idle motions; the chest with its lid |
 | `Sources/Services/StoryLibrary.swift` | `Content/Stories/` front matter as types; placeholder filling |
@@ -93,6 +97,12 @@ Shared pieces to use instead of writing your own:
 - UI tests launch with `-silent` so nothing speaks. `-huntFixture` (debug builds) starts from a ready
   3-treasure adventure in Golden Gate Park (`Views/Hunt/HuntFixture.swift`); `UITests/HuntUITests`
   walks it.
+- **The grown-up and pirates:** `FamilyModel.grownUpName` fills `{grown_up}` (what the child calls
+  the parent, falling back to their name). `FamilyModel.child` is the pirate playing now
+  (`choosePlayingChild`); `children` lists them all.
+- **Where a hunt happens:** `Adventure.playArea` (center, radius, the parent's name for it). A
+  placement from a starter story keeps the parent's blank in `ChestPlacement.hintBlank`; `hint` is
+  already filled.
 
 ## Rules that the code enforces
 
@@ -106,7 +116,12 @@ Shared pieces to use instead of writing your own:
 - Built-in treasure ids are the manifest's. Looks saved with milestone 1 ids (`gem`, `orb`) load as
   the nearest new treasure; never rename an id.
 - Placements must belong to the family and carry a review time that isn't in the future. Only the
-  parent's hide flow creates them, after zooming in to a detailed map and confirming the spot.
+  parent's hide and setup flows create them, after zooming in to a detailed map (`MapReview`) and
+  confirming the spot.
+- A new hunt saves all at once (`saveHuntSetup`): 3–5 placements in play order, or nothing.
+- The family keeps at least one pirate. Removing one removes their chest, after the parent confirms.
+- Get ready is Ready! only when every check passes; the map can only warn, since Apple Maps can't
+  promise offline tiles.
 - GPS: fixes older than 10 s or worse than 30 m are ignored. Dig! appears within 40 m and hides
   only after 4 s beyond 60 m. With no trusted fix the map says it's foggy and points to We found it.
 - Demo mode uses its own in-memory family and is the only place with automatic placement and the
