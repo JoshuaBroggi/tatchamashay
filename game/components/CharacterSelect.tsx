@@ -4,6 +4,7 @@ import { useGLTF, useAnimations, Environment, Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { CharacterVariant, CHARACTER_CONFIGS } from '../types';
+import { themeColor } from '../theme';
 
 interface CharacterPreviewProps {
     variant: CharacterVariant;
@@ -494,11 +495,14 @@ const CharacterPreview: React.FC<CharacterPreviewProps> = ({ variant, isSelected
 interface CharacterSelectSceneProps {
     selectedCharacter: CharacterVariant;
     onSelectCharacter: (variant: CharacterVariant) => void;
+    /** 'expedition' lights the turntable in the 2.0 forest palette. */
+    tone?: 'classic' | 'expedition';
 }
 
 // The 3D scene for character selection - renders INSIDE the Canvas
 export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({ 
-    selectedCharacter 
+    selectedCharacter,
+    tone = 'classic',
 }) => {
     // Position the camera closer for character selection
     const { camera } = useThree();
@@ -509,13 +513,19 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
         camera.lookAt(0, 2.5, 0);
     }, [camera]);
     
+    const isExpedition = tone === 'expedition';
+    const palette = useMemo(() => isExpedition
+        ? { background: themeColor('ground-raised'), floor: themeColor('ground-high'), rimLeft: themeColor('gold'), rimRight: themeColor('rune') }
+        : null, [isExpedition]);
+
     // Background color based on character
-    const bgColor = isFluffy ? '#1e3a5f' : '#1a1a2e';
+    const bgColor = palette?.background ?? (isFluffy ? '#1e3a5f' : '#1a1a2e');
     
     return (
         <>
             {/* Atmospheric background - lighter blue for Fluffy */}
-            <color attach="background" args={[bgColor]} />
+            {/* Expedition tone leaves the canvas clear so the page's panel gradient shows through */}
+            {!isExpedition && <color attach="background" args={[bgColor]} />}
             <fog attach="fog" args={[bgColor, 15, 30]} />
             
             {/* Strong ambient lighting so character is visible */}
@@ -543,12 +553,12 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
             {/* Rim lights for dramatic effect - pink/rainbow for Fluffy, purple for others */}
             <pointLight
                 position={[-4, 3, -2]}
-                color={isFluffy ? "#F472B6" : "#6366f1"}
+                color={palette?.rimLeft ?? (isFluffy ? "#F472B6" : "#6366f1")}
                 intensity={isFluffy ? 2 : 4}
             />
             <pointLight
                 position={[4, 3, -2]}
-                color={isFluffy ? "#60A5FA" : "#a855f7"}
+                color={palette?.rimRight ?? (isFluffy ? "#60A5FA" : "#a855f7")}
                 intensity={isFluffy ? 2 : 4}
             />
 
@@ -559,9 +569,9 @@ export const CharacterSelectScene: React.FC<CharacterSelectSceneProps> = ({
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]} receiveShadow>
                 <circleGeometry args={[4, 32]} />
                 <meshStandardMaterial 
-                    color={isFluffy ? "#4ADE80" : "#2d2d4a"} 
-                    roughness={isFluffy ? 0.8 : 0.3} 
-                    metalness={isFluffy ? 0.1 : 0.7}
+                    color={palette?.floor ?? (isFluffy ? "#4ADE80" : "#2d2d4a")} 
+                    roughness={isFluffy || isExpedition ? 0.8 : 0.3} 
+                    metalness={isFluffy || isExpedition ? 0.1 : 0.7}
                 />
             </mesh>
             

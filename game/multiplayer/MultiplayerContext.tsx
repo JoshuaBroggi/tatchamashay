@@ -1,3 +1,4 @@
+import PartySocket from 'partysocket';
 import React, { createContext, useContext, useCallback, useRef, useState, useEffect } from 'react';
 import { CharacterVariant, Level } from '../types';
 import {
@@ -12,32 +13,18 @@ import {
 // PartyKit host - use environment variable or default to localhost for development
 const PARTYKIT_HOST = import.meta.env.VITE_PARTYKIT_HOST || 'localhost:1999';
 
-// Multiplayer requires running: npm install
-// After install, set this to true to enable multiplayer
-const MULTIPLAYER_AVAILABLE = false;
-
-// Type for PartySocket when multiplayer is disabled
-type PartySocketType = any;
-
-// Stub function - returns null until npm install is run
-const getPartySocket = async (): Promise<PartySocketType | null> => {
-  if (!MULTIPLAYER_AVAILABLE) {
-    console.warn('Multiplayer not available. Run "npm install" to enable multiplayer features.');
-    return null;
-  }
-  // This will only be reached after npm install and setting MULTIPLAYER_AVAILABLE = true
-  return null;
-};
-
 const defaultContextValue: MultiplayerContextValue = {
   isConnected: false,
   isConnecting: false,
   roomCode: null,
   playerId: null,
   isHost: false,
+  hostId: null,
   remotePlayers: new Map(),
   playerCount: 0,
   gameStarted: false,
+  roomLevel: null,
+  connectionError: null,
   createRoom: async () => '',
   joinRoom: async () => {},
   leaveRoom: () => {},
@@ -66,8 +53,10 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
   const [hostId, setHostId] = useState<string | null>(null);
   const [remotePlayers, setRemotePlayers] = useState<Map<string, InterpolatedPlayer>>(new Map());
   const [gameStarted, setGameStarted] = useState(false);
+  const [roomLevel, setRoomLevel] = useState<Level | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const socketRef = useRef<PartySocketType | null>(null);
+  const socketRef = useRef<PartySocket | null>(null);
   const playerIdRef = useRef<string | null>(null);
   const lastPositionBroadcast = useRef<number>(0);
   
@@ -113,6 +102,7 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
           break;
 
         case 'game_start':
+          setRoomLevel(data.level);
           setGameStarted(true);
           break;
 
@@ -127,12 +117,14 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
           break;
 
         case 'level_change':
+          setRoomLevel(data.level);
           // Handle in game components via subscription
           window.dispatchEvent(new CustomEvent('mp:level_change', { detail: data }));
           break;
 
         case 'error':
           console.error('Server error:', data.message);
+          setConnectionError(data.message);
           break;
       }
     } catch (e) {
@@ -175,8 +167,9 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
     });
   }, []);
 
-  const handleSyncState = useCallback((state: { hostId: string; players: RemotePlayer[]; gameStarted: boolean }) => {
+  const handleSyncState = useCallback((state: { hostId: string; players: RemotePlayer[]; gameStarted: boolean; currentLevel: Level }) => {
     setHostId(state.hostId);
+    setRoomLevel(state.currentLevel);
     setGameStarted(state.gameStarted);
     handlePlayerList(state.players, state.hostId);
   }, [handlePlayerList]);
@@ -225,146 +218,99 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
     });
   }, []);
 
-  const createRoom = useCallback(async (playerName: string, characterVariant: CharacterVariant): Promise<string> => {
-    const PartySocket = await getPartySocket();
-    if (!PartySocket) {
-      throw new Error('Multiplayer not available. Please run npm install to enable.');
-    }
-    
-    setIsConnecting(true);
-    
-    const code = generateRoomCode();
-    const id = generatePlayerId();
-    
-    playerIdRef.current = id;
-    setPlayerId(id);
-    setRoomCode(code);
-
-    return new Promise((resolve, reject) => {
-      try {
-        const socket = new PartySocket({
-          host: PARTYKIT_HOST,
-          room: code,
-        });
-
-        socket.addEventListener('open', () => {
-          setIsConnected(true);
-          setIsConnecting(false);
-          
-          // Send join message
-          socket.send(JSON.stringify({
-            type: 'join',
-            playerId: id,
-            name: playerName,
-            characterVariant,
-          }));
-          
-          resolve(code);
-        });
-
-        socket.addEventListener('message', handleMessage);
-
-        socket.addEventListener('close', () => {
-          setIsConnected(false);
-          setRoomCode(null);
-          setRemotePlayers(new Map());
-          setGameStarted(false);
-        });
-
-        socket.addEventListener('error', (error: any) => {
-          console.error('WebSocket error:', error);
-          setIsConnecting(false);
-          reject(error);
-        });
-
-        socketRef.current = socket;
-      } catch (error) {
-        setIsConnecting(false);
-        reject(error);
-      }
-    });
-  }, [handleMessage]);
-
-  const joinRoom = useCallback(async (code: string, playerName: string, characterVariant: CharacterVariant): Promise<void> => {
-    const PartySocket = await getPartySocket();
-    if (!PartySocket) {
-      throw new Error('Multiplayer not available. Please run npm install to enable.');
-    }
-    
-    setIsConnecting(true);
-    
-    const id = generatePlayerId();
-    playerIdRef.current = id;
-    setPlayerId(id);
-    setRoomCode(code.toUpperCase());
-
-    return new Promise((resolve, reject) => {
-      try {
-        const socket = new PartySocket({
-          host: PARTYKIT_HOST,
-          room: code.toUpperCase(),
-        });
-
-        socket.addEventListener('open', () => {
-          setIsConnected(true);
-          setIsConnecting(false);
-          
-          // Send join message
-          socket.send(JSON.stringify({
-            type: 'join',
-            playerId: id,
-            name: playerName,
-            characterVariant,
-          }));
-          
-          resolve();
-        });
-
-        socket.addEventListener('message', handleMessage);
-
-        socket.addEventListener('close', () => {
-          setIsConnected(false);
-          setRoomCode(null);
-          setRemotePlayers(new Map());
-          setGameStarted(false);
-        });
-
-        socket.addEventListener('error', (error: any) => {
-          console.error('WebSocket error:', error);
-          setIsConnecting(false);
-          reject(error);
-        });
-
-        socketRef.current = socket;
-      } catch (error) {
-        setIsConnecting(false);
-        reject(error);
-      }
-    });
-  }, [handleMessage]);
-
-  const leaveRoom = useCallback(() => {
-    if (socketRef.current && playerId) {
-      socketRef.current.send(JSON.stringify({
-        type: 'leave',
-        playerId,
-      }));
-      socketRef.current.close();
-    }
-    
-    socketRef.current = null;
+  const resetRoomState = useCallback(() => {
     setIsConnected(false);
+    setIsConnecting(false);
     setRoomCode(null);
     setPlayerId(null);
     playerIdRef.current = null;
     setHostId(null);
     setRemotePlayers(new Map());
     setGameStarted(false);
-  }, [playerId]);
+    setRoomLevel(null);
+  }, []);
 
-  const startGame = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.send(JSON.stringify({ type: 'game_start' }));
+  // Open a socket to a room and join it. PartySocket reconnects on its own after a drop; each
+  // reopen re-sends `join` so the server restores this player under the same id.
+  const connectToRoom = useCallback((code: string, playerName: string, characterVariant: CharacterVariant): Promise<void> => {
+    socketRef.current?.close();
+
+    const id = generatePlayerId();
+    playerIdRef.current = id;
+    setPlayerId(id);
+    setRoomCode(code);
+    setIsConnecting(true);
+    setConnectionError(null);
+
+    return new Promise((resolve, reject) => {
+      let opened = false;
+      // The connection id matches the player id so the server can tie a dropped socket to its player.
+      const socket = new PartySocket({ host: PARTYKIT_HOST, room: code, id });
+
+      socket.addEventListener('open', () => {
+        opened = true;
+        setIsConnected(true);
+        setIsConnecting(false);
+        socket.send(JSON.stringify({
+          type: 'join',
+          playerId: id,
+          name: playerName,
+          characterVariant,
+        }));
+        resolve();
+      });
+
+      socket.addEventListener('message', handleMessage);
+
+      socket.addEventListener('close', () => {
+        if (socketRef.current !== socket) return;
+        // Keep the room so the lobby can show "reconnecting" while PartySocket retries.
+        setIsConnected(false);
+      });
+
+      socket.addEventListener('error', (error) => {
+        console.error('WebSocket error:', error);
+        if (!opened) {
+          socket.close();
+          if (socketRef.current === socket) {
+            socketRef.current = null;
+            resetRoomState();
+          }
+          reject(new Error('Could not reach the crew server'));
+        }
+      });
+
+      socketRef.current = socket;
+    });
+  }, [handleMessage, resetRoomState]);
+
+  const createRoom = useCallback(async (playerName: string, characterVariant: CharacterVariant): Promise<string> => {
+    const code = generateRoomCode();
+    await connectToRoom(code, playerName, characterVariant);
+    return code;
+  }, [connectToRoom]);
+
+  const joinRoom = useCallback(async (code: string, playerName: string, characterVariant: CharacterVariant): Promise<void> => {
+    await connectToRoom(code.toUpperCase(), playerName, characterVariant);
+  }, [connectToRoom]);
+
+  const leaveRoom = useCallback(() => {
+    const socket = socketRef.current;
+    socketRef.current = null;
+    if (socket) {
+      if (playerIdRef.current && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'leave', playerId: playerIdRef.current }));
+      }
+      socket.close();
+    }
+    resetRoomState();
+    setConnectionError(null);
+  }, [resetRoomState]);
+
+  // Only the crew leader's request is honoured; the server checks this too.
+  const startGame = useCallback((level: Level) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'game_start', level }));
     }
   }, []);
 
@@ -444,9 +390,12 @@ export const MultiplayerProvider: React.FC<MultiplayerProviderProps> = ({ childr
     roomCode,
     playerId,
     isHost,
+    hostId,
     remotePlayers,
     playerCount,
     gameStarted,
+    roomLevel,
+    connectionError,
     createRoom,
     joinRoom,
     leaveRoom,

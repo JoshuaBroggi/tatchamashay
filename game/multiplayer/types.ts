@@ -39,7 +39,7 @@ export type ClientMessage =
   | { type: 'balloon_pop'; balloonIds: string[]; poppedBy: string }
   | { type: 'gem_collect'; gemId: string; collectedBy: string }
   | { type: 'level_change'; level: Level }
-  | { type: 'game_start' }
+  | { type: 'game_start'; level: Level }
   | { type: 'character_update'; playerId: string; characterVariant: string };
 
 export type ServerMessage =
@@ -52,7 +52,7 @@ export type ServerMessage =
   | { type: 'gem_collect'; gemId: string; collectedBy: string }
   | { type: 'level_change'; level: Level }
   | { type: 'leave'; playerId: string }
-  | { type: 'game_start' }
+  | { type: 'game_start'; level: Level }
   | { type: 'error'; message: string };
 
 // Multiplayer context value
@@ -65,17 +65,22 @@ export interface MultiplayerContextValue {
   
   // Player info
   isHost: boolean;
+  hostId: string | null;
   remotePlayers: Map<string, InterpolatedPlayer>;
   playerCount: number;
   
   // Game state
   gameStarted: boolean;
+  /** Expedition the crew leader picked; null until the room reports one. */
+  roomLevel: Level | null;
+  /** Last error the room server reported (for example "Room is full"). */
+  connectionError: string | null;
   
   // Actions
   createRoom: (playerName: string, characterVariant: CharacterVariant) => Promise<string>;
   joinRoom: (roomCode: string, playerName: string, characterVariant: CharacterVariant) => Promise<void>;
   leaveRoom: () => void;
-  startGame: () => void;
+  startGame: (level: Level) => void;
   
   // Sync methods
   broadcastPosition: (x: number, y: number, z: number, rotation: number) => void;

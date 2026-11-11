@@ -14,6 +14,11 @@ try {
   };
 }
 
+type LevelId = "overworld" | "desert" | "jurassicPark";
+const LEVEL_IDS: readonly LevelId[] = ["overworld", "desert", "jurassicPark"];
+const isLevelId = (value: unknown): value is LevelId =>
+  typeof value === "string" && (LEVEL_IDS as readonly string[]).includes(value);
+
 // Message types for game synchronization
 type MessageType =
   | { type: "join"; playerId: string; name: string; characterVariant: string }
@@ -23,8 +28,8 @@ type MessageType =
   | { type: "attack_end"; playerId: string }
   | { type: "balloon_pop"; balloonIds: string[]; poppedBy: string }
   | { type: "gem_collect"; gemId: string; collectedBy: string }
-  | { type: "level_change"; level: "overworld" | "desert" }
-  | { type: "game_start" }
+  | { type: "level_change"; level: LevelId }
+  | { type: "game_start"; level?: LevelId }
   | { type: "sync_state"; state: GameState }
   | { type: "player_list"; players: PlayerInfo[]; hostId: string }
   | { type: "character_update"; playerId: string; characterVariant: string };
@@ -42,7 +47,7 @@ interface PlayerInfo {
 interface GameState {
   hostId: string;
   players: PlayerInfo[];
-  currentLevel: "overworld" | "desert";
+  currentLevel: LevelId;
   gameStarted: boolean;
   poppedBalloons: string[];
   collectedGems: string[];
@@ -52,7 +57,7 @@ export default class GameRoom implements Party.Server {
   private players: Map<string, PlayerInfo> = new Map();
   private hostId: string | null = null;
   private gameStarted: boolean = false;
-  private currentLevel: "overworld" | "desert" = "overworld";
+  private currentLevel: LevelId = "overworld";
   private poppedBalloons: Set<string> = new Set();
   private collectedGems: Set<string> = new Set();
 
@@ -72,6 +77,9 @@ export default class GameRoom implements Party.Server {
       players: playerList,
       hostId: this.hostId
     }));
+
+    // Tell the newcomer which expedition the leader picked
+    connection.send(JSON.stringify({ type: "level_change", level: this.currentLevel }));
 
     // If game already started, send sync state
     if (this.gameStarted) {
@@ -123,11 +131,11 @@ export default class GameRoom implements Party.Server {
           break;
 
         case "level_change":
-          this.handleLevelChange(data);
+          this.handleLevelChange(data, sender);
           break;
 
         case "game_start":
-          this.handleGameStart(sender);
+          this.handleGameStart(data, sender);
           break;
 
         case "character_update":
@@ -151,8 +159,14 @@ export default class GameRoom implements Party.Server {
   }
 
   private handlePlayerJoin(data: { playerId: string; name: string; characterVariant: string }, sender: Party.Connection) {
-    // Maximum 4 players
-    if (this.players.size >= 4) {
+    // A connection may only join as itself (clients connect with id = playerId)
+    if (data.playerId !== sender.id) {
+      sender.send(JSON.stringify({ type: "error", message: "Player id does not match connection" }));
+      return;
+    }
+
+    // Maximum 4 players (a reconnecting player keeps their slot)
+    if (this.players.size >= 4 && !this.players.has(data.playerId)) {
       sender.send(JSON.stringify({ type: "error", message: "Room is full" }));
       return;
     }
@@ -185,6 +199,14 @@ export default class GameRoom implements Party.Server {
     if (this.hostId === playerId) {
       const remainingPlayers = Array.from(this.players.keys());
       this.hostId = remainingPlayers.length > 0 ? remainingPlayers[0] : null;
+    }
+
+    // Empty room: reset so the code can be reused for a fresh crew
+    if (this.players.size === 0) {
+      this.gameStarted = false;
+      this.currentLevel = "overworld";
+      this.poppedBalloons.clear();
+      this.collectedGems.clear();
     }
 
     // Broadcast updated player list
@@ -247,35 +269,36 @@ export default class GameRoom implements Party.Server {
     this.room.broadcast(JSON.stringify(data));
   }
 
-  private handleLevelChange(data: { level: "overworld" | "desert" }) {
-    this.currentLevel = data.level;
-    
-    // Reset level-specific state
-    if (data.level === "overworld") {
-      this.collectedGems.clear();
+  private handleLevelChange(data: { level: LevelId }, sender: Party.Connection) {
+    // Only the crew leader picks the expedition. Clients connect with id = playerId.
+    if (sender.id !== this.hostId || !isLevelId(data.level)) {
+      sender.send(JSON.stringify({ type: "error", message: "Only the crew leader can pick the expedition" }));
+      return;
     }
+
+    this.currentLevel = data.level;
+    this.collectedGems.clear();
 
     // Broadcast to all players
-    this.room.broadcast(JSON.stringify(data));
+    this.room.broadcast(JSON.stringify({ type: "level_change", level: this.currentLevel }));
   }
 
-  private handleGameStart(sender: Party.Connection) {
-    // Only host can start the game
-    const senderPlayer = Array.from(this.players.values()).find(p => 
-      sender.id === p.id || this.hostId === p.id
-    );
-    
-    if (!senderPlayer || senderPlayer.id !== this.hostId) {
-      // For now, allow any player to start for testing
+  private handleGameStart(data: { level?: LevelId }, sender: Party.Connection) {
+    // Only the crew leader can start the expedition
+    if (sender.id !== this.hostId) {
+      sender.send(JSON.stringify({ type: "error", message: "Only the crew leader can start the expedition" }));
+      return;
     }
 
+    if (isLevelId(data.level)) {
+      this.currentLevel = data.level;
+    }
     this.gameStarted = true;
     this.poppedBalloons.clear();
     this.collectedGems.clear();
-    this.currentLevel = "overworld";
 
-    // Broadcast game start
-    this.room.broadcast(JSON.stringify({ type: "game_start" }));
+    // Broadcast game start with the expedition so every client loads the same level
+    this.room.broadcast(JSON.stringify({ type: "game_start", level: this.currentLevel }));
   }
 
   private handleCharacterUpdate(data: { playerId: string; characterVariant: string }) {

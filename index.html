@@ -2,13 +2,181 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Tatchamashay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;600&display=swap" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      body, html { margin: 0; padding: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; }
-      #root { width: 100%; height: 100vh; }
-      canvas { display: block; touch-action: none; outline: none; }
+    <script>
+      // 2.0 design tokens (docs/design/2.0/README.md). Values live in theme.css as CSS variables.
+      tailwind.config = {
+        theme: {
+          extend: {
+            // `short:` = a landscape phone (the 2.0 screens are laid out for 1280×720 first)
+            screens: {
+              short: { raw: '(max-height: 520px)' },
+            },
+            colors: {
+              ground: {
+                deepest: 'var(--tm-ground-deepest)',
+                DEFAULT: 'var(--tm-ground)',
+                raised: 'var(--tm-ground-raised)',
+                high: 'var(--tm-ground-high)',
+              },
+              line: {
+                DEFAULT: 'var(--tm-line)',
+                strong: 'var(--tm-line-strong)',
+              },
+              ink: {
+                DEFAULT: 'var(--tm-ink)',
+                body: 'var(--tm-ink-body)',
+                soft: 'var(--tm-ink-soft)',
+                muted: 'var(--tm-ink-muted)',
+              },
+              gold: 'var(--tm-gold)',
+              rune: 'var(--tm-rune)',
+              invented: 'var(--tm-invented)',
+              ok: 'var(--tm-ok)',
+              warn: 'var(--tm-warn)',
+              danger: 'var(--tm-danger)',
+              panel: 'var(--tm-panel)',
+            },
+            fontFamily: {
+              display: ['"Barlow Condensed"', 'sans-serif'],
+              body: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <!-- 2.0 component classes. In Tailwind's components layer so utilities (sizes, short: variants) override them. -->
+    <style type="text/tailwindcss">
+      @layer components {
+        /* Headline type: Barlow Condensed 800, uppercase, letter-spaced */
+        .tm-display {
+          font-family: var(--tm-font-display);
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        /* Small letter-spaced label (eyebrow) */
+        .tm-eyebrow {
+          font-family: var(--tm-font-body);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+        }
+
+        /* Buttons: square corners, gold fill or gold outline */
+        .tm-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          height: 60px;
+          padding: 0 28px;
+          font-family: var(--tm-font-display);
+          font-size: 26px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          text-decoration: none;
+          cursor: pointer;
+          border-radius: 0;
+          transition: filter 120ms ease, background-color 120ms ease, color 120ms ease;
+          white-space: nowrap;
+        }
+        .tm-btn:focus-visible {
+          outline: 2px solid var(--tm-rune);
+          outline-offset: 3px;
+        }
+        .tm-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.45;
+        }
+        .tm-btn-primary {
+          background: var(--tm-gold);
+          color: var(--tm-ground);
+          border: 0;
+        }
+        .tm-btn-primary:hover:not(:disabled) {
+          filter: brightness(1.1);
+        }
+        .tm-btn-secondary {
+          background: transparent;
+          color: var(--tm-ink);
+          border: 2px solid var(--tm-gold);
+        }
+        .tm-btn-secondary:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--tm-gold) 12%, transparent);
+        }
+        .tm-btn-quiet {
+          background: transparent;
+          color: var(--tm-ink);
+          border: 1px solid var(--tm-line-strong);
+        }
+        .tm-btn-quiet:hover:not(:disabled) {
+          background: var(--tm-ground-raised);
+        }
+
+        .tm-link {
+          color: var(--tm-ink-soft);
+          font-size: 15px;
+          font-weight: 600;
+          background: none;
+          border: 0;
+          padding: 0;
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        .tm-link:hover {
+          color: #fff;
+        }
+
+        /* Text input (room codes, names) */
+        .tm-input {
+          box-sizing: border-box;
+          height: 50px;
+          min-width: 0;
+          border: 1px solid var(--tm-line-strong);
+          border-radius: 0;
+          background: var(--tm-ground);
+          color: var(--tm-ink);
+          padding: 0 14px;
+          font-family: var(--tm-font-body);
+          font-size: 16px;
+        }
+        .tm-input::placeholder {
+          color: var(--tm-ink-muted);
+        }
+        .tm-input:focus {
+          outline: 2px solid var(--tm-gold);
+          outline-offset: -1px;
+        }
+
+        /* Menu screens: full-height page with a scroll fallback on short (phone landscape) screens */
+        .tm-screen {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          box-sizing: border-box;
+          overflow-y: auto;
+          touch-action: pan-y;
+          background: var(--tm-ground);
+          color: var(--tm-ink-body);
+          font-family: var(--tm-font-body);
+        }
+
+        /* Title art: the repo's own forest-ruins painting under a left-to-right scrim */
+        .tm-title-scene {
+          background:
+            linear-gradient(90deg, rgba(var(--tm-ground-deepest-rgb), 0.92) 0%, rgba(var(--tm-ground-deepest-rgb), 0.55) 50%, rgba(var(--tm-ground-deepest-rgb), 0) 85%),
+            url(/textures/forest_panorama.png) center / cover;
+        }
+      }
     </style>
   <script type="importmap">
 {

@@ -1,0 +1,87 @@
+/* Tatchamashay 2.0 design tokens — see docs/design/2.0/README.md.
+   Tailwind classes (bg-ground, text-gold, font-display, …) map onto these in index.html. */
+:root {
+  /* Grounds: deep forest */
+  --tm-ground-deepest: #08110B;
+  --tm-ground-deepest-rgb: 8, 17, 11;   /* same color, for translucent scrims and panels */
+  --tm-ground: #0E1A12;
+  --tm-ground-raised: #15271B;
+  --tm-ground-high: #1F3826;
+
+  /* Borders */
+  --tm-line: #2E5236;
+  --tm-line-strong: #4E7A4A;
+
+  /* Text */
+  --tm-ink: #F8FAEF;
+  --tm-ink-body: #E9EFD9;
+  --tm-ink-soft: #C3D5B6;
+  --tm-ink-muted: #86A07E;
+
+  /* Accents */
+  --tm-gold: #D4A24C;      /* main buttons, scores, legendary items */
+  --tm-rune: #7FE3F0;      /* magic, runes, air meter, hunt signals */
+  --tm-invented: #E9A3C9;  /* anything a player made themselves */
+  --tm-ok: #6FCF97;        /* ready, connected, health */
+  --tm-warn: #E67E22;      /* crew member needs help */
+  --tm-danger: #E07A5F;    /* errors */
+
+  /* Dark translucent panel over the game scene */
+  --tm-panel: rgba(var(--tm-ground-deepest-rgb), 0.7);
+  --tm-panel-strong: rgba(var(--tm-ground-deepest-rgb), 0.8);
+
+  --tm-font-display: 'Barlow Condensed', sans-serif;
+  --tm-font-body: Inter, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--tm-ground);
+  color: var(--tm-ink-body);
+  font-family: var(--tm-font-body);
+  touch-action: none;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+  outline: none;
+}
+
+/* Explorer turntable backdrop (behind a transparent 3D canvas) */
+.tm-turntable {
+  background: radial-gradient(ellipse at 50% 80%, var(--tm-line), var(--tm-ground-raised));
+}
+
+/* In-game controls: keyboard hints on desktop, thumbstick + buttons on touch screens */
+.tm-touch-only {
+  display: none !important;
+}
+@media (pointer: coarse) {
+  .tm-touch-only {
+    display: block !important;
+  }
+  .tm-pointer-only {
+    display: none !important;
+  }
+}
+.tm-stick {
+  border: 2px solid color-mix(in srgb, var(--tm-ink) 35%, transparent);
+  background: rgba(var(--tm-ground-deepest-rgb), 0.4);
+}
+.tm-stick-knob {
+  background: color-mix(in srgb, var(--tm-ink) 50%, transparent);
+}
+
+@keyframes tm-spin {
+  to { transform: rotate(360deg); }
+}

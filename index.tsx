@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './theme.css';
 
 const rootElement = (window as any).document.getElementById('root');
 if (!rootElement) {

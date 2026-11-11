@@ -656,7 +656,7 @@ export const RemotePlayer: React.FC<RemotePlayerProps> = ({ player, showNameTag 
           distanceFactor={15}
           sprite
         >
-          <div className="px-3 py-1 bg-black/70 rounded-full text-white text-sm font-bold whitespace-nowrap backdrop-blur-sm border border-white/20">
+          <div className="whitespace-nowrap border border-line-strong bg-panel px-3 py-1 font-body text-sm font-semibold text-ink">
             {player.name}
           </div>
         </Html>
