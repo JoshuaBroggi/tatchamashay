@@ -1,0 +1,194 @@
+{
+"v": 3,
+"createdOnFiles": {
+"v": 1,
+"at": "2026-11-10T12:00:00Z"
+},
+"title": "Tatchamashay Screen Mockups",
+"launch": {
+"view": "canvas"
+},
+"pages": [],
+"boards": {
+"Main.dc.html": {
+"x": 0,
+"y": 0,
+"w": 1280,
+"h": 720,
+"title": "1 \u00b7 Title"
+},
+"CharacterSelect.dc.html": {
+"x": 1360,
+"y": 0,
+"w": 1280,
+"h": 720,
+"title": "2 \u00b7 Choose explorer",
+"is_interactive": true
+},
+"LevelSelect.dc.html": {
+"x": 2720,
+"y": 0,
+"w": 1280,
+"h": 720,
+"title": "3 \u00b7 Choose expedition",
+"is_interactive": true
+},
+"Lobby.dc.html": {
+"x": 4080,
+"y": 0,
+"w": 1280,
+"h": 720,
+"title": "4 \u00b7 Crew lobby"
+},
+"HUD.dc.html": {
+"x": 0,
+"y": 840,
+"w": 1280,
+"h": 720,
+"title": "5 \u00b7 In-game overlay"
+},
+"TreasureFound.dc.html": {
+"x": 1360,
+"y": 840,
+"w": 1280,
+"h": 720,
+"title": "6 \u00b7 Treasure found"
+},
+"Results.dc.html": {
+"x": 2720,
+"y": 840,
+"w": 1280,
+"h": 720,
+"title": "7 \u00b7 Expedition results"
+},
+"MobileHUD.dc.html": {
+"x": 4080,
+"y": 840,
+"w": 844,
+"h": 390,
+"title": "8 \u00b7 Phone overlay (landscape)"
+},
+"PirateMap.dc.html": {
+"x": 0,
+"y": 2000,
+"w": 390,
+"h": 844,
+"title": "9 \u00b7 Pirate map"
+},
+"RealWorld.dc.html": {
+"x": 470,
+"y": 2000,
+"w": 390,
+"h": 844,
+"title": "10 \u00b7 Real-world hunt"
+},
+"MagicReveal.dc.html": {
+"x": 940,
+"y": 2000,
+"w": 390,
+"h": 844,
+"title": "11 \u00b7 Magical reveal"
+},
+"Vault.dc.html": {
+"x": 1410,
+"y": 2000,
+"w": 390,
+"h": 844,
+"title": "12 \u00b7 Treasure vault"
+},
+"InventTreasure.dc.html": {
+"x": 1880,
+"y": 2000,
+"w": 390,
+"h": 844,
+"title": "13 \u00b7 Invent & bury a treasure"
+},
+"Chest1.dc.html": {
+"x": 0,
+"y": 3300,
+"w": 390,
+"h": 844,
+"title": "14 \u00b7 Chest unearthed"
+},
+"Chest2.dc.html": {
+"x": 470,
+"y": 3300,
+"w": 390,
+"h": 844,
+"title": "15 \u00b7 Lid cracks open"
+},
+"Chest3.dc.html": {
+"x": 940,
+"y": 3300,
+"w": 390,
+"h": 844,
+"title": "16 \u00b7 Reveal: Super Lobster"
+},
+"Chest4.dc.html": {
+"x": 1410,
+"y": 3300,
+"w": 390,
+"h": 844,
+"title": "17 \u00b7 Alt reveal: Death Vader"
+}
+},
+"order": [
+"Main.dc.html",
+"CharacterSelect.dc.html",
+"LevelSelect.dc.html",
+"Lobby.dc.html",
+"HUD.dc.html",
+"TreasureFound.dc.html",
+"Results.dc.html",
+"MobileHUD.dc.html",
+"PirateMap.dc.html",
+"RealWorld.dc.html",
+"MagicReveal.dc.html",
+"Vault.dc.html",
+"InventTreasure.dc.html",
+"Chest1.dc.html",
+"Chest2.dc.html",
+"Chest3.dc.html",
+"Chest4.dc.html"
+],
+"notes": {
+"flow": {
+"x": 0,
+"y": -300,
+"text": "Tatchamashay 2.0 \u2014 menu flow \u2192 expedition loop",
+"kind": "title1",
+"maxW": 5360
+},
+"core": {
+"x": 0,
+"y": 1700,
+"text": "Part 2 \u2014 the real-world treasure loop",
+"kind": "title1",
+"maxW": 2270
+},
+"loop": {
+"x": 2360,
+"y": 2000,
+"w": 360,
+"text": "Loop: open the pirate map \u2192 walk to the X in the real world \u2192 dig, and the treasure is revealed with rune magic \u2192 it goes into the vault. Emmanuel can invent a treasure and bury it at a real spot for others to find.",
+"fill": "teal",
+"size": "m"
+},
+"chest": {
+"x": 0,
+"y": 3000,
+"text": "Part 3 \u2014 opening the chest",
+"kind": "title1",
+"maxW": 1800
+},
+"chestnote": {
+"x": 1880,
+"y": 3300,
+"w": 360,
+"text": "Tap the chest \u2192 lid shakes, runes ignite \u2192 light bursts out \u2192 the treasure rises. Here it's a companion character from the current game (rendered from the repo's 3D models), which joins your vault and can follow you on hunts.",
+"fill": "teal",
+"size": "m"
+}
+},
+"designSystems": []
+}
