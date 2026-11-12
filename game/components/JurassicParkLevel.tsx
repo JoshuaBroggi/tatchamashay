@@ -4,6 +4,7 @@ import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getQualitySettings } from '../world/quality';
+import { VineDogTreasure, VINE_DOG_TREASURE_SCORE } from './vinedog/VineDogTreasure';
 
 // ============================================================
 // Arena boundaries and collision
@@ -1093,6 +1094,12 @@ export const JurassicParkLevel: React.FC<JurassicParkLevelProps> = ({
                     collected={collectedEggsRef.current.has(egg.id)}
                 />
             ))}
+
+            {/* ==================== HIDDEN TREASURE: VINE DOG ==================== */}
+            <VineDogTreasure
+                playerPosRef={playerPosRef}
+                onCollect={() => onScoreUpdate(prev => prev + VINE_DOG_TREASURE_SCORE)}
+            />
 
             {/* ==================== POP EFFECTS ==================== */}
             {popEffects.map((e) => (
