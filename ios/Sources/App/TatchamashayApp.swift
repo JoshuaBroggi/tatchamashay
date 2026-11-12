@@ -38,7 +38,7 @@ final class AppModel {
         #if DEBUG
         // UI tests start from an empty family.
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") {
-            try? FileManager.default.removeItem(at: JSONFilePersistence.defaultURL)
+            JSONFilePersistence(url: JSONFilePersistence.defaultURL).eraseEverything()
             UserDefaults.standard.removeObject(forKey: "currentHuntRun")
             UserDefaults.standard.removeObject(forKey: "playingChild")
             UserDefaults.standard.removeObject(forKey: RevealMemory.key)

@@ -2,7 +2,8 @@ import Foundation
 
 /// Everything one family has, as stored.
 struct FamilyData: Codable, Hashable, Sendable {
-    var schemaVersion = 1
+    /// The saved file's format. Bump `FamilyMigrations.currentVersion` and add a step when it changes.
+    var schemaVersion = FamilyMigrations.currentVersion
     var parent: ParentAccount?
     var children: [ChildProfile] = []
     var designs: [TreasureDesign] = []
@@ -22,6 +23,21 @@ struct FamilyData: Codable, Hashable, Sendable {
     /// A child's chest, newest first. Built only from saved copies, never from live designs.
     func chest(for childID: ChildProfile.ID) -> [CollectionRecord] {
         collections.filter { $0.childID == childID }.sorted { $0.foundAt > $1.foundAt }
+    }
+}
+
+extension FamilyData {
+    /// Lenient on purpose: a file from an older app may lack the version or a list, and still loads.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        parent = try c.decodeIfPresent(ParentAccount.self, forKey: .parent)
+        children = try c.decodeIfPresent([ChildProfile].self, forKey: .children) ?? []
+        designs = try c.decodeIfPresent([TreasureDesign].self, forKey: .designs) ?? []
+        adventures = try c.decodeIfPresent([Adventure].self, forKey: .adventures) ?? []
+        placements = try c.decodeIfPresent([ChestPlacement].self, forKey: .placements) ?? []
+        collections = try c.decodeIfPresent([CollectionRecord].self, forKey: .collections) ?? []
     }
 }
 
@@ -262,25 +278,6 @@ extension FamilyData {
 protocol FamilyPersistence: Sendable {
     func read() throws -> FamilyData?
     func write(_ data: FamilyData) throws
-}
-
-/// The family file in Application Support, written atomically.
-struct JSONFilePersistence: FamilyPersistence {
-    let url: URL
-
-    static var defaultURL: URL {
-        URL.applicationSupportDirectory.appending(path: "Family").appending(path: "family.json")
-    }
-
-    func read() throws -> FamilyData? {
-        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return nil }
-        return try JSONDecoder.family.decode(FamilyData.self, from: Data(contentsOf: url))
-    }
-
-    func write(_ data: FamilyData) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder.family.encode(data).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-    }
 }
 
 /// Keeps data only in memory. Used by Demo mode so it never touches the family file.
