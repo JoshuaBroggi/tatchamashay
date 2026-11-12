@@ -10,6 +10,7 @@ struct HuntView: View {
     @Environment(AppModel.self) private var app
     @Environment(FamilyModel.self) private var family
     @Environment(LocationService.self) private var location
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var tracker: DigRangeTracker?
@@ -19,6 +20,8 @@ struct HuntView: View {
     @State private var reveal: Reveal?
     @State private var saving = false
     @State private var confirmingFound = false
+    @State private var pause = HuntPause()
+    @State private var screenAwake = ScreenAwake()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +34,11 @@ struct HuntView: View {
             family.startRunIfNeeded()
             startMoments()
             frameNextSpot()
+            keepScreenAwake()
         }
+        .onDisappear { screenAwake.update(huntActive: false) }
+        .onChange(of: scenePhase) { phaseChanged() }
+        .onChange(of: family.isRunComplete) { keepScreenAwake() }
         .task {
             while !Task.isCancelled {
                 tick()
@@ -46,6 +53,7 @@ struct HuntView: View {
             dig = DigState(showsDig: false, signal: dig.signal, warmth: nil)
             tick()
             frameNextSpot()
+            keepScreenAwake()
         }
         .fullScreenCover(item: $reveal) { reveal in
             ChestOpeningView(look: reveal.record.savedCopy, foundAgain: reveal.foundAgain,
@@ -259,8 +267,33 @@ struct HuntView: View {
         publish(moments.start(run: run.id, progress: family.progress, now: .now))
     }
 
+    /// The screen stays on while there is a treasure left to find and the hunt is in front.
+    private func keepScreenAwake() {
+        screenAwake.update(huntActive: scenePhase == .active && family.nextPlacement != nil && !family.isRunComplete)
+    }
+
+    /// Away from the screen (another app, the lock screen): stop the voice and sounds and stop
+    /// judging GPS. Back again: if the hunt was away longer than a fix stays fresh, forget the old
+    /// Dig! decision and wait for a new fix.
+    private func phaseChanged() {
+        if scenePhase == .active {
+            if pause.resume(now: .now) {
+                tracker = nil
+                dig = DigState(showsDig: false, signal: .foggy, warmth: nil)
+            }
+            tick()
+        } else {
+            pause.pause(now: .now)
+            if scenePhase == .background {
+                app.voice.stop()
+                app.sounds.stopAll()
+            }
+        }
+        keepScreenAwake()
+    }
+
     private func tick() {
-        guard let next = family.nextPlacement else { return }
+        guard !pause.isPaused, let next = family.nextPlacement else { return }
         if tracker?.target != next.spot { tracker = DigRangeTracker(target: next.spot) }
         let now = Date.now
         let fix = app.isDemo ? app.demoFix.map { LocationFix(coordinate: $0.coordinate, horizontalAccuracy: 5, timestamp: now) }

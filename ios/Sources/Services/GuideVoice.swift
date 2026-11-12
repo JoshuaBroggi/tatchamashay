@@ -25,14 +25,23 @@ final class SpeechGuideVoice: GuideVoice {
     private let synthesizer = AVSpeechSynthesizer()
     private let settings: PlaySettings
     private let voice = AVSpeechSynthesisVoice(language: "en-US")
+    private let audio: AudioSessionController
+    private let finish = SpeechFinish()
 
-    init(settings: PlaySettings) { self.settings = settings }
+    init(settings: PlaySettings, audio: AudioSessionController = .shared) {
+        self.settings = settings
+        self.audio = audio
+        synthesizer.delegate = finish
+        finish.onQuiet = { [weak self] in self?.wentQuiet() }
+        audio.onSilence { [weak self] in self?.synthesizer.stopSpeaking(at: .immediate) }
+    }
 
     var isSpeaking: Bool { synthesizer.isSpeaking }
 
     func speak(_ lines: [String], rate: Double) {
-        guard settings.spokenGuideOn else { return }
-        AudioSessionSetup.activate()
+        // During a phone call or while the app isn't in front, the line is dropped, never queued:
+        // a stale line must not play later.
+        guard settings.spokenGuideOn, lines.contains(where: { !$0.isEmpty }), audio.begin(.voice) else { return }
         for line in lines where !line.isEmpty {
             let utterance = AVSpeechUtterance(string: line)
             utterance.rate = Self.utteranceRate(rate)
@@ -42,7 +51,15 @@ final class SpeechGuideVoice: GuideVoice {
         }
     }
 
-    func stop() { synthesizer.stopSpeaking(at: .immediate) }
+    func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
+        audio.end(.voice)
+    }
+
+    /// An utterance finished or was cut off. Once the queue is empty, let the audio session rest.
+    private func wentQuiet() {
+        if !synthesizer.isSpeaking { audio.end(.voice) }
+    }
 
     /// Maps a story `tts_rate` (0–1, 0.5 normal) onto the system's range, where the default is normal.
     nonisolated static func utteranceRate(_ ttsRate: Double) -> Float {
@@ -52,6 +69,20 @@ final class SpeechGuideVoice: GuideVoice {
         return clamped <= 0.5
             ? low + (normal - low) * clamped * 2
             : normal + (high - normal) * (clamped - 0.5) * 2
+    }
+}
+
+/// Tells `SpeechGuideVoice` when the system voice stops talking.
+@MainActor
+private final class SpeechFinish: NSObject, AVSpeechSynthesizerDelegate {
+    var onQuiet: (@MainActor () -> Void)?
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.onQuiet?() }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.onQuiet?() }
     }
 }
 
