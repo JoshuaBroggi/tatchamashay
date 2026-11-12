@@ -10,7 +10,10 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
-    CODE_SIGNING_ALLOWED: NO
+    # The simulator needs no signing; device builds sign with the family's Apple team.
+    "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
+    DEVELOPMENT_TEAM: RAADXJAY3M
+    CODE_SIGN_STYLE: Automatic
 packages:
   Yams:
     url: https://github.com/jpsim/Yams
