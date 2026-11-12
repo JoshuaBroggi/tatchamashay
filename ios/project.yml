@@ -39,6 +39,8 @@ targets:
       - path: Content/Stories
         type: folder
         buildPhase: resources
+      # App icon and the privacy manifest.
+      - path: Resources
     dependencies:
       - package: Yams
     settings:
@@ -47,6 +49,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_CFBundleDisplayName: Tatchamashay
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Tatchamashay uses your location during a hunt to show the Dig! button when you reach a treasure. Your location stays on this phone."
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

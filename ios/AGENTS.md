@@ -151,3 +151,12 @@ starts zoomed out and the walkthrough fails at "the map should be detailed enoug
 After the walkthrough restarts the app, the replay's 3D reveal sometimes stops drawing on the
 simulator: the text moves on but the chest picture freezes. The scene keeps running underneath, and
 `main`'s older reveal showed no model at all at the same step. Check the replay on a real phone.
+
+## App shell
+
+- **Icon:** `swift scripts/make_icon.swift` redraws `Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png`.
+- **Privacy manifest:** `Resources/PrivacyInfo.xcprivacy` (no tracking, nothing collected, `UserDefaults`
+  for the app's own settings). Add an entry if new code reads file timestamps, disk space or uptime.
+- **Grown-up gate:** `GrownUpGate` (`Views/Shared/GrownUpGate.swift`) asks a two-digit multiplication
+  before the Grown-ups tab opens, once per app session. Debug builds launched with `-silent` skip it,
+  so the UI tests walk straight in.
