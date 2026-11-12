@@ -118,7 +118,7 @@ struct RootView: View {
                         Tab("Map", systemImage: "map.fill") { HuntView().overlay { GuideLayer() } }
                         Tab("My Chest", systemImage: "shippingbox.fill") { ChestScreen() }
                         Tab("Make", systemImage: "wand.and.stars") { CreateView() }
-                        Tab("Grown-ups", systemImage: "person.2.fill") { ParentView() }
+                        Tab("Grown-ups", systemImage: "person.2.fill") { GrownUpGate { ParentView() } }
                     }
                     .tint(Palette.gold)
                 }
