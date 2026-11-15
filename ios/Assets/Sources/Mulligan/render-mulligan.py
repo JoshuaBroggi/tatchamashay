@@ -42,3 +42,9 @@ camera.location = (3,6,3.1)
 camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
 scene.render.filepath = str(OUTPUT/'rear.png')
 bpy.ops.render.render(write_still=True)
+# Front and profile views make the narrow skull/jaw proportions reviewable.
+for name, position in [('front',(0,-7,2.3)),('side',(7,-.2,2.3))]:
+    camera.location = position
+    camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
+    scene.render.filepath = str(OUTPUT/f'{name}.png')
+    bpy.ops.render.render(write_still=True)

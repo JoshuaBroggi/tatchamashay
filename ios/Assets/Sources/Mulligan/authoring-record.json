@@ -9,6 +9,8 @@
   "durationSeconds": 6,
   "source": "build-mulligan.py",
   "objectAnimation": false,
+  "headWidthScale": 0.55,
+  "jawWidthScale": 0.5,
   "motions": [
     "breathing",
     "head turn and nod",

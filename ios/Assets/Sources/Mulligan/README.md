@@ -5,7 +5,7 @@ All three supplied toy photographs describe this one creature. This is a new iPh
 model and rig made by Codex from those references, rather than an imported or archived mesh.
 
 The adaptation keeps the reference's hunched olive body, long forelimbs and shorter rear legs,
-pink snout and extremities, yellow teeth/claws, eyeless head and dark branching ridges across the
+pink snout and extremities, yellow teeth/claws, narrow eyeless head and dark branching ridges across the
 back and rump. It has four limbs and no tail. The material gradient is preserved; whole-body
 tinting is disabled so selecting an app color does not erase the authored markings.
 
@@ -22,7 +22,13 @@ by the existing Treasure makers & credits screen.
 - `mulligan.blend`: source mesh, skin weights and 30-joint deforming armature.
 - `authoring-record.json`: source geometry and animation metadata.
 - `delivery-record.json`: the final packed USDZ's size, hash, geometry and joint-sample metadata.
-- `render-mulligan.py`, `idle-preview.gif`, `rear-preview.png`: source art review; not app captures.
+- `render-mulligan.py`, `idle-preview.gif`, `rear-preview.png`, `front-preview.png` and
+  `side-preview.png`: source art review; not app captures.
+
+Joshua's head-shape correction on 15 November is reflected in generator revision 2. The skull
+is 45% narrower and the lower jaw 50% narrower than revision 1, retaining the snout's depth and
+height. Lips, teeth, mouth lining and forehead ridges follow those proportions. The same
+centerline skeleton, skin assignments and baked idle are retained.
 
 Run with Blender 4.5 from the repository root:
 
@@ -44,7 +50,7 @@ to a 0.32 m longest dimension, Y-up/meters/+Z-facing with feet on the ground, an
 
 ## Delivery evidence
 
-The shared converter accepted the final **678,798-byte** USDZ: one skeleton, 30 joints, one clip,
+The shared converter accepted the final **678,051-byte** USDZ: one skeleton, 30 joints, one clip,
 145 rotation samples and 29 changing joints; Root is stationary. The transparent thumbnail is
 512 × 512. Source pose renders were inspected from the front and rear, including jaw/head changes.
 This is art/conversion evidence, not observed RealityKit playback.
@@ -55,4 +61,6 @@ this change; on-phone appearance, animation and performance remain unobserved. E
 catalog coverage already enumerates every `BuiltInModel` and skeletal manifest entry for CI.
 
 ![Blender source idle, not app playback](idle-preview.gif)
+![Blender front source render](front-preview.png)
+![Blender side source render](side-preview.png)
 ![Blender rear source render](rear-preview.png)

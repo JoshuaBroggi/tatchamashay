@@ -28,6 +28,12 @@ DARK = (0.035, 0.043, 0.031)
 IVORY = (0.80, 0.64, 0.30)
 MOUTH = (0.052, 0.013, 0.022)
 
+# Joshua's reference has a narrow, deep skull and an even narrower lower jaw.
+# Apply the same transverse proportion to the skin, lips, teeth and forehead ridges,
+# retaining their depth/height and the existing centerline head/jaw bind poses.
+HEAD_WIDTH_SCALE = .55
+JAW_WIDTH_SCALE = .50
+
 
 def mix(a, b, t):
     t = min(1, max(0, t))
@@ -45,9 +51,12 @@ verts, faces, colors, weights, materials = [], [], [], [], []
 
 def vertex(p, color, weight):
     p = Vector(p)
+    assignment = weight(p) if callable(weight) else weight
+    if set(assignment) <= {'Neck', 'Head', 'Jaw'}:
+        p.x *= JAW_WIDTH_SCALE if 'Jaw' in assignment else HEAD_WIDTH_SCALE
     verts.append(tuple(p))
     colors.append(tuple(color(p) if callable(color) else color) + (1,))
-    weights.append(weight(p) if callable(weight) else weight)
+    weights.append(assignment)
     return len(verts)-1
 
 
@@ -207,7 +216,7 @@ def muzzle(sections, bone, lower=False):
     face(tuple(rows[-1]))
 
 
-# Broad eyeless, closed-brow head from the supplied side views.
+# Narrow eyeless skull and tapered jaw; vertex() also narrows the mouth details.
 ellipsoid((0,-.65,2.10), (.60,.48,.39), head_color, {'Neck':.3,'Head':.7}, 24, 12)
 muzzle([(-.72,.49,2.14,.31), (-1.04,.61,2.17,.28), (-1.40,.57,2.15,.22),
         (-1.69,.47,2.12,.15), (-1.86,.37,2.10,.105), (-1.91,.29,2.10,.085)], 'Head')
@@ -442,6 +451,7 @@ triangles = sum(len(p.vertices)-2 for p in mesh.polygons)
 report = dict(bones=len(bones), vertices=len(verts), triangles=triangles,
               clip='Idle', fps=24, firstFrame=1, lastFrame=145, durationSeconds=6,
               source='build-mulligan.py', objectAnimation=False,
+              headWidthScale=HEAD_WIDTH_SCALE, jawWidthScale=JAW_WIDTH_SCALE,
               motions=['breathing','head turn and nod','jaw movement','planted-foot weight shift','toe flex'])
 (HERE/'authoring-record.json').write_text(json.dumps(report,indent=2)+'\n')
 print('AUTHORED MULLIGAN',json.dumps(report),flush=True)

@@ -19,9 +19,16 @@
   "referenceCredits": "Three toy photographs supplied by Joshua Broggi. Original photographer/manufacturer and source URLs were not supplied. No photo or character ownership or CC-BY license is asserted. Reference photographs are not bundled.",
   "authoring": "New procedural Blender geometry and 30-joint weighted rig authored by Codex at Joshua Broggi’s request; not imported from a third-party model.",
   "revision": {
-    "generatorVersion": 1,
-    "generatorSHA256": "00d3d85fcd9fa33a2aa056f56199cb0a44f8a9537769eaf096d056f2091a9ec1",
-    "blendSHA256": "e7d3399dde8209aebd647515b4cce9506f51c00542a5afc6a0ff20bdef9e4615"
+    "generatorVersion": 2,
+    "generatorSHA256": "0b740e2bcd7c248ab0e9c489a3ef4446fdd38ee892623330c8adece479300920",
+    "blendSHA256": "bd3cd7dc1475753afddaff6ca81f385885a266d20474744806860b970f29115d"
   },
-  "tool": "Blender 4.5.3 LTS (67807e1800cc)"
+  "tool": "Blender 4.5.3 LTS (67807e1800cc)",
+  "corrections": [
+    {
+      "date": "2026-11-15",
+      "request": "this muligan has a flat wide head, whereas in the pictures i gave you, he has a narrow jaw and head",
+      "changes": "Skull narrowed by 45% and lower jaw by 50%, including teeth, lips, mouth lining and forehead ridges. Depth, height, centerline skeleton, skin assignments and the idle action are retained."
+    }
+  ]
 }
