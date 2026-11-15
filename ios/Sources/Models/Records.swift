@@ -128,14 +128,14 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
     case potion
     case dragonEgg
     case turtle, doubloon, spider
-    /// A previously shipped phone model, retained for saved appearances.
+    /// Original six-legged creature restored from the earlier iPhone build.
     case vineDog
     /// Keep models saved by another app version intact, even when their assets aren't bundled.
     case unavailable(String)
 
     /// Only bundled models can be chosen for a new beast.
     static let allCases: [BuiltInModel] = [
-        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider
+        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider, .vineDog
     ]
 
     var rawValue: String {
@@ -195,7 +195,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
         case .spider: "Silky the Spider"
-        case .vineDog: "Vine dog"
+        case .vineDog: "Vine Dog"
         case .unavailable: "Saved beast"
         }
     }

@@ -15,7 +15,8 @@ struct BundledAssetLoaders: AssetLoaders {
 
     func modelLoads(_ model: BuiltInModel) async -> Bool {
         let look = TreasureLook(model: model, color: model.defaultColor, name: model.displayName)
-        return await !TreasureEntities.treasure(look, catalog: catalog).isFallback
+        let loaded = await TreasureEntities.treasure(look, catalog: catalog)
+        return !loaded.isFallback && loaded.hasRequiredAnimation
     }
 
     func chestLoads() async -> Bool { await TreasureEntities.chest(catalog: catalog) != nil }
