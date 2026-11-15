@@ -149,7 +149,7 @@ struct HuntView: View {
         .overlay(alignment: .bottomLeading) {
             if mapExperience.enabled {
                 HStack(spacing: 6) {
-                    Image(systemName: mapExperience.uses3D ? "view.3d" : "map")
+                    Image(systemName: "map")
                     Text(mapExperience.uses3D ? "3D exploration" : "2D exploration")
                     if movement.isUncertain { Text("· Location uncertain") }
                 }
@@ -197,7 +197,10 @@ struct HuntView: View {
         }
         .opacity(movement.isUncertain ? 0.5 : 1)
         .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(family.activeCharacter.map { "Playing as \($0.savedCopy.name)" } ?? "Your explorer")
+        .accessibilityValue(movement.isUncertain ? "Location uncertain" : (movement.isWalking && !calm ? "Walking" : "Standing"))
+        .accessibilityIdentifier("mapCharacter")
     }
 
     private var header: some View {

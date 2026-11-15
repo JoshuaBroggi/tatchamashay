@@ -45,6 +45,12 @@ final class CharacterMapUITests: XCTestCase {
         select.tap()
         XCTAssertTrue(app.staticTexts["transformationName"].waitForExistence(timeout: 8))
         XCTAssertEqual(app.staticTexts["transformationName"].label, "You're now Star Compass!")
+        let preview = app.descendants(matching: .any)["transformationCharacter"].firstMatch
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Ready"), object: preview)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        let model = app.descendants(matching: .any)["treasureModel"].firstMatch
+        let rendered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "usdz"), object: model)
+        XCTAssertEqual(XCTWaiter.wait(for: [rendered], timeout: 10), .completed)
         attach("Saved character transformation")
         app.buttons["transformationDone"].tap()
         XCTAssertTrue(app.staticTexts["characterMapMode"].waitForExistence(timeout: 5))
@@ -65,9 +71,52 @@ final class CharacterMapUITests: XCTestCase {
     }
 
     @MainActor
+    func testVineDogWalksAndDemogorgonCanBeSelected() async throws {
+        let app = launchFixture(characters: true)
+        setMode(true, in: app)
+        app.tabBars.buttons["My Chest"].tap()
+        app.staticTexts["Vine Dog"].firstMatch.tap()
+        let select = app.buttons["beThisCharacter"]
+        if !select.isHittable { app.swipeUp() }
+        select.tap()
+        XCTAssertTrue(app.buttons["transformationDone"].waitForExistence(timeout: 5))
+        app.buttons["transformationDone"].tap()
+        let marker = app.descendants(matching: .any)["mapCharacter"].firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 10))
+        XCTAssertEqual(marker.label, "Playing as Vine Dog")
+        // Two trusted, walking-speed movements start the gait; stationary updates then stop it.
+        for north in [0.0, 4, 8] {
+            XCUIDevice.shared.location = XCUILocation(location: CLLocation(
+                coordinate: CLLocationCoordinate2D(latitude: 37.7694 + north / 111_320, longitude: -122.4862),
+                altitude: 0, horizontalAccuracy: 5, verticalAccuracy: 5, timestamp: .now))
+            try await Task.sleep(for: .seconds(2))
+        }
+        XCTAssertEqual(marker.value as? String, "Walking")
+        attach("Vine Dog walking on the 3D map")
+        try await Task.sleep(for: .seconds(3))
+        XCTAssertEqual(marker.value as? String, "Standing")
+        app.tabBars.buttons["My Chest"].tap()
+        // Leave the previously selected detail before choosing the second discovery.
+        if app.navigationBars.buttons.firstMatch.exists { app.navigationBars.buttons.firstMatch.tap() }
+        app.staticTexts["Demogorgon"].firstMatch.tap()
+        if !app.buttons["beThisCharacter"].isHittable { app.swipeUp() }
+        app.buttons["beThisCharacter"].tap()
+        XCTAssertTrue(app.staticTexts["transformationName"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["transformationName"].label, "You're now Demogorgon!")
+        app.buttons["transformationDone"].tap()
+        XCTAssertEqual(marker.label, "Playing as Demogorgon")
+    }
+
+    @MainActor
     private func launchFixture() -> XCUIApplication {
+        launchFixture(characters: false)
+    }
+
+    @MainActor
+    private func launchFixture(characters: Bool) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-huntFixture", "-silent"]
+        if characters { app.launchArguments.append("-characterFixture") }
         app.launch()
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow While Using App"]
         if allow.waitForExistence(timeout: 2) { allow.tap() }
@@ -92,7 +141,8 @@ final class CharacterMapUITests: XCTestCase {
     @MainActor
     private func choose(_ name: String, in app: XCUIApplication) {
         app.buttons["chooseTreasure"].tap()
-        let button = app.buttons["Choose \(name)"]
+        let number = name == "Star Compass" ? 1 : 3
+        let button = app.buttons["Choose Hidden treasure \(number)"]
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         button.tap()
     }

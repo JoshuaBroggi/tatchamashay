@@ -147,5 +147,5 @@ They are synthesized by `tools/sounds.mjs` (mono, 44.1 kHz, AAC 96 kbps). They a
 
 ## Optional map characters
 
-The restored Demogorgon joins Vine Dog as a selectable discovered character. Source history,
-gait metadata and rebuilding are documented in [CHARACTER_MOVEMENT.md](CHARACTER_MOVEMENT.md).
+Character exploration uses the same collected models and saved appearances. Gait metadata and
+rebuilding are documented in [CHARACTER_MOVEMENT.md](CHARACTER_MOVEMENT.md).

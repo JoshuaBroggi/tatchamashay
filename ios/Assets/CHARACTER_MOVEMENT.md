@@ -15,7 +15,8 @@ Optional `locomotion` metadata adds a gait without changing collection-preview i
   when stopping or turning motion off.
 
 Vine Dog uses its six existing shoulder and hip joints. Demogorgon uses its two hip joints and
-opposing upper arms. Both are the family's earlier procedural rigs, not downloaded replacement
+opposing upper arms. Demodog uses its four shoulder and hip joints. These are the family's earlier
+procedural rigs, not downloaded replacement
 models. Demogorgon's USDZ, source GLB and thumbnail are restored from commit
 `ce65d11` on the earlier iPhone restoration branch; its manifest records the original procedural
 source commit `2b397b3cad58d17722b5bd907433863b4881c9df` and Joshua's requested private family use.

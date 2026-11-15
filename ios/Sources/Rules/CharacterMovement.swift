@@ -23,7 +23,7 @@ struct CharacterMovement {
         }
         isUncertain = false
         if let lastMovement, now.timeIntervalSince(lastMovement) > 3 { isWalking = false; movingSamples = 0 }
-        guard lastSample != fix.timestamp else { return }
+        if let lastSample, fix.timestamp <= lastSample { return }
         lastSample = fix.timestamp
         guard let previous = anchor else {
             coordinate = fix.coordinate

@@ -53,6 +53,7 @@ struct ChestScreen: View {
                             ForEach(shelf.items) { item in
                                 NavigationLink(value: item.record) { ChestTile(item: item) }
                                     .buttonStyle(.plain)
+                                    .accessibilityIdentifier("collectedTreasure-\(item.id)")
                             }
                         }
                     }

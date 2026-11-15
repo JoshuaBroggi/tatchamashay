@@ -155,7 +155,6 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "demogorgon"
         case .demodog: "demodog"
         case .vineDog: "vine-dog"
-        case .demogorgon: "demogorgon"
         case .unavailable(let savedID): savedID
         }
     }
@@ -202,7 +201,6 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "Vine Dog"
-        case .demogorgon: "Demogorgon"
         case .unavailable: "Saved beast"
         }
     }

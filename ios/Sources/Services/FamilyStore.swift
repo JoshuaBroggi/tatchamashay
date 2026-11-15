@@ -125,16 +125,19 @@ extension FamilyData {
     mutating func createFamily(parent: ParentAccount, child: ChildProfile) throws {
         guard self.parent == nil else { throw FamilyStoreError.parentAlreadySet }
         guard child.parentID == parent.id else { throw FamilyStoreError.notInFamily }
+        guard child.activeCollectionID == nil else { throw FamilyStoreError.unknownTreasure }
         self.parent = parent
         children = [child]
     }
 
     mutating func saveChild(_ child: ChildProfile) throws {
         try requireFamily(child.parentID)
-        if let collectionID = child.activeCollectionID {
-            try validateCharacter(child: child.id, collection: collectionID)
-        }
-        upsert(child, in: &children)
+        // Profile edits may originate from an older sheet. Only selectCharacter changes the choice;
+        // renaming a child must neither erase it nor be blocked by an unavailable old reference.
+        guard self.child(child.id) != nil || child.activeCollectionID == nil else { throw FamilyStoreError.unknownTreasure }
+        var updated = child
+        updated.activeCollectionID = self.child(child.id)?.activeCollectionID
+        upsert(updated, in: &children)
     }
 
     private func validateCharacter(child childID: ChildProfile.ID, collection collectionID: CollectionRecord.ID) throws {

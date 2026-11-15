@@ -17,6 +17,7 @@ struct CharacterTransformationView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var started = Date.now
     @State private var finished = false
+    @State private var showNew = false
 
     private var calm: Bool { settings.reducesMotion(system: systemReduceMotion) }
 
@@ -24,26 +25,34 @@ struct CharacterTransformationView: View {
         VStack(spacing: 20) {
             Text("Becoming your character")
                 .font(Typeface.headline(30))
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: finished || calm)) { context in
-                let elapsed = context.date.timeIntervalSince(started)
-                let progress = min(max(elapsed / 1.4, 0), 1)
-                ZStack {
-                    if progress >= 0.5 || calm {
-                        WalkingCharacterView(look: character, calm: calm)
-                    } else if let previous {
-                        WalkingCharacterView(look: previous)
-                    } else {
-                        Image(systemName: "figure.walk")
-                            .font(.system(size: 110))
-                            .foregroundStyle(Palette.gold)
-                    }
-                    if !calm && progress < 1 {
+            ZStack {
+                // RealityKit keeps a stable viewport; only the flame layer uses a TimelineView.
+                if showNew || calm {
+                    TreasureModelView(look: character)
+                        .frame(width: 260, height: 280)
+                        .allowsHitTesting(false)
+                } else if let previous {
+                    TreasureModelView(look: previous)
+                        .frame(width: 260, height: 280)
+                        .allowsHitTesting(false)
+                } else {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 110))
+                        .foregroundStyle(Palette.gold)
+                }
+                if !calm && !finished {
+                    TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                        let progress = min(max(context.date.timeIntervalSince(started) / 1.4, 0), 1)
                         flame(progress: progress)
                     }
                 }
-                .frame(height: 280)
-                .accessibilityHidden(true)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 280)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(character.name)
+            .accessibilityValue(finished ? "Ready" : "Transforming")
+            .accessibilityIdentifier("transformationCharacter")
             Text("You're now \(character.name)!")
                 .font(Typeface.headline(32))
                 .multilineTextAlignment(.center)
@@ -59,7 +68,10 @@ struct CharacterTransformationView: View {
         .task {
             started = .now
             if !calm { app.sounds.play(.revealSparkle) }
-            try? await Task.sleep(for: .milliseconds(1_400))
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
+            showNew = true
+            try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
             finished = true
             UIAccessibility.post(notification: .announcement, argument: "You're now \(character.name)")

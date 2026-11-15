@@ -13,11 +13,12 @@ struct WalkingCharacterView: View {
 
     var body: some View {
         ZStack {
-            if visible && scenePhase == .active {
-                CharacterStage(look: look, walking: walking, heading: heading, calm: calm)
+            if visible {
+                CharacterStage(look: look, walking: walking, heading: heading, calm: calm || scenePhase != .active)
                     .id(look)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { visible = true }
         .onDisappear { visible = false }
         .accessibilityElement(children: .ignore)
@@ -83,6 +84,7 @@ private struct CharacterStage: View {
             scene.heading = heading
             scene.calm = calm
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
     }
 }

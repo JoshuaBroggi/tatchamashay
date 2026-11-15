@@ -134,6 +134,26 @@ struct CharacterMapTests {
         #expect(family.unfoundPlacements.isEmpty)
     }
 
+    @Test("Ordinary profile edits preserve the selected character, including a stale reference")
+    func profileEdits() async throws {
+        let f = Fixture()
+        let store = try await f.makeStore()
+        let (result, _) = try await store.recordCharacterFind(child: f.child.id, placement: f.placement.id,
+                                                             run: UUID(), method: .dig, at: .now)
+        var edited = f.child // A profile sheet opened before the find has no character reference.
+        edited.pirateName = "Captain Pearl"
+        let saved = try await store.saveChild(edited)
+        #expect(saved.child(f.child.id)?.activeCollectionID == result.record.id)
+        var stale = saved
+        stale.children[0].activeCollectionID = UUID()
+        let recoveredStore = LocalFamilyStore(persistence: MemoryPersistence(stale))
+        let renamed = try await recoveredStore.saveChild(edited)
+        #expect(renamed.child(f.child.id)?.pirateName == "Captain Pearl")
+        #expect(renamed.collections == saved.collections)
+        let selected = try await recoveredStore.selectCharacter(child: f.child.id, collection: result.record.id)
+        #expect(selected.child(f.child.id)?.activeCollectionID == result.record.id)
+    }
+
     @MainActor
     @Test("Existing articulated assets have a working gait and reset cleanly")
     func articulatedMovement() async throws {
@@ -152,7 +172,7 @@ struct CharacterMapTests {
     @MainActor
     @Test("Requested skeletal characters move real joints without changing their idle resources")
     func skeletalMovement() async throws {
-        for model in [BuiltInModel.vineDog, .demogorgon] {
+        for model in [BuiltInModel.vineDog, .demogorgon, .demodog] {
             let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: .green, name: "Walker"))
             #expect(!loaded.isFallback)
             #expect(loaded.entry?.provenance?.sourceCommit == "2b397b3cad58d17722b5bd907433863b4881c9df")
@@ -222,5 +242,18 @@ struct CharacterMovementTests {
         #expect(movement.isUncertain)
         movement.update(nil, now: start.addingTimeInterval(20))
         #expect(movement.coordinate == lastKnown)
+    }
+
+    @Test("Late location samples never pull the character backwards")
+    func outOfOrderFix() {
+        var movement = CharacterMovement()
+        for second in [0.0, 2, 4] {
+            let sample = fix(second * 1.5, second)
+            movement.update(sample, now: sample.timestamp)
+        }
+        let position = movement.coordinate
+        movement.update(fix(1, 3), now: start.addingTimeInterval(4))
+        #expect(movement.coordinate == position)
+        #expect(movement.isWalking)
     }
 }
