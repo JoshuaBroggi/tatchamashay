@@ -193,54 +193,93 @@ struct WelcomeView: View {
     @State private var parentName = ""
     @State private var pirateName = ""
     @State private var saving = false
+    @FocusState private var focusedField: NameField?
+
+    private enum NameField: Hashable { case parent, pirate }
+
+    private var canSave: Bool {
+        !parentName.trimmed.isEmpty && !pirateName.trimmed.isEmpty && !saving
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Overline(text: "Tatchamashay")
-            Text("Ahoy! Let's set up your crew")
-                .font(Typeface.headline(40))
-                .foregroundStyle(Palette.textPrimary)
-            Text("For grown-ups. Everything stays on this phone. Your pirate has no account and no public name.")
-                .font(Typeface.body(14))
-                .foregroundStyle(Palette.textSecondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Overline(text: "Tatchamashay")
+                Text("Ahoy! Let's set up your crew")
+                    .font(Typeface.headline(40))
+                    .foregroundStyle(Palette.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("For grown-ups. Everything stays on this phone. Your pirate has no account and no public name.")
+                    .font(Typeface.body(14))
+                    .foregroundStyle(Palette.textSecondary)
 
-            field("Your name", text: $parentName, prompt: "Mom, Dad, Grandpa…")
-            field("Your pirate's name", text: $pirateName, prompt: "Captain Emmanuel")
-
-            if let error = app.real.errorMessage {
-                Text(error).foregroundStyle(Palette.textSecondary)
+                field("Your name", text: $parentName, prompt: "Mom, Dad, Grandpa…", focus: .parent)
+                field("Your pirate's name", text: $pirateName, prompt: "Captain Emmanuel", focus: .pirate)
             }
-            Spacer()
-            Button("Open the map") {
-                saving = true
-                Task {
-                    await app.real.createFamily(
-                        parentName: parentName.trimmed,
-                        pirateName: pirateName.trimmed
-                    )
-                    saving = false
-                }
-            }
-            .buttonStyle(GoldButtonStyle())
-            .accessibilityIdentifier("startAdventure")
-            .disabled(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty || saving)
-            .opacity(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty ? 0.5 : 1)
+            .disabled(saving)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 24)
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 10) {
+                if let error = app.real.errorMessage {
+                    Text(error)
+                        .font(Typeface.body(14))
+                        .foregroundStyle(Palette.invented)
+                        .accessibilityIdentifier("crewSaveError")
+                }
+                Text(canSave || saving ? "Both names save on this iPhone." : "Enter both names to continue.")
+                    .font(Typeface.body(14))
+                    .foregroundStyle(Palette.textSecondary)
+                Button(action: saveCrew) {
+                    Text(saving ? "Saving crew…" : "Open the map")
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(GoldButtonStyle())
+                .accessibilityIdentifier("startAdventure")
+                .disabled(!canSave)
+                .opacity(canSave || saving ? 1 : 0.5)
+            }
+            .padding(16)
+            .background(Palette.ground1)
+        }
         .background(Palette.ground1.ignoresSafeArea())
     }
 
-    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
+    private func field(_ label: String, text: Binding<String>, prompt: String, focus: NameField) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(Typeface.label()).foregroundStyle(Palette.textSecondary)
             TextField("", text: text, prompt: Text(prompt).foregroundStyle(Palette.textMuted))
+                .textContentType(.nickname)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(focus == .parent ? .next : .done)
+                .focused($focusedField, equals: focus)
+                .onSubmit {
+                    if focus == .parent { focusedField = .pirate }
+                    else if parentName.trimmed.isEmpty { focusedField = .parent }
+                    else { saveCrew() }
+                }
+                .accessibilityLabel(label)
+                .accessibilityIdentifier(focus == .parent ? "crewParentName" : "crewPirateName")
                 .font(Typeface.body(16))
                 .padding(.horizontal, 12)
                 .frame(height: 48)
                 .background(Palette.ground2)
                 .overlay(Rectangle().stroke(Palette.borderStrong, lineWidth: 1))
                 .foregroundStyle(Palette.textPrimary)
+        }
+    }
+
+    private func saveCrew() {
+        guard canSave else { return }
+        focusedField = nil
+        saving = true
+        Task {
+            await app.real.createFamily(parentName: parentName.trimmed, pirateName: pirateName.trimmed)
+            saving = false
         }
     }
 }

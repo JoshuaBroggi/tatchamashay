@@ -39,6 +39,10 @@ enum AssetReadiness {
         }
         for look in looks where checkedModels.insert(look.model).inserted {
             if Task.isCancelled { return [] }
+            if !BuiltInModel.allCases.contains(look.model) {
+                problems.append("A saved beast uses a model from another version. A simple shape will appear; its saved look is kept.")
+                continue
+            }
             if await !loaders.modelLoads(look.model) {
                 problems.append("\(look.model.displayName) couldn't open. A simple shape will appear instead. Try reinstalling the app to restore it.")
             }

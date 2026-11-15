@@ -107,7 +107,7 @@ enum ParentTestJourney {
     }
 
     static func reviewSpot(in app: XCUIApplication) {
-        let map = app.maps.firstMatch
+        let map = app.otherElements["spotMap"]
         XCTAssertTrue(map.waitForExistence(timeout: 5))
         let hint = app.staticTexts["Zoom in until you can see paths, roads and water."]
         sleep(2)

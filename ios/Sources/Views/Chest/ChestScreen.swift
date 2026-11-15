@@ -94,7 +94,7 @@ struct ChestTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ZStack(alignment: .topTrailing) {
-                RadialGradient(colors: [Color(item.look.color).opacity(0.5), .clear],
+                RadialGradient(colors: [Color(item.look.primaryPaintColor).opacity(0.5), .clear],
                                center: .center, startRadius: 0, endRadius: 45)
                 thumbnail.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if item.stickers > 0 {
@@ -124,7 +124,7 @@ struct ChestTile: View {
         } else {
             Image(systemName: item.look.model.symbol)
                 .font(.system(size: 32))
-                .foregroundStyle(Color(item.look.color))
+                .foregroundStyle(Color(item.look.primaryPaintColor))
         }
     }
 }

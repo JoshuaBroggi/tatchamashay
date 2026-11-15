@@ -16,7 +16,6 @@ review or complete device QA before shipping.
 If an actual push, merge, signing, installation, or launch failure prevents completion, resolve it when
 possible and report the exact remaining blocker promptly. Never claim delivery without observing it.
 
-
 The iPhone app is the sole supported game. Start with `ios/AGENTS.md`, then `ios/PLAN.md`.
 All gameplay, character, treasure, collection and asset work belongs in `ios/`.
 

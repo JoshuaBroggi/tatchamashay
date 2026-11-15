@@ -8,7 +8,6 @@ Joshua's connected physical iPhone. Push, merge, and phone deployment have stand
 Test in the live installed app without adding approval, staging, or pre-release device-QA gates.
 Preserve the phone's saved family and collections; never launch with reset or test-fixture arguments.
 
-
 SwiftUI iPhone app (iOS 18+, MapKit, RealityKit): a private family treasure map. Read `PLAN.md` for
 current product rules. This is the sole supported game; `archive/browser/` is retired reference
 source. The app has no live multiplayer backend.
@@ -50,7 +49,7 @@ xcrun simctl location <udid> set 37.7694,-122.4862
 ```
 
 The simulator stops reporting unchanged location after about ten seconds; nudge the location for a
-fresh fix. Check reveals and location behavior on a real phone before shipping.
+fresh fix. Check reveals and location behavior in the live app after immediate phone installation.
 
 ## Layout
 
