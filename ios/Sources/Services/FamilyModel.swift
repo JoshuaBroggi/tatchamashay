@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// The app's view of one family's records, kept current after every write.
+/// The app's view of one family's records, kept current after every successful write.
 @MainActor
 @Observable
 final class FamilyModel {
@@ -10,20 +10,13 @@ final class FamilyModel {
     private(set) var isLoaded = false
     var errorMessage: String?
 
-    /// The run in progress for the current adventure. A new run is a replay.
-    private(set) var currentRun: HuntRun?
-
     private let store: any FamilyStore
-    private let runDefaultsKey: String?
     private let playingDefaultsKey: String?
-
-    /// The child profile playing now, when the family has more than one. Nil means the first.
     private(set) var playingChildID: ChildProfile.ID?
 
     init(store: any FamilyStore, isDemo: Bool = false) {
         self.store = store
         self.isDemo = isDemo
-        runDefaultsKey = isDemo ? nil : "currentHuntRun"
         playingDefaultsKey = isDemo ? nil : "playingChild"
         if let playingDefaultsKey, let saved = UserDefaults.standard.string(forKey: playingDefaultsKey) {
             playingChildID = UUID(uuidString: saved)
@@ -31,36 +24,53 @@ final class FamilyModel {
     }
 
     var parent: ParentAccount? { data.parent }
-    /// The child playing: the one the grown-up picked, or the first profile.
-    var child: ChildProfile? {
-        playingChildID.flatMap { data.child($0) } ?? data.children.first
-    }
+    /// A parent can select a child profile in settings. Parents never become players.
+    var child: ChildProfile? { playingChildID.flatMap { data.child($0) } ?? data.children.first }
     var children: [ChildProfile] { data.children }
-    /// What the child calls the grown-up, for the guide's `{grown_up}`.
     var grownUpName: String? { parent?.grownUpName }
-    /// Milestone 1 plays the newest adventure.
-    var adventure: Adventure? { data.adventures.max { $0.createdAt < $1.createdAt } }
 
-    var adventurePlacements: [ChestPlacement] {
-        adventure?.placementIDs.compactMap { data.placement($0) } ?? []
+    /// Every valid saved placement across all old adventure groups. No story or order unlocks it.
+    var mapPlacements: [ChestPlacement] {
+        guard let parent else { return [] }
+        return data.placements.filter { placement in
+            guard placement.familyID == parent.id, placement.placedBy == parent.id,
+                  placement.reviewedAt <= Date.now,
+                  placement.spot.latitude.isFinite, placement.spot.longitude.isFinite,
+                  (-90...90).contains(placement.spot.latitude), (-180...180).contains(placement.spot.longitude),
+                  let adventure = data.adventure(placement.adventureID), adventure.familyID == parent.id,
+                  adventure.placementIDs.contains(placement.id),
+                  let design = data.design(placement.designID), design.familyID == parent.id,
+                  design.deletedAt == nil, let version = design.version(placement.versionID),
+                  version.designID == design.id else { return false }
+            return true
+        }
     }
 
-    var chest: [CollectionRecord] {
-        child.map { data.chest(for: $0.id) } ?? []
+    var unfoundPlacements: [ChestPlacement] { mapPlacements.filter { !hasCollected($0) } }
+    var parentDesigns: [TreasureDesign] {
+        data.designs.filter { $0.familyID == parent?.id && $0.deletedAt == nil }
+            .sorted { $0.current.createdAt > $1.current.createdAt }
     }
+    var chest: [CollectionRecord] { child.map { data.chest(for: $0.id) } ?? [] }
+
+    func hasCollected(_ placement: ChestPlacement) -> Bool {
+        guard let child else { return false }
+        return data.collection(.init(childID: child.id, placementID: placement.id)) != nil
+    }
+
+    func design(for placement: ChestPlacement) -> TreasureDesign? { data.design(placement.designID) }
 
     func load() async {
         do {
             data = try await store.load()
-            currentRun = restoredRun()
-            isLoaded = true
+            errorMessage = nil
         } catch {
             errorMessage = "Couldn't open the treasure log."
-            isLoaded = true
         }
+        isLoaded = true
     }
 
-    // MARK: Setup
+    // MARK: Parent settings
 
     func createFamily(parentName: String, pirateName: String) async {
         let parent = ParentAccount(displayName: parentName)
@@ -74,7 +84,6 @@ final class FamilyModel {
         await write { try await $0.saveChild(child) }
     }
 
-    /// Sets what the child calls the grown-up. Empty goes back to the grown-up's own name.
     func setGrownUpName(_ name: String) async {
         guard var parent else { return }
         parent.childCallsMe = name.isEmpty ? nil : name
@@ -86,153 +95,83 @@ final class FamilyModel {
         await write { try await $0.saveChild(ChildProfile(parentID: parent.id, pirateName: pirateName, avatar: avatar)) }
     }
 
-    func saveChild(_ child: ChildProfile) async {
-        await write { try await $0.saveChild(child) }
-    }
+    func saveChild(_ child: ChildProfile) async { await write { try await $0.saveChild(child) } }
 
-    /// Removes a profile and its chest. The last profile stays.
     func removeChild(_ child: ChildProfile) async {
-        await write { try await $0.removeChild(child.id) }
+        guard await tryWrite({ try await $0.removeChild(child.id) }) else { return }
         if playingChildID == child.id { choosePlayingChild(nil) }
     }
 
-    /// Picks who plays. A different child starts their own run.
     func choosePlayingChild(_ id: ChildProfile.ID?) {
+        if let id, data.child(id) == nil { return }
         playingChildID = id
         guard let playingDefaultsKey else { return }
         if let id { UserDefaults.standard.set(id.uuidString, forKey: playingDefaultsKey) }
         else { UserDefaults.standard.removeObject(forKey: playingDefaultsKey) }
     }
 
-    // MARK: Parent: setting up a hunt
+    // MARK: Parent creation
 
-    /// Saves a new hunt in one go; it becomes the adventure the hunt plays. Returns whether it saved.
-    @discardableResult
-    func saveHuntSetup(_ adventure: Adventure, designs: [TreasureDesign], placements: [ChestPlacement]) async -> Bool {
-        await write { try await $0.saveHuntSetup(adventure, designs: designs, placements: placements) }
-        return errorMessage == nil && data.adventure(adventure.id) != nil
+    /// New designs are parent-made; edits preserve legacy child provenance and saved chest copies.
+    func saveParentDesign(_ look: TreasureLook, editing designID: TreasureDesign.ID? = nil) async -> TreasureDesign? {
+        guard let design = parentDesign(look, editing: designID) else { return nil }
+        guard await tryWrite({ try await $0.saveDesign(design) }) else { return nil }
+        return data.design(design.id)
     }
 
-    // MARK: Parent: hiding treasure
-
-    /// Hides one built-in treasure on a spot the parent reviewed on the map.
-    func hideTreasure(_ look: TreasureLook, at spot: Coordinate, hint: String, reviewedAt: Date) async {
-        guard let parent else { return }
-        var adventure = self.adventure ?? Adventure(
-            familyID: parent.id, title: "Today's Hunt", goal: "Find the lost treasure!"
-        )
-        if data.adventure(adventure.id) == nil {
-            await write { try await $0.saveAdventure(adventure) }
-            adventure = data.adventure(adventure.id) ?? adventure
-        }
-        let design = TreasureDesign(familyID: parent.id, maker: .parent(parent.id), look: look)
-        let placement = ChestPlacement(
+    /// Creates or edits a beast and places it in one atomic write. An edited placed design keeps
+    /// its placement ID, so a child's already-collected treasure never becomes unfound again.
+    @discardableResult
+    func hideTreasure(_ look: TreasureLook, at spot: Coordinate, hint: String, reviewedAt: Date,
+                      editing designID: TreasureDesign.ID? = nil) async -> Bool {
+        guard let parent, let design = parentDesign(look, editing: designID) else { return false }
+        let existing = mapPlacements.first { $0.designID == design.id }
+        let adventure = existing.flatMap { data.adventure($0.adventureID) }
+            ?? Adventure(familyID: parent.id, title: "Treasures", goal: "")
+        var placement = existing ?? ChestPlacement(
             familyID: parent.id, adventureID: adventure.id, designID: design.id,
             versionID: design.current.id, spot: spot, hint: hint, placedBy: parent.id, reviewedAt: reviewedAt
         )
-        await write { try await $0.saveDesign(design) }
-        await write { try await $0.place(placement) }
+        placement.versionID = design.current.id
+        placement.spot = spot
+        placement.hint = hint.trimmingCharacters(in: .whitespacesAndNewlines)
+        placement.reviewedAt = reviewedAt
+        placement.syncState = .waitingToSync
+        return await tryWrite { try await $0.saveParentTreasure(design, adventure: adventure, placement: placement) }
     }
 
     func removePlacement(_ placement: ChestPlacement) async {
         await write { try await $0.removePlacement(placement.id) }
     }
 
-    func design(for placement: ChestPlacement) -> TreasureDesign? { data.design(placement.designID) }
-
-    // MARK: Child: inventing and hiding a treasure for the grown-up
-
-    /// Treasures the child invented, newest first.
-    var inventions: [TreasureDesign] {
-        guard let child else { return [] }
-        return data.designs
-            .filter { $0.maker == .child(child.id) && $0.deletedAt == nil }
-            .sorted { $0.current.createdAt > $1.current.createdAt }
-    }
-
-    /// Saves the child's invention: a new design, or a new version of `editing`. Old versions never
-    /// change, so treasures already found keep their look. Returns the saved design, or nil if the
-    /// save failed.
-    func saveInvention(_ look: TreasureLook, editing designID: TreasureDesign.ID? = nil) async -> TreasureDesign? {
-        guard let parent, let child else { return nil }
-        var design: TreasureDesign
-        if let designID, var existing = data.design(designID) {
-            existing.edit(to: look)
-            design = existing
-        } else {
-            design = TreasureDesign(familyID: parent.id, maker: .child(child.id), look: look)
+    private func parentDesign(_ look: TreasureLook, editing designID: TreasureDesign.ID?) -> TreasureDesign? {
+        guard let parent, !look.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Give your beast a name."
+            return nil
         }
-        let saved = await tryWrite { try await $0.saveDesign(design) }
-        guard saved else { return nil }
-        design = data.design(design.id) ?? design
-        return design
-    }
-
-    /// Hides one version of the child's invention as a new one-treasure adventure for the grown-up,
-    /// on a spot the parent reviewed on the map. Returns whether it was saved.
-    func hideForGrownUp(design designID: TreasureDesign.ID, version versionID: TreasureVersion.ID,
-                        at spot: Coordinate, hint: String, reviewedAt: Date, guideID: String? = nil) async -> Bool {
-        guard let parent, let child, let look = data.design(designID)?.version(versionID)?.look else { return false }
-        let adventure = Adventure(
-            familyID: parent.id, title: "\(child.pirateName)'s treasure", goal: "Find \(look.name)!",
-            finale: "You found it!", guideID: guideID, hiddenBy: child.id
-        )
-        let placement = ChestPlacement(
-            familyID: parent.id, adventureID: adventure.id, designID: designID, versionID: versionID,
-            spot: spot, hint: hint, placedBy: parent.id, reviewedAt: reviewedAt
-        )
-        return await tryWrite { try await $0.saveAdventure(adventure, placing: placement) }
-    }
-
-    /// The child who hid an adventure's treasure for the grown-up, if a child did.
-    func hiddenBy(_ adventure: Adventure) -> ChildProfile? { adventure.hiddenBy.flatMap { data.child($0) } }
-
-    // MARK: The hunt
-
-    func startRunIfNeeded() {
-        guard let adventure, let child else { return }
-        if let currentRun, currentRun.adventureID == adventure.id, currentRun.childID == child.id { return }
-        startNewRun()
-    }
-
-    /// Replays the adventure. Treasures already in the chest earn a "found it again" sticker instead.
-    func startNewRun() {
-        guard let adventure, let child else { return }
-        let run = HuntRun(adventureID: adventure.id, childID: child.id)
-        currentRun = run
-        if let runDefaultsKey, let encoded = try? JSONEncoder().encode(run) {
-            UserDefaults.standard.set(encoded, forKey: runDefaultsKey)
+        if let designID {
+            guard var design = data.design(designID), design.familyID == parent.id, design.deletedAt == nil else {
+                errorMessage = "Couldn't find that beast."
+                return nil
+            }
+            if design.current.look != look { design.edit(to: look) }
+            return design
         }
+        return TreasureDesign(familyID: parent.id, maker: .parent(parent.id), look: look)
     }
 
-    func isFoundThisRun(_ placement: ChestPlacement) -> Bool {
-        guard let child, let run = currentRun,
-              let record = data.collection(.init(childID: child.id, placementID: placement.id)) else { return false }
-        return record.firstRunID == run.id || record.foundAgainRunIDs.contains(run.id)
-    }
+    // MARK: Collection
 
-    /// Where this run stands: found so far, the next treasure, and whether it's time for the finale.
-    var progress: HuntProgress {
-        guard let adventure, let child, let run = currentRun else {
-            return HuntProgress(order: adventurePlacements.map(\.id), foundThisRun: [])
-        }
-        return data.progress(of: adventure, child: child.id, run: run.id)
-    }
-
-    /// The next treasure to look for in this run.
-    var nextPlacement: ChestPlacement? {
-        progress.next.flatMap { data.placement($0) }
-    }
-
-    var isRunComplete: Bool { progress.isComplete }
-
-    /// Puts the treasure in the child's chest. Safe to call any number of times for the same run.
+    /// Collects any selected placement, including one from an older adventure. Finds remain counted
+    /// across restarts and legacy run IDs. A failed write changes neither the map nor the chest.
     func recordFind(_ placement: ChestPlacement, method: FindMethod) async -> CollectResult? {
-        startRunIfNeeded()
-        guard let child, let run = currentRun else { return nil }
+        guard let child, mapPlacements.contains(where: { $0.id == placement.id }) else {
+            errorMessage = "That treasure is no longer available."
+            return nil
+        }
         do {
             let (result, updated) = try await store.recordFind(
-                child: child.id, placement: placement.id, run: run.id, method: method, at: .now
+                child: child.id, placement: placement.id, run: UUID(), method: method, at: .now
             )
             data = updated
             errorMessage = nil
@@ -242,8 +181,6 @@ final class FamilyModel {
             return nil
         }
     }
-
-    // MARK: Helpers
 
     private func write(_ change: (any FamilyStore) async throws -> FamilyData) async {
         do {
@@ -257,11 +194,6 @@ final class FamilyModel {
     private func tryWrite(_ change: (any FamilyStore) async throws -> FamilyData) async -> Bool {
         await write(change)
         return errorMessage == nil
-    }
-
-    private func restoredRun() -> HuntRun? {
-        guard let runDefaultsKey, let saved = UserDefaults.standard.data(forKey: runDefaultsKey) else { return nil }
-        return try? JSONDecoder().decode(HuntRun.self, from: saved)
     }
 }
 
@@ -292,7 +224,6 @@ enum DemoFamily {
         data.adventures = [adventure]
         let model = FamilyModel(store: LocalFamilyStore(persistence: MemoryPersistence(data)), isDemo: true)
         await model.load()
-        model.startNewRun()
         return model
     }
 }

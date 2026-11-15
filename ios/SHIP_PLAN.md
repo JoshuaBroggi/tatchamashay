@@ -1,3 +1,5 @@
+> Product update: `PLAN.md` now specifies child-only play, parent-only creation and an unordered map of all unfound treasure. Historical story, child-creation and replay milestones below are superseded by that plan.
+
 # Tatchamashay 2.0 — Road to the iPhone
 
 How we get from "works in the simulator" to a production-quality app in the family's hands.

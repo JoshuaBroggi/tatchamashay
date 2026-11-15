@@ -93,7 +93,6 @@ struct ChestRevealTests {
     func noDoubleAdd() async throws {
         let model = FamilyModel(store: try await f.makeStore())
         await model.load()
-        model.startNewRun()
         let first = await model.recordFind(f.placement, method: .dig)
         let second = await model.recordFind(f.placement, method: .dig)
         #expect(first?.record.id == second?.record.id)
@@ -128,17 +127,13 @@ struct ChestShelfTests {
         #expect(shelf.title == "1 treasure")
     }
 
-    @Test("Counts found-again stickers from replays, never extra treasures")
-    func stickers() async throws {
-        let store = try await f.makeStore()
-        _ = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: UUID(), method: .dig, at: .now)
-        _ = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: UUID(), method: .dig, at: .now)
-        let (_, data) = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: UUID(),
-                                                   method: .parentConfirmed, at: .now)
-        let shelf = ChestShelf(records: data.chest(for: f.child.id))
+    @Test("Legacy replay stickers remain visible in saved collections")
+    func stickers() {
+        var legacy = record(name: "Legacy", at: .now)
+        legacy.foundAgainRunIDs = [UUID(), UUID()]
+        let shelf = ChestShelf(records: [legacy])
         #expect(shelf.treasureCount == 1)
         #expect(shelf.stickerCount == 2)
-        #expect(shelf.items.first?.stickers == 2)
         #expect(shelf.stickerLine == "2 found-again stickers")
         #expect(ChestShelf(records: []).stickerLine == nil)
         #expect(ChestShelf(records: []).title == "0 treasures")

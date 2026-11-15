@@ -11,10 +11,6 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     CODE_SIGNING_ALLOWED: NO
-packages:
-  Yams:
-    url: https://github.com/jpsim/Yams
-    from: 6.2.0
 targets:
   Tatchamashay:
     type: application
@@ -33,11 +29,6 @@ targets:
       - path: Assets/Thumbnails
         type: folder
         buildPhase: resources
-      - path: Content/Stories
-        type: folder
-        buildPhase: resources
-    dependencies:
-      - package: Yams
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.app

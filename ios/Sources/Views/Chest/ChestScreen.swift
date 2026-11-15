@@ -44,7 +44,7 @@ struct ChestScreen: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header(shelf)
                     if shelf.items.isEmpty {
-                        Text("Your chest is empty. Follow the X on the map to find your first treasure!")
+                        Text("Your chest is empty. Choose an X on the map to find your first treasure!")
                             .font(Typeface.body(15))
                             .foregroundStyle(Palette.textSecondary)
                             .padding(.top, 40)
@@ -163,11 +163,6 @@ struct ChestDetailView: View {
                 Text(record.savedCopy.name)
                     .font(Typeface.headline(36))
                     .textCase(.uppercase)
-                if !record.savedCopy.story.isEmpty {
-                    Text(record.savedCopy.story)
-                        .font(Typeface.body(16))
-                        .foregroundStyle(Palette.textSecondary)
-                }
                 Text("Found \(record.foundAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(Typeface.body(13))
                     .foregroundStyle(Palette.textMuted)

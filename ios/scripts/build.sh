@@ -9,6 +9,7 @@ case "$DEVICE" in
   *-*-*-*-*) DEST="platform=iOS Simulator,id=$DEVICE" ;;
   *) DEST="platform=iOS Simulator,name=$DEVICE" ;;
 esac
+mkdir -p build
 xcodegen generate --quiet
 xcodebuild -project Tatchamashay.xcodeproj -scheme Tatchamashay -destination "$DEST" \
   -derivedDataPath build "$ACTION" 2>&1 | tee build/last-$ACTION.log \
