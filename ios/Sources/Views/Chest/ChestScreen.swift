@@ -149,6 +149,11 @@ struct StickerBadge: View {
 
 struct ChestDetailView: View {
     let record: CollectionRecord
+    @Environment(FamilyModel.self) private var family
+    @Environment(AppModel.self) private var app
+    @Environment(MapExperienceSettings.self) private var mapExperience
+    @State private var selecting = false
+    @State private var transformation: CharacterChange?
 
     var body: some View {
         ScrollView {
@@ -166,6 +171,22 @@ struct ChestDetailView: View {
                 Text("Found \(record.foundAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(Typeface.body(13))
                     .foregroundStyle(Palette.textMuted)
+                if mapExperience.enabled {
+                    if family.activeCharacter?.id == record.id {
+                        Label("Playing as \(record.savedCopy.name)", systemImage: "checkmark.circle.fill")
+                            .font(Typeface.body(17, weight: .semibold))
+                            .foregroundStyle(Palette.gold)
+                            .accessibilityIdentifier("activeCharacter")
+                    } else {
+                        Button("Be this character", action: selectCharacter)
+                            .buttonStyle(GoldButtonStyle())
+                            .disabled(selecting)
+                            .accessibilityIdentifier("beThisCharacter")
+                    }
+                    if let error = family.errorMessage {
+                        Text(error).font(Typeface.body(15)).foregroundStyle(Palette.invented)
+                    }
+                }
                 if record.foundAgainCount > 0 {
                     Label("Found again \(record.foundAgainCount) more \(record.foundAgainCount == 1 ? "time" : "times")",
                           systemImage: "star.circle.fill")
@@ -178,6 +199,27 @@ struct ChestDetailView: View {
         }
         .foregroundStyle(Palette.textPrimary)
         .background(Palette.ground1.ignoresSafeArea())
+        .fullScreenCover(item: $transformation) { change in
+            CharacterTransformationView(previous: change.previous, character: change.character) {
+                transformation = nil
+                app.selectedTab = .map
+            }
+        }
+        .onChange(of: family.child?.id) { transformation = nil }
+        .onChange(of: mapExperience.enabled) { if !mapExperience.enabled { transformation = nil } }
+    }
+
+    private func selectCharacter() {
+        guard mapExperience.enabled, !selecting, let childID = family.child?.id else { return }
+        selecting = true
+        let previous = family.activeCharacter?.savedCopy
+        Task {
+            let saved = await family.selectCharacter(record)
+            if saved, mapExperience.enabled, family.child?.id == childID {
+                transformation = CharacterChange(childID: childID, previous: previous, character: record.savedCopy)
+            }
+            selecting = false
+        }
     }
 }
 

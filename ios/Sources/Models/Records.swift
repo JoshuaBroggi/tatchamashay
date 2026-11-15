@@ -40,6 +40,8 @@ struct ChildProfile: Identifiable, Codable, Hashable, Sendable {
     var parentID: ParentAccount.ID
     var pirateName: String
     var avatar: PirateAvatar = .parrot
+    /// Optional exploration character. Old family files decode this as nil.
+    var activeCollectionID: CollectionRecord.ID?
     var syncState: SyncState = .waitingToSync
 }
 

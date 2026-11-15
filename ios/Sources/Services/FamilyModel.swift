@@ -53,6 +53,18 @@ final class FamilyModel {
     }
     var chest: [CollectionRecord] { child.map { data.chest(for: $0.id) } ?? [] }
 
+    var activeCharacter: CollectionRecord? {
+        guard let child, let id = child.activeCollectionID, let parent else { return nil }
+        return chest.first { $0.id == id && $0.familyID == parent.id }
+    }
+
+    @discardableResult
+    func selectCharacter(_ record: CollectionRecord) async -> Bool {
+        guard let child, let parent, record.childID == child.id, record.familyID == parent.id else { return false }
+        if activeCharacter?.id == record.id { return true }
+        return await tryWrite { try await $0.selectCharacter(child: child.id, collection: record.id) }
+    }
+
     func hasCollected(_ placement: ChestPlacement) -> Bool {
         guard let child else { return false }
         return data.collection(.init(childID: child.id, placementID: placement.id)) != nil
@@ -164,15 +176,21 @@ final class FamilyModel {
 
     /// Collects any selected placement, including one from an older adventure. Finds remain counted
     /// across restarts and legacy run IDs. A failed write changes neither the map nor the chest.
-    func recordFind(_ placement: ChestPlacement, method: FindMethod) async -> CollectResult? {
+    func recordFind(_ placement: ChestPlacement, method: FindMethod, equipCharacter: Bool = false) async -> CollectResult? {
         guard let child, mapPlacements.contains(where: { $0.id == placement.id }) else {
             errorMessage = "That treasure is no longer available."
             return nil
         }
         do {
-            let (result, updated) = try await store.recordFind(
-                child: child.id, placement: placement.id, run: UUID(), method: method, at: .now
-            )
+            let result: CollectResult
+            let updated: FamilyData
+            if equipCharacter {
+                (result, updated) = try await store.recordCharacterFind(
+                    child: child.id, placement: placement.id, run: UUID(), method: method, at: .now)
+            } else {
+                (result, updated) = try await store.recordFind(
+                    child: child.id, placement: placement.id, run: UUID(), method: method, at: .now)
+            }
             data = updated
             errorMessage = nil
             return result

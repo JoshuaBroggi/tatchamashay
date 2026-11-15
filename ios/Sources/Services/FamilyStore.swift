@@ -104,6 +104,10 @@ protocol FamilyStore: Sendable {
     /// Safe to repeat across restarts and legacy runs: one find per child per placement.
     func recordFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
                     method: FindMethod, at date: Date) async throws -> (CollectResult, FamilyData)
+    func selectCharacter(child: ChildProfile.ID, collection: CollectionRecord.ID) async throws -> FamilyData
+    /// Opt-in collection and character selection in one write. Regular finds keep their old behavior.
+    func recordCharacterFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
+                             method: FindMethod, at date: Date) async throws -> (CollectResult, FamilyData)
 }
 
 // MARK: - The rules, shared by every store
@@ -127,7 +131,23 @@ extension FamilyData {
 
     mutating func saveChild(_ child: ChildProfile) throws {
         try requireFamily(child.parentID)
+        if let collectionID = child.activeCollectionID {
+            try validateCharacter(child: child.id, collection: collectionID)
+        }
         upsert(child, in: &children)
+    }
+
+    private func validateCharacter(child childID: ChildProfile.ID, collection collectionID: CollectionRecord.ID) throws {
+        let parent = try requireParent()
+        guard child(childID)?.parentID == parent.id else { throw FamilyStoreError.unknownChild }
+        guard let record = collections.first(where: { $0.id == collectionID }) else { throw FamilyStoreError.unknownTreasure }
+        guard record.familyID == parent.id, record.childID == childID else { throw FamilyStoreError.notInFamily }
+    }
+
+    mutating func selectCharacter(child childID: ChildProfile.ID, collection collectionID: CollectionRecord.ID) throws {
+        try validateCharacter(child: childID, collection: collectionID)
+        guard let index = children.firstIndex(where: { $0.id == childID }) else { throw FamilyStoreError.unknownChild }
+        children[index].activeCollectionID = collectionID
     }
 
     mutating func removeChild(_ id: ChildProfile.ID) throws {
@@ -376,9 +396,24 @@ actor LocalFamilyStore: FamilyStore {
 
     func recordFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
                     method: FindMethod, at date: Date) throws -> (CollectResult, FamilyData) {
+        try collect(child: child, placement: placement, run: run, method: method, at: date, equip: false)
+    }
+
+    func recordCharacterFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
+                             method: FindMethod, at date: Date) throws -> (CollectResult, FamilyData) {
+        try collect(child: child, placement: placement, run: run, method: method, at: date, equip: true)
+    }
+
+    func selectCharacter(child: ChildProfile.ID, collection: CollectionRecord.ID) throws -> FamilyData {
+        try change { try $0.selectCharacter(child: child, collection: collection) }
+    }
+
+    private func collect(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
+                         method: FindMethod, at date: Date, equip: Bool) throws -> (CollectResult, FamilyData) {
         var data = try load()
         let result = try data.recordFind(child: child, placement: placement, run: run, method: method, at: date, now: clock())
         if case .alreadyCounted = result { return (result, data) }
+        if equip { try data.selectCharacter(child: child, collection: result.record.id) }
         try persistence.write(data)
         cache = data
         return (result, data)

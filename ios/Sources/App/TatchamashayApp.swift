@@ -10,6 +10,7 @@ struct TatchamashayApp: App {
             RootView()
                 .environment(app)
                 .environment(app.settings)
+                .environment(app.mapExperience)
                 .environment(location)
                 .task {
                     location.start()
@@ -29,6 +30,7 @@ final class AppModel {
 
     /// Parent sound and motion controls, shared by every screen.
     let settings: PlaySettings
+    let mapExperience: MapExperienceSettings
     let sounds: any SoundEffects
     let catalog = TreasureCatalog.bundled
 
@@ -46,6 +48,13 @@ final class AppModel {
             HuntFixture.install(at: JSONFilePersistence.defaultURL)
         }
         #endif
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-resetFamily") || ProcessInfo.processInfo.arguments.contains("-huntFixture") {
+            UserDefaults.standard.removeObject(forKey: MapExperienceSettings.enabledKey)
+            UserDefaults.standard.removeObject(forKey: MapExperienceSettings.flatKey)
+        }
+        #endif
+        mapExperience = MapExperienceSettings()
         let store = LocalFamilyStore(persistence: JSONFilePersistence(url: JSONFilePersistence.defaultURL))
         real = FamilyModel(store: store)
         let settings = PlaySettings()
