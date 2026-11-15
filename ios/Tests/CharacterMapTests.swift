@@ -16,13 +16,13 @@ struct CharacterMapTests {
     }
 
     @MainActor
-    @Test("The existing map stays default and both optional choices survive relaunch")
+    @Test("3D starts enabled and later map choices survive relaunch")
     func preferences() {
         let name = "character-map-\(UUID())"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         let settings = MapExperienceSettings(defaults: defaults)
-        #expect(!settings.enabled && !settings.uses3D)
+        #expect(settings.enabled && settings.uses3D && !settings.useFlatMap)
         settings.enabled = true
         #expect(settings.uses3D)
         settings.useFlatMap = true
@@ -30,7 +30,23 @@ struct CharacterMapTests {
         #expect(reopened.enabled && reopened.useFlatMap && !reopened.uses3D)
         reopened.enabled = false
         #expect(!MapExperienceSettings(defaults: defaults).enabled)
-        #expect(!MapExperienceSettings(defaults: nil).enabled)
+        #expect(MapExperienceSettings(defaults: nil).uses3D)
+    }
+
+    @MainActor
+    @Test("Earlier opt-in preferences migrate to 3D once")
+    func upgradesEarlierDefault() {
+        let name = "character-upgrade-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: MapExperienceSettings.enabledKey)
+        defaults.set(true, forKey: MapExperienceSettings.flatKey)
+        let upgraded = MapExperienceSettings(defaults: defaults)
+        #expect(upgraded.uses3D)
+        upgraded.useFlatMap = true
+        #expect(MapExperienceSettings(defaults: defaults).useFlatMap)
+        upgraded.enabled = false
+        #expect(!MapExperienceSettings(defaults: defaults).enabled)
     }
 
     @Test("Regular finds do not change the optional character")

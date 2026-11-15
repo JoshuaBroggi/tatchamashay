@@ -1,6 +1,6 @@
 # Character movement on the optional map
 
-The Map settings switch **Show 3D** enables character exploration. It starts off. **Use 2D map**
+The Map settings switch **Show 3D** enables character exploration. It starts on, including a one-time upgrade from the earlier opt-in default. **Use 2D map**
 keeps the character on a flat map. Existing treasure and collection behavior remains the default.
 
 The active character is loaded through `TreasureEntities` from a collection's immutable saved look.

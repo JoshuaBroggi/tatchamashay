@@ -46,7 +46,7 @@ controls and explain any missing models or sounds; playable fallbacks remain ava
 
 ### Optional character exploration
 
-Map settings includes **Show 3D**, initially off. Enabling it adds a tilted street map and the child's
+Map settings includes **Show 3D**, initially on. Enabling it adds a tilted street map and the child's
 selected discovered character. **Use 2D map** retains character exploration on a flat map. Turning
 the mode off restores the regular map and existing chest flow. Treasure selection, placement, GPS
 eligibility and collection rules stay the same in either mode.
