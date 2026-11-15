@@ -40,12 +40,14 @@ final class ParentSetupUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["hideTreasure"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Ready to find"].exists)
+        XCTAssertTrue(app.staticTexts["Sleepy Sprout"].firstMatch.exists)
         XCTAssertFalse(app.buttons["getReady"].exists)
         XCTAssertFalse(app.buttons["setupHunt"].exists)
         app.buttons["parentDone"].tap()
         XCTAssertTrue(app.buttons["chooseTreasure"].waitForExistence(timeout: 5))
         app.buttons["chooseTreasure"].tap()
-        XCTAssertTrue(app.buttons["Choose Sleepy Sprout"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Choose Hidden treasure 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Choose Sleepy Sprout"].exists)
     }
 
     @MainActor
