@@ -126,6 +126,11 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case potion
     case dragonEgg = "dragon-egg"
     case turtle, doubloon
+    /// Saved by an earlier phone build; retain its identity even without its bundled model.
+    case vineDog = "vine-dog"
+
+    static let allCases: [BuiltInModel] = [.octopus, .clam, .parrot, .crown, .starCompass,
+                                           .potion, .dragonEgg, .turtle, .doubloon]
 
     var id: String { rawValue }
 
@@ -159,6 +164,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "Dragon Egg"
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
+        case .vineDog: "Vine dog"
         }
     }
 
@@ -174,6 +180,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "dragon egg"
         case .turtle: "turtle"
         case .doubloon: "coin"
+        case .vineDog: "dog"
         }
     }
 
@@ -189,6 +196,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "oval.portrait.fill"
         case .turtle: "tortoise.fill"
         case .doubloon: "circle.circle.fill"
+        case .vineDog: "dog.fill"
         }
     }
 
@@ -201,7 +209,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .crown, .doubloon: .gold
         case .starCompass: .yellow
         case .potion: .purple
-        case .dragonEgg: .moss
+        case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
         }
     }
