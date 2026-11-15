@@ -1,0 +1,27 @@
+{
+  "requestedName": "Mulligan",
+  "requestDate": "2026-11-15",
+  "request": "Mulligan - use standard idle looping and all motions",
+  "references": [
+    {
+      "filename": "Screenshot 2026-11-15 at 9.45.06 AM.png",
+      "sha256": "5ffb4125cccda4921f0f81c60063f6fb8c98258582799bc6a050b0676c6ca103"
+    },
+    {
+      "filename": "Screenshot 2026-11-15 at 9.45.47 AM.png",
+      "sha256": "7ac2b796e4fff9920e46714fdb6768d7a7d4668777529b668b5815949d31de08"
+    },
+    {
+      "filename": "Screenshot 2026-11-15 at 9.45.58 AM.png",
+      "sha256": "ee3a5819d76ab173a7de846d611beda5bed501460e3aa7eaceb3e84665d4bfae"
+    }
+  ],
+  "referenceCredits": "Three toy photographs supplied by Joshua Broggi. Original photographer/manufacturer and source URLs were not supplied. No photo or character ownership or CC-BY license is asserted. Reference photographs are not bundled.",
+  "authoring": "New procedural Blender geometry and 30-joint weighted rig authored by Codex at Joshua Broggi’s request; not imported from a third-party model.",
+  "revision": {
+    "generatorVersion": 1,
+    "generatorSHA256": "00d3d85fcd9fa33a2aa056f56199cb0a44f8a9537769eaf096d056f2091a9ec1",
+    "blendSHA256": "e7d3399dde8209aebd647515b4cce9506f51c00542a5afc6a0ff20bdef9e4615"
+  },
+  "tool": "Blender 4.5.3 LTS (67807e1800cc)"
+}

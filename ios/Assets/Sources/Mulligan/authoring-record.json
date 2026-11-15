@@ -1,0 +1,19 @@
+{
+  "bones": 30,
+  "vertices": 6808,
+  "triangles": 12084,
+  "clip": "Idle",
+  "fps": 24,
+  "firstFrame": 1,
+  "lastFrame": 145,
+  "durationSeconds": 6,
+  "source": "build-mulligan.py",
+  "objectAnimation": false,
+  "motions": [
+    "breathing",
+    "head turn and nod",
+    "jaw movement",
+    "planted-foot weight shift",
+    "toe flex"
+  ]
+}
