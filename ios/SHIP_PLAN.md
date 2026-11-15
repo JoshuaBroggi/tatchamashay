@@ -1,4 +1,4 @@
-> Product update: `PLAN.md` now specifies child-only play, parent-only creation and an unordered map of all unfound treasure. Historical story, child-creation and replay milestones below are superseded by that plan.
+> The iPhone is the sole supported game. Browser gameplay is retired. See PLAN.md for the current simplified journey.
 
 # Tatchamashay 2.0 — Road to the iPhone
 
@@ -62,10 +62,11 @@ One session. Stage 1 can run at the same time.
 Nothing here is sacred; this is the restructure.
 
 1. **Make the repo iPhone-first.**
-   - Browser source is retired in `archive/browser/`; its standard launch/build/deploy commands fail.
-   - Root guidance targets iPhone only. Future web work is admin-only using the same content contract.
-   - Shut down existing Vercel/browser and PartyKit deployments through their hosting accounts.
-   - Confirm licensing before shipping any app or importing historical assets.
+   - Tag the current state `v1-web-final`, then move the old web game (`App.tsx`, `game/`, `party/`, `public/`, the web config files) into `web/`.
+   - Delete the models we can't ship (Death Vader, Distortus Rex, the Jurassic World and LEGO mosasaurs, the unlicensed scorpion source). They stay reachable through the tag.
+   - Point Vercel at `web/`, or switch its deploys off.
+   - New root `README.md` and `AGENTS.md` describe the iPhone app; the web game's rules move into `web/AGENTS.md`.
+   - Give `ios/` its own license file; `web/` stays GPL.
 2. **Automatic iPhone checks.** A GitHub Actions workflow on a macOS runner that runs `ios/scripts/build.sh test` on every PR touching `ios/`. Make it a required check on `main`, and require branches to be up to date before merging. That alone would have caught the milestone 2 clashes.
 3. **Pull requests.**
    - #1 design mockups: merge, minus `death-vader.png`, `chest-frame-4.jpg` and the forest reference image of unknown source.
@@ -73,7 +74,7 @@ Nothing here is sacred; this is the restructure.
    - #6 web restyle: close, unless the web game has a future. It restyles a game this plan retires.
 4. **Tidy.** Remove the 13 finished worktrees and delete merged branches, local and remote.
 
-**Done when:** `main` has the supported `ios/` app and retired `archive/browser/`, an iPhone check runs on PRs, and no stale PRs, worktrees or branches remain.
+**Done when:** `main` has `ios/` and `web/`, an iPhone check runs on PRs, and no stale PRs, worktrees or branches remain.
 
 ## Stage 2 — Production hardening (six parallel tracks)
 
@@ -120,7 +121,7 @@ Start once Stage 0 has a device build and Stage 1's check is running. Each track
 | When | What |
 |---|---|
 | Stage 0 | Unlock the phone, connect it, turn on Developer Mode. |
-| Stage 1 | Browser retirement approved; close obsolete browser work and disable hosted deployments. |
+| Stage 1 | Say yes or no to retiring the web game (closing #6, moving it to `web/`). |
 | Stage 3 | Create the App Store Connect API key and the app record's legal agreements. |
 | Stage 4 | The outing with Emmanuel. |
 

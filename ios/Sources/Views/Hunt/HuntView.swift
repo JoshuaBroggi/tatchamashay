@@ -7,6 +7,7 @@ struct HuntView: View {
     @Environment(AppModel.self) private var app
     @Environment(FamilyModel.self) private var family
     @Environment(LocationService.self) private var location
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var framedMap = false
@@ -18,6 +19,8 @@ struct HuntView: View {
     @State private var reveal: Reveal?
     @State private var saving = false
     @State private var confirmingFound = false
+    @State private var pause = HuntPause()
+    @State private var screenAwake = ScreenAwake()
 
     private var selected: ChestPlacement? {
         family.unfoundPlacements.first { $0.id == selectedID }
@@ -30,7 +33,9 @@ struct HuntView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
-        .onAppear { frameMapIfNeeded(); tick() }
+        .onAppear { frameMapIfNeeded(); tick(); keepScreenAwake() }
+        .onDisappear { screenAwake.update(huntActive: false) }
+        .onChange(of: scenePhase) { phaseChanged() }
         .task {
             while !Task.isCancelled {
                 tick()
@@ -47,6 +52,7 @@ struct HuntView: View {
             frameMapIfNeeded()
         }
         .onChange(of: family.unfoundPlacements.map(\.id)) {
+            keepScreenAwake()
             if selected == nil { selectedID = nil; resetTarget() }
             frameMapIfNeeded()
         }
@@ -277,8 +283,32 @@ struct HuntView: View {
         framedMap = true
     }
 
+    /// The screen stays on while there is a treasure left to find and the hunt is in front.
+    private func keepScreenAwake() {
+        screenAwake.update(huntActive: scenePhase == .active && !family.unfoundPlacements.isEmpty)
+    }
+
+    /// Away from the screen (another app, the lock screen): stop the voice and sounds and stop
+    /// judging GPS. Back again: if the hunt was away longer than a fix stays fresh, forget the old
+    /// Dig! decision and wait for a new fix.
+    private func phaseChanged() {
+        if scenePhase == .active {
+            if pause.resume(now: .now) {
+                tracker = nil
+                dig = DigState(showsDig: false, signal: .foggy, warmth: nil)
+            }
+            tick()
+        } else {
+            pause.pause(now: .now)
+            if scenePhase == .background {
+                app.sounds.stopAll()
+            }
+        }
+        keepScreenAwake()
+    }
+
     private func tick() {
-        guard let selected else { return }
+        guard !pause.isPaused, let selected else { return }
         if tracker?.target != selected.spot { tracker = DigRangeTracker(target: selected.spot) }
         let now = Date.now
         let fix = app.isDemo ? app.demoFix.map {

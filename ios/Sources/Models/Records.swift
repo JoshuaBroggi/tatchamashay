@@ -128,6 +128,8 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
     case potion
     case dragonEgg
     case turtle, doubloon, spider
+    /// A previously shipped phone model, retained for saved appearances.
+    case vineDog
     /// Keep models saved by another app version intact, even when their assets aren't bundled.
     case unavailable(String)
 
@@ -148,11 +150,13 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "turtle"
         case .doubloon: "doubloon"
         case .spider: "spider"
+        case .vineDog: "vine-dog"
         case .unavailable(let savedID): savedID
         }
     }
 
     init?(rawValue: String) {
+        if rawValue == "vine-dog" { self = .vineDog; return }
         guard let model = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
         self = model
     }
@@ -191,6 +195,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
         case .spider: "Silky the Spider"
+        case .vineDog: "Vine dog"
         case .unavailable: "Saved beast"
         }
     }
@@ -208,6 +213,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "turtle"
         case .doubloon: "coin"
         case .spider: "spider"
+        case .vineDog: "dog"
         case .unavailable: "treasure"
         }
     }
@@ -225,6 +231,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "tortoise.fill"
         case .doubloon: "circle.circle.fill"
         case .spider: "ladybug.fill"
+        case .vineDog: "dog.fill"
         case .unavailable: "shippingbox.fill"
         }
     }
@@ -238,7 +245,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .crown, .doubloon: .gold
         case .starCompass: .yellow
         case .potion: .purple
-        case .dragonEgg: .moss
+        case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
         case .spider: .chestnut
         case .unavailable: .gold
