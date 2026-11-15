@@ -4,7 +4,7 @@ The treasure chest, built-in treasures and sound effects for the iPhone app. The
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 15 treasures |
+| `Models/` | One USDZ per model: the chest and 16 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -29,6 +29,7 @@ The treasure chest, built-in treasures and sound effects for the iPhone app. The
 | `demogorgon` | Demogorgon | skeletal idle | original colors |
 | `demodog` | Demodog | skeletal idle | original colors |
 | `vine-dog` | Vine Dog | skeletal idle | original colors |
+| `mulligan` | Mulligan | skeletal breathing, head/jaw and weight shifts | authored colors |
 
 Original treasures are 0.13–0.35 m tall and stand on y = 0, facing +Z. Their files are 80–400 KB; the chest is about 690 KB. The creatures fit a 0.32 m box and stay below 2 MB each. Their white eyes and dark pupils stay fixed while the body takes the child's color.
 

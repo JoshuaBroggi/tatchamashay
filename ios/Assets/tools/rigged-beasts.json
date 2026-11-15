@@ -63,6 +63,27 @@
         "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
         "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
       }
+    },
+    {
+      "id": "mulligan",
+      "displayName": "Mulligan",
+      "file": "Models/Mulligan.usdz",
+      "thumbnail": "Thumbnails/mulligan.png",
+      "description": "Mulligan takes a deep breath and looks around your treasure chest.",
+      "defaultColor": "#A5AA78",
+      "source": "../Sources/Mulligan/mulligan.blend",
+      "clip": "Idle",
+      "speed": 1,
+      "triangleBudget": 12000,
+      "tintableParts": [],
+      "provenance": {
+        "title": "Mulligan \u2014 family-requested character adaptation",
+        "creator": "Codex / procedural Blender model and rig for Joshua Broggi",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/976380dc6ae2c2c372b2ef088e201d036e062317/ios/Assets/Sources/Mulligan",
+        "usage": "Created at Joshua\u2019s explicit request from three user-supplied toy photographs for this private family build. Underlying character and reference-photo rights are not claimed as original or CC-BY.",
+        "changes": "New iPhone-first Blender mesh and weighted 30-joint rig, olive-to-pink skin, charcoal ridges, yellow teeth and claws. One baked six-second idle combines breathing, head turns, jaw movement, planted-foot weight shifts and toe flex; converted through the shared USDZ pipeline.",
+        "sourceCommit": "976380dc6ae2c2c372b2ef088e201d036e062317"
+      }
     }
   ]
 }

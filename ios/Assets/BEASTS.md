@@ -33,6 +33,25 @@ On 15 November 2026 Joshua explicitly requested **Demogorgon, Demodog and Vine D
 
 See [RIGGED_BEAST_WORKFLOW.md](RIGGED_BEAST_WORKFLOW.md) for adding future converted GLBs, native Blender rigs, or directly authored iPhone USDZs. No future creatures are initiated by this change. Simulator and signed device builds succeeded. The expanded app installed and launched on Joshua’s iPhone on 15 November 2026; visible playback has not been inspected. No local tests were run.
 
+## Mulligan — family-requested iPhone-first beast
+
+Joshua requested **Mulligan** on 15 November 2026 from three supplied views of the same toy, with
+standard looping idle motions. The new Blender source follows its olive hunch, long forelimbs,
+pink snout/lower limbs, yellow teeth and claws, and black branching back/rump ridges. It is a
+character adaptation for the private family build, not a claim of original character or photo
+rights, and is not labeled CC-BY. Manifest provenance feeds the existing in-app credits.
+
+`mulligan` adds one 678,798-byte USDZ, a transparent 512 × 512 thumbnail and a 30-joint skin. Its
+single six-second `GentleIdle` combines breathing, head turns, jaw movement, planted-foot weight
+shifts and toe flex. The converter records 12,000 triangles, 145 joint samples and 29 changing
+joints with a stationary Root. Authored colors are retained. The enum/manifest additions reuse
+the shared live picker, preview, chest/detail animation player, Less motion and readiness checks.
+
+The [complete source and art renders](Sources/Mulligan/README.md) include the deterministic
+authoring script, `.blend`, source/reference records, export metadata and idle preview. Simulator
+and signed iPhone builds succeeded. No local tests or app walkthroughs ran. No app installation,
+launch or observed RealityKit playback is claimed for this change.
+
 ## Excluded
 
 | Source | Why it is not bundled |

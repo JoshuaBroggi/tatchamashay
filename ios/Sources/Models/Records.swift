@@ -130,6 +130,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case scorpion, spider
     case demogorgon, demodog
     case vineDog = "vine-dog"
+    case mulligan
 
     var id: String { rawValue }
 
@@ -169,6 +170,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "Vine Dog"
+        case .mulligan: "Mulligan"
         }
     }
 
@@ -190,6 +192,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "vine dog"
+        case .mulligan: "Mulligan"
         }
     }
 
@@ -211,6 +214,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .demogorgon: "figure.stand"
         case .demodog: "pawprint.fill"
         case .vineDog: "leaf.fill"
+        case .mulligan: "pawprint.fill"
         }
     }
 
@@ -231,6 +235,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .demogorgon: .coral
         case .demodog: .moss
         case .vineDog: .green
+        case .mulligan: .moss
         }
     }
 }
