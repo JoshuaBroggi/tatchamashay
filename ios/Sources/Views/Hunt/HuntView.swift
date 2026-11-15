@@ -91,7 +91,7 @@ struct HuntView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(saving)
-                    .accessibilityLabel("Find \(name(of: placement))")
+                    .accessibilityLabel("Find \(hiddenLabel(for: placement))")
                     .accessibilityIdentifier("treasureMarker-\(placement.id)")
                 }
                 .annotationTitles(.hidden)
@@ -172,7 +172,7 @@ struct HuntView: View {
     @ViewBuilder
     private func hunting(_ placement: ChestPlacement) -> some View {
         HStack {
-            Text(name(of: placement))
+            Text(hiddenLabel(for: placement))
                 .font(Typeface.headline(26))
                 .accessibilityIdentifier("selectedTreasure")
             Spacer()
@@ -225,7 +225,7 @@ struct HuntView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.gold)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(name(of: placement)).font(Typeface.body(18, weight: .semibold))
+                            Text(hiddenLabel(for: placement)).font(Typeface.body(18, weight: .semibold))
                             if !placement.hint.isEmpty {
                                 Text(placement.hint).font(Typeface.body(14)).foregroundStyle(Palette.textSecondary)
                             }
@@ -236,7 +236,7 @@ struct HuntView: View {
                     .foregroundStyle(Palette.textPrimary)
                     .padding(.vertical, 6)
                 }
-                .accessibilityLabel("Choose \(name(of: placement))")
+                .accessibilityLabel("Choose \(hiddenLabel(for: placement))")
                 .accessibilityIdentifier("chooseTreasure-\(placement.id)")
                 .listRowBackground(Palette.ground2)
             }
@@ -250,8 +250,12 @@ struct HuntView: View {
         .tint(Palette.gold)
     }
 
-    private func name(of placement: ChestPlacement) -> String {
-        family.design(for: placement)?.version(placement.versionID)?.look.name ?? "Treasure"
+    /// Use all placements so collecting another treasure doesn't renumber the remaining Xs.
+    private func hiddenLabel(for placement: ChestPlacement) -> String {
+        guard let index = family.mapPlacements.firstIndex(where: { $0.id == placement.id }) else {
+            return "Hidden treasure"
+        }
+        return "Hidden treasure \(index + 1)"
     }
 
     private func select(_ placement: ChestPlacement) {

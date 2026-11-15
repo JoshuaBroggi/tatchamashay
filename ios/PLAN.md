@@ -50,6 +50,8 @@ controls and explain any missing models or sounds; playable fallbacks remain ava
   Include older adventure groups. A new app launch or new placement never resets found status.
 - Show all unfound markers. A selected marker determines the current hint, distance and Dig! state;
   selecting it never hides the others. A list also makes overlapping markers individually selectable.
+- Before the chest opens, only Parents shows a treasure's name. The child map, chooser and VoiceOver
+  use numbered Hidden treasure labels; the reveal and My Chest show the saved name.
 - Allow any collection order. Reset GPS target tracking when the selection changes. A location update
   must not unexpectedly replace the selected target or recenter a map the child is exploring.
 - A successful save precedes celebration. A failed save keeps the marker and offers retry. Repeated

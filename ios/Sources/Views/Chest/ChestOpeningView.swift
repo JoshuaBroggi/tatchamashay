@@ -92,7 +92,7 @@ struct ChestOpeningView: View {
                     await scene.make(&content)
                 }
                 .accessibilityElement()
-                .accessibilityLabel(look.name)
+                .accessibilityLabel(flow.phase >= .revealed ? look.name : "Sealed treasure chest")
                 .accessibilityValue(scene.treasureShown)
                 .accessibilityIdentifier("treasureModel")
             }
