@@ -98,7 +98,7 @@ struct TreasureCatalogTests {
                 #expect(!loaded.isFallback)
                 let clip = try #require(TreasureEntities.skeletalClip(in: loaded.entity))
                 #expect(!clip.entity.availableAnimations.isEmpty)
-                #expect(clip.animation.duration > 0)
+                #expect(clip.animation.definition.duration > 0)
                 #expect(loaded.hasRequiredAnimation)
             }
         }
