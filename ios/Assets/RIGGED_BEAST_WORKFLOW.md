@@ -26,7 +26,7 @@ A Swift file containing primitive shapes is not by itself a rigged beast. The co
 - Final USD stage: **Y up, meters, faces +Z**, centered on X/Z with feet on Y=0; aim for a 0.32 m longest dimension. Blender authoring/import space is Z-up, facing -Y; the converter normalizes size and exports Y-up.
 - Keep meshes around 12,000 triangles total by default, with small textures (converter caps USDZ texture sizes at 512 px). Avoid runtime cloth, physics, drivers or IK dependencies: bake the final joint poses.
 - Provide a transparent 512×512 PNG thumbnail. The GLB/.blend route renders it; direct USDZ packaging requires a supplied PNG.
-- Preserve original materials unless a redesign is requested. List exact mesh names in `tintableParts` only when recoloring the entire mesh is sensible; leave eyes/mouth details out of those meshes. Empty lists are supported. The three flower creatures preserve their authored colors.
+- Preserve original geometry, shading and fixed details. Every creature offered on the color screen must declare its recolorable body material in `tintMaterial` and its body object names in `tintableParts`. RealityKit can combine skinned meshes under their armature, so named parts alone may not reach the rendered material. The three flower creatures use their existing `Material_0` body material; the color picker changes that material's base color. Empty lists are only suitable for models whose UI does not offer recoloring.
 - Record creator, source URL, source revision, modifications and usage in `provenance`. For CC-BY inputs also supply full `attribution` (original author/title/profile/source/license links and changes). Do not invent a license or call a character adaptation original.
 - Motion is visible in the picker, large preview, chest reveal and collection detail. Reuse `TreasureModelView`, `TreasureEntities` and `IdleMotionPlayer`. Respect the parent's Less motion and iOS Reduce Motion settings; avoid animated views for offscreen tiles.
 
@@ -77,6 +77,8 @@ Example job in the config's `beasts` array:
 For direct USDZ replace `source` with the native USDZ path and add `thumbnailSource` (PNG path) and `heightMeters`. The tool checks the native stage's skeleton/animation, units and size, copies the files and adds the same catalog entry. It does not re-export the native animation. Your source must already meet the framing, skin binding and looping requirements.
 
 The generic converter refuses missing rigs/actions, missing skin weights/bind/rest transforms, missing or unchanging joint animation samples, multiple clips, wrong USD units/axis, or oversized files. It writes model entries **additively**, preserving existing IDs and sounds. This static conversion inspection does not prove RealityKit playback on a phone.
+
+For recolorable models, set `tintMaterial` to the exact material name exported in the USDZ. The converter verifies that a skinned mesh uses that material and keeps the field in the generated catalog, so rebuilding an asset cannot silently disable its color picker.
 
 ## App registration
 

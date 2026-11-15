@@ -136,6 +136,8 @@ struct TreasureCatalogTests {
             #expect(!source.creator.isEmpty && !source.changes.isEmpty)
             #expect(entry.attribution == nil, "Do not label character adaptations CC-BY")
             #expect(entry.skeletalAnimation?.sourceClip == "Idle")
+            #expect(entry.tintMaterial != nil && !entry.tintableParts.isEmpty,
+                    "Every flower creature must respond to the creation flow's color choices")
         }
     }
 
@@ -145,7 +147,8 @@ struct TreasureCatalogTests {
     func tints(model: BuiltInModel) async throws {
         let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: .red, name: "x"), catalog: catalog)
         #expect(!loaded.isFallback)
-        let colors = materials(in: loaded.entity).filter { $0.name == "Tint" }.map(\.baseColor.tint)
+        let tintMaterial = try #require(loaded.entry?.tintMaterial)
+        let colors = materials(in: loaded.entity).filter { $0.name == tintMaterial }.map(\.baseColor.tint)
         #expect(!colors.isEmpty)
         let (r, g, b) = TreasureColor.red.rgb
         for color in colors {

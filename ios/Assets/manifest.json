@@ -359,7 +359,8 @@
       "defaultColor": "#CDBFB4",
       "kind": "treasure",
       "heightMeters": 0.32,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": ["DemogorgonBody"],
       "idleMotion": "skeletal",
       "movingParts": [],
       "skeletalAnimation": {
@@ -385,7 +386,8 @@
       "defaultColor": "#9A8A80",
       "kind": "treasure",
       "heightMeters": 0.1073,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": ["DemodogBody"],
       "idleMotion": "skeletal",
       "movingParts": [],
       "skeletalAnimation": {
@@ -411,7 +413,8 @@
       "defaultColor": "#56702B",
       "kind": "treasure",
       "heightMeters": 0.1883,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": ["VineDogBody"],
       "idleMotion": "skeletal",
       "movingParts": [],
       "skeletalAnimation": {

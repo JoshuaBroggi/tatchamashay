@@ -6,6 +6,26 @@ final class TreasurePreviewUITests: XCTestCase {
 
     @MainActor
     func testSpiderPreviewRendersSelectedColors() throws {
+        try checkPreview(model: "spider")
+    }
+
+    @MainActor
+    func testDemogorgonPreviewRendersSelectedColors() throws {
+        try checkPreview(model: "demogorgon")
+    }
+
+    @MainActor
+    func testDemodogPreviewRendersSelectedColors() throws {
+        try checkPreview(model: "demodog")
+    }
+
+    @MainActor
+    func testVineDogPreviewRendersSelectedColors() throws {
+        try checkPreview(model: "vine-dog")
+    }
+
+    @MainActor
+    private func checkPreview(model: String) throws {
         let app = XCUIApplication()
         #if targetEnvironment(simulator)
         app.launchArguments = ["-resetFamily", "-huntFixture", "-silent"]
@@ -19,9 +39,9 @@ final class TreasurePreviewUITests: XCTestCase {
         let next = app.buttons["inventNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 5))
         next.tap()
-        let spider = app.buttons["object-spider"]
-        if !spider.isHittable { app.scrollViews.firstMatch.swipeUp() }
-        spider.tap()
+        let creature = app.buttons["object-\(model)"]
+        if !creature.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        creature.tap()
         next.tap()
         XCTAssertTrue(app.staticTexts["What color is it?"].waitForExistence(timeout: 5))
 
@@ -40,11 +60,11 @@ final class TreasurePreviewUITests: XCTestCase {
             let result = XCTWaiter.wait(for: [rendered], timeout: 10)
             let screenshot = preview.screenshot()
             let attachment = XCTAttachment(screenshot: screenshot)
-            attachment.name = "spider-\(color.lowercased())"
+            attachment.name = "\(model)-\(color.lowercased())"
             attachment.lifetime = .keepAlways
             add(attachment)
             let fraction = try Self.coloredFraction(in: screenshot, color: color)
-            XCTAssertEqual(result, .completed, "\(color) should visibly color the spider; colored fraction: \(fraction)")
+            XCTAssertEqual(result, .completed, "\(color) should visibly color \(model); colored fraction: \(fraction)")
         }
     }
 
