@@ -139,7 +139,8 @@ struct TreasureCatalogTests {
         }
     }
 
-    @Test("Tinting sets the chosen color on every model's body material", arguments: BuiltInModel.allCases)
+    @Test("Tinting sets the chosen color on every recolorable model's body material",
+          arguments: TreasureCatalog.bundled.treasures.filter { $0.tintMaterial != nil }.compactMap(\.model))
     @MainActor
     func tints(model: BuiltInModel) async throws {
         let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: .red, name: "x"), catalog: catalog)

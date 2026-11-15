@@ -7,7 +7,12 @@ final class TreasurePreviewUITests: XCTestCase {
     @MainActor
     func testSpiderPreviewRendersSelectedColors() throws {
         let app = XCUIApplication()
+        #if targetEnvironment(simulator)
         app.launchArguments = ["-resetFamily", "-huntFixture", "-silent"]
+        #else
+        // Device verification uses the existing family and only edits an unsaved creation draft.
+        app.launchArguments = ["-silent"]
+        #endif
         app.launch()
         app.tabBars.buttons["Make"].tap()
         app.buttons["makeTreasure"].tap()
@@ -22,7 +27,10 @@ final class TreasurePreviewUITests: XCTestCase {
 
         // Inspect the rendered pixels, since a correctly tinted material can still look white.
         for color in ["Red", "Blue", "Red"] {
-            app.buttons["color-\(color.lowercased())"].tap()
+            let swatch = app.buttons["color-\(color.lowercased())"]
+            let ready = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: swatch)
+            wait(for: [ready], timeout: 10)
+            swatch.tap()
             let preview = app.descendants(matching: .any)["treasureModel"].firstMatch
             let loaded = expectation(for: NSPredicate(format: "value == 'usdz'"), evaluatedWith: preview)
             wait(for: [loaded], timeout: 10)
