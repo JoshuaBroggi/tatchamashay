@@ -436,7 +436,7 @@
       "description": "Mulligan takes a deep breath and looks around your treasure chest.",
       "defaultColor": "#A5AA78",
       "kind": "treasure",
-      "heightMeters": 0.2477,
+      "heightMeters": 0.2278,
       "tintableParts": [],
       "idleMotion": "skeletal",
       "movingParts": [],
@@ -448,10 +448,10 @@
       "provenance": {
         "title": "Mulligan \u2014 family-requested character adaptation",
         "creator": "Codex / procedural Blender model and rig for Joshua Broggi",
-        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/2b097193d0fa3247b6e40911a1ccde50ee91a585/ios/Assets/Sources/Mulligan",
-        "usage": "Created at Joshua\u2019s explicit request from three user-supplied toy photographs for this private family build. Underlying character and reference-photo rights are not claimed as original or CC-BY.",
-        "changes": "New iPhone-first Blender mesh and weighted 30-joint rig, olive-to-pink skin, charcoal ridges, yellow teeth and claws. Skull narrowed by 45% and lower jaw by 50% after Joshua\u2019s reference correction; all mouth details and forehead ridges follow the revised shape. One baked six-second idle combines breathing, head turns, jaw movement, planted-foot weight shifts and toe flex; converted through the shared USDZ pipeline.",
-        "sourceCommit": "2b097193d0fa3247b6e40911a1ccde50ee91a585"
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/a477def6fa1633b4b30f91e5fb6892499e65431a/ios/Assets/Sources/Mulligan",
+        "usage": "Created at Joshua\u2019s explicit request from five user-supplied toy photographs for this private family build. Underlying character and reference-photo rights are not claimed as original or CC-BY.",
+        "changes": "New iPhone-first Blender mesh and weighted 30-joint rig. Rebuilt narrow wedge skull and pointed V-shaped jaw with 88 fine teeth, violet lining/folds and a red tongue. Added 19 woven chest-cord layers, 20 shoulder nodules, facial branches and forearm creases. One baked six-second idle combines breathing, head turns, open-jaw movement, planted-foot weight shifts and toe flex; limb baking preserves bind roll. Converted through the shared USDZ pipeline.",
+        "sourceCommit": "a477def6fa1633b4b30f91e5fb6892499e65431a"
       }
     }
   ],

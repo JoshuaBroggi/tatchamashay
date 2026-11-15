@@ -35,19 +35,23 @@ See [RIGGED_BEAST_WORKFLOW.md](RIGGED_BEAST_WORKFLOW.md) for adding future conve
 
 ## Mulligan — family-requested iPhone-first beast
 
-Joshua requested **Mulligan** on 15 November 2026 from three supplied views of the same toy, with
+Joshua requested **Mulligan** on 15 November 2026 from five supplied views of the same toy, with
 standard looping idle motions. The new Blender source follows its olive hunch, long forelimbs,
 pink snout/lower limbs, yellow teeth and claws, and black branching back/rump ridges. It is a
 character adaptation for the private family build, not a claim of original character or photo
 rights, and is not labeled CC-BY. Manifest provenance feeds the existing in-app credits.
 
-`mulligan` adds one 678,051-byte USDZ, a transparent 512 × 512 thumbnail and a 30-joint skin. Its
+`mulligan` adds one 1,101,448-byte USDZ, a transparent 512 × 512 thumbnail and a 30-joint skin. Its
 single six-second `GentleIdle` combines breathing, head turns, jaw movement, planted-foot weight
-shifts and toe flex. The converter records 12,000 triangles, 145 joint samples and 29 changing
+shifts and toe flex. The converter records 21,598 triangles, 145 joint samples and 29 changing
 joints with a stationary Root. Authored colors are retained. The enum/manifest additions reuse
 the shared live picker, preview, chest/detail animation player, Less motion and readiness checks.
-The head-shape revision narrows the skull by 45% and the lower jaw by 50% to match Joshua's
-references, including the lips, teeth, mouth lining and forehead ridges; it retains the same rig.
+The detailed revision rebuilds the skull as a narrow wedge and the lower jaw as thin rails
+meeting at a pointed chin. It adds 88 fine teeth, violet mouth lining/folds, a curved red tongue,
+nostril recesses, finer facial branches, 19 woven chest-cord layers, 20 shoulder nodules and
+forearm creases. The open jaw eases between 39 and 49 degrees in the idle. The same skeleton
+and shared playback path are retained; limb baking preserves bind roll so the markings and paws
+face correctly. The richer geometry uses a 22,000-triangle budget and stays below 2 MB.
 
 The [complete source and art renders](Sources/Mulligan/README.md) include the deterministic
 authoring script, `.blend`, source/reference records, export metadata and idle preview. Simulator
