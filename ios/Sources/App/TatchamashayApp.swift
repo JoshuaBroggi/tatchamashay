@@ -50,7 +50,8 @@ final class AppModel {
         #endif
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-resetFamily") || ProcessInfo.processInfo.arguments.contains("-huntFixture") {
-            UserDefaults.standard.removeObject(forKey: MapExperienceSettings.enabledKey)
+            UserDefaults.standard.set(true, forKey: MapExperienceSettings.default3DKey)
+            UserDefaults.standard.set(false, forKey: MapExperienceSettings.enabledKey)
             UserDefaults.standard.removeObject(forKey: MapExperienceSettings.flatKey)
         }
         #endif
