@@ -1,7 +1,7 @@
 {
   "bones": 30,
-  "vertices": 6808,
-  "triangles": 12084,
+  "vertices": 12289,
+  "triangles": 21598,
   "clip": "Idle",
   "fps": 24,
   "firstFrame": 1,
@@ -9,8 +9,89 @@
   "durationSeconds": 6,
   "source": "build-mulligan.py",
   "objectAnimation": false,
-  "headWidthScale": 0.55,
-  "jawWidthScale": 0.5,
+  "skullProfile": [
+    [
+      -0.65,
+      0.265,
+      2.005,
+      0.43
+    ],
+    [
+      -0.92,
+      0.255,
+      2.01,
+      0.44
+    ],
+    [
+      -1.2,
+      0.205,
+      2.02,
+      0.34
+    ],
+    [
+      -1.5,
+      0.14,
+      2.025,
+      0.235
+    ],
+    [
+      -1.78,
+      0.078,
+      2.03,
+      0.125
+    ],
+    [
+      -1.97,
+      0.026,
+      2.035,
+      0.045
+    ],
+    [
+      -2.025,
+      0.006,
+      2.04,
+      0.014
+    ]
+  ],
+  "mandibularRail": [
+    [
+      0.185,
+      -0.99,
+      1.955
+    ],
+    [
+      0.172,
+      -1.17,
+      1.925
+    ],
+    [
+      0.13,
+      -1.4,
+      1.91
+    ],
+    [
+      0.077,
+      -1.65,
+      1.915
+    ],
+    [
+      0.025,
+      -1.88,
+      1.93
+    ],
+    [
+      0,
+      -2.025,
+      1.95
+    ]
+  ],
+  "teeth": 88,
+  "shoulderNodules": 20,
+  "chestCordLayers": 19,
+  "jawOpeningDegrees": [
+    38.96,
+    49.27
+  ],
   "motions": [
     "breathing",
     "head turn and nod",

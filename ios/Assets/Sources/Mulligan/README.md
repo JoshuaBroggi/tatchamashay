@@ -1,7 +1,7 @@
 # Mulligan source
 
 Joshua requested **Mulligan** on 15 November 2026: “use standard idle looping and all motions.”
-All three supplied toy photographs describe this one creature. This is a new iPhone-first Blender
+All five supplied toy photographs describe this one creature. This is a new iPhone-first Blender
 model and rig made by Codex from those references, rather than an imported or archived mesh.
 
 The adaptation keeps the reference's hunched olive body, long forelimbs and shorter rear legs,
@@ -22,13 +22,15 @@ by the existing Treasure makers & credits screen.
 - `mulligan.blend`: source mesh, skin weights and 30-joint deforming armature.
 - `authoring-record.json`: source geometry and animation metadata.
 - `delivery-record.json`: the final packed USDZ's size, hash, geometry and joint-sample metadata.
-- `render-mulligan.py`, `idle-preview.gif`, `rear-preview.png`, `front-preview.png` and
-  `side-preview.png`: source art review; not app captures.
+- `render-mulligan.py`, `idle-preview.gif`, `rear-preview.png`, `front-preview.png`,
+  `side-preview.png` and the 1024-pixel `detail-preview.png`: source art review; not app captures.
 
-Joshua's head-shape correction on 15 November is reflected in generator revision 2. The skull
-is 45% narrower and the lower jaw 50% narrower than revision 1, retaining the snout's depth and
-height. Lips, teeth, mouth lining and forehead ridges follow those proportions. The same
-centerline skeleton, skin assignments and baked idle are retained.
+Generator revision 3 follows Joshua's additional open-mouth references. The skull is a narrow
+tapering wedge, and two slim mandibular rails meet at a single pointed chin, replacing the broad
+lower plate. The mouth has 88 fine teeth, a concave violet lining and folds, a curved red tongue,
+small nostril recesses and finer facial branches. The chest has 19 irregular woven cord layers
+and larger branching strands; rounded deltoids carry 20 raised nodules and wrapping creases.
+Forearm markings and subtle skin mottling add detail without texture downloads.
 
 Run with Blender 4.5 from the repository root:
 
@@ -42,17 +44,19 @@ ffmpeg -framerate 6 -pattern_type glob -i 'ios/Assets/tools/.build/mulligan-prev
 ```
 
 The source `Idle` action is baked at 24 fps, frames 1–145: one six-second, in-place loop with
-breathing, head turn/nod, jaw opening, weight shifts and toe flex. The generator solves planted
-wrists/ankles offline and keys the final joint poses. There are no object-transform animation,
+breathing, head turn/nod, jaw opening, weight shifts and toe flex. The characteristic open jaw
+eases between approximately 39 and 49 degrees. The generator solves planted wrists/ankles offline,
+preserving each limb's bind roll, and keys the final joint poses. There are no object-transform animation,
 runtime IK, drivers or physics dependencies. The shared converter exports `GentleIdle`, normalizes
-to a 0.32 m longest dimension, Y-up/meters/+Z-facing with feet on the ground, and reduces the source's
-12,084 triangles to the configured 12,000-triangle budget.
+to a 0.32 m longest dimension, Y-up/meters/+Z-facing with feet on the ground. The detailed source
+has 21,598 triangles within a 22,000-triangle budget; the 2,000,000-byte delivery limit is unchanged.
 
 ## Delivery evidence
 
-The shared converter accepted the final **678,051-byte** USDZ: one skeleton, 30 joints, one clip,
+The shared converter accepted the final **1,101,448-byte** USDZ: one skeleton, 30 joints, one clip,
 145 rotation samples and 29 changing joints; Root is stationary. The transparent thumbnail is
-512 × 512. Source pose renders were inspected from the front and rear, including jaw/head changes.
+512 × 512. Source pose renders were inspected from the front and rear, including the open jaw,
+mouth interior, shoulder/chest detail and moving head/jaw poses.
 This is art/conversion evidence, not observed RealityKit playback.
 
 Simulator compilation and signed iPhone compilation both succeeded. No local tests, UI tests,
@@ -61,6 +65,7 @@ this change; on-phone appearance, animation and performance remain unobserved. E
 catalog coverage already enumerates every `BuiltInModel` and skeletal manifest entry for CI.
 
 ![Blender source idle, not app playback](idle-preview.gif)
+![Blender source detail render](detail-preview.png)
 ![Blender front source render](front-preview.png)
 ![Blender side source render](side-preview.png)
 ![Blender rear source render](rear-preview.png)

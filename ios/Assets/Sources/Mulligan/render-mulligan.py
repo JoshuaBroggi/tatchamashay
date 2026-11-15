@@ -19,7 +19,7 @@ camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_eule
 camera.data.type = 'ORTHO'
 camera.data.ortho_scale = 3.85
 scene.camera = camera
-for pos, power, size in [((3,-4,6),650,5),((-4,-2,3),400,4),((1,3,5),650,3)]:
+for pos, power, size in [((3,-4,6),430,5),((-4,-2,3),180,4),((1,3,5),350,3)]:
     bpy.ops.object.light_add(type='AREA',location=pos)
     light = bpy.context.object
     light.rotation_euler = (center-light.location).to_track_quat('-Z','Y').to_euler()
@@ -48,3 +48,11 @@ for name, position in [('front',(0,-7,2.3)),('side',(7,-.2,2.3))]:
     camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
     scene.render.filepath = str(OUTPUT/f'{name}.png')
     bpy.ops.render.render(write_still=True)
+# A larger art close-up exposes the actual modeled mouth/chest/shoulder detail.
+center = Vector((0,-.85,1.82))
+camera.location = (3.1,-5.4,3.2)
+camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
+camera.data.ortho_scale = 2.45
+scene.render.resolution_x = scene.render.resolution_y = 1024
+scene.render.filepath = str(OUTPUT/'detail.png')
+bpy.ops.render.render(write_still=True)

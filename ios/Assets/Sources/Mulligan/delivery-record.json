@@ -1,8 +1,8 @@
 {
   "exporter": "Blender 4.5.3 LTS",
   "file": "Models/Mulligan.usdz",
-  "bytes": 678051,
-  "sha256": "4e7c6ec3196088aff522b422cb868a95a7954074f94382a0d791e5515604e7bf",
+  "bytes": 1101448,
+  "sha256": "99572925266b6a5d8394a81d0453f0208f9af2f1ec054d97d2b821cc233186bc",
   "skeletons": 1,
   "skeletalClips": 1,
   "joints": 30,
@@ -38,7 +38,7 @@
     "Toe2_R",
     "Toe3_R"
   ],
-  "triangles": 12000,
+  "triangles": 21598,
   "upAxis": "Y",
   "metersPerUnit": 1.0,
   "framesPerSecond": 24.0,

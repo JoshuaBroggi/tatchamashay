@@ -14,14 +14,22 @@
     {
       "filename": "Screenshot 2026-11-15 at 9.45.58 AM.png",
       "sha256": "ee3a5819d76ab173a7de846d611beda5bed501460e3aa7eaceb3e84665d4bfae"
+    },
+    {
+      "filename": "Screenshot 2026-11-15 at 10.54.22 AM.png",
+      "sha256": "2cd843423d34d858bd54f772c25ac561be4462767f6d97019f00ae6e1dca5564"
+    },
+    {
+      "filename": "Screenshot 2026-11-15 at 10.54.38 AM.png",
+      "sha256": "9a80310dc1b326f72bb2c91388612b17c0faf2cbdbf78b3f2becaaa672f72aa4"
     }
   ],
-  "referenceCredits": "Three toy photographs supplied by Joshua Broggi. Original photographer/manufacturer and source URLs were not supplied. No photo or character ownership or CC-BY license is asserted. Reference photographs are not bundled.",
+  "referenceCredits": "Five toy photographs supplied by Joshua Broggi, including two open-mouth views added with the detail correction. Original photographer/manufacturer and source URLs were not supplied. No photo or character ownership or CC-BY license is asserted. Reference photographs are not bundled.",
   "authoring": "New procedural Blender geometry and 30-joint weighted rig authored by Codex at Joshua Broggi’s request; not imported from a third-party model.",
   "revision": {
-    "generatorVersion": 2,
-    "generatorSHA256": "0b740e2bcd7c248ab0e9c489a3ef4446fdd38ee892623330c8adece479300920",
-    "blendSHA256": "bd3cd7dc1475753afddaff6ca81f385885a266d20474744806860b970f29115d"
+    "generatorVersion": 3,
+    "generatorSHA256": "b9542ae6b5b9e6fcaf2217b3d61cfd0c8751ce7ea4aa3c3476629fdbbde519d8",
+    "blendSHA256": "004224410de31ab22d83028089632555ec860ea2def86d6dd7d67dc9fb5290c0"
   },
   "tool": "Blender 4.5.3 LTS (67807e1800cc)",
   "corrections": [
@@ -29,6 +37,11 @@
       "date": "2026-11-15",
       "request": "this muligan has a flat wide head, whereas in the pictures i gave you, he has a narrow jaw and head",
       "changes": "Skull narrowed by 45% and lower jaw by 50%, including teeth, lips, mouth lining and forehead ridges. Depth, height, centerline skeleton, skin assignments and the idle action are retained."
+    },
+    {
+      "date": "2026-11-15",
+      "request": "THE jaw is even more narrow and pointed. the details are too few in yours",
+      "changes": "Rebuilt the skull as a narrow tapering wedge and the lower jaw as slim mandibular rails meeting at one pointed chin, with a concave violet lining, 88 fine teeth, red tongue, nostril recesses and fine facial branches. Added 19 woven chest-cord layers with larger branching strands, 20 rounded shoulder nodules, rounded deltoids and forearm creases. Jaw rests open at 39 degrees and eases to 49 degrees in the same six-second idle. The 30-joint skeleton is retained, and planted-foot baking preserves authored limb bind roll."
     }
   ]
 }

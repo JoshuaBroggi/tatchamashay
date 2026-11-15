@@ -3,7 +3,7 @@
 Blender 4.5: blender --background --factory-startup --python build-mulligan.py
 Then run tools/convert-rigged-beasts.py -- mulligan. No external assets or add-ons.
 Coordinates: Z up, facing -Y. The shared converter supplies iPhone framing/units.
-The character adaptation follows Joshua's three supplied toy photographs.
+The character adaptation follows Joshua's five supplied toy photographs.
 """
 from pathlib import Path
 import json
@@ -24,15 +24,10 @@ OLIVE = (0.25, 0.27, 0.12)
 LIGHT_OLIVE = (0.33, 0.35, 0.17)
 PINK = (0.66, 0.25, 0.29)
 OCHRE = (0.62, 0.40, 0.16)
-DARK = (0.035, 0.043, 0.031)
+DARK = (0.018, 0.023, 0.015)
 IVORY = (0.80, 0.64, 0.30)
-MOUTH = (0.052, 0.013, 0.022)
-
-# Joshua's reference has a narrow, deep skull and an even narrower lower jaw.
-# Apply the same transverse proportion to the skin, lips, teeth and forehead ridges,
-# retaining their depth/height and the existing centerline head/jaw bind poses.
-HEAD_WIDTH_SCALE = .55
-JAW_WIDTH_SCALE = .50
+MOUTH = (0.022, 0.006, 0.033)
+TONGUE = (0.57, 0.045, 0.045)
 
 
 def mix(a, b, t):
@@ -43,7 +38,9 @@ def mix(a, b, t):
 def skin_color(p):
     # The references have pink hands/feet, ochre transitions and an olive torso.
     t = (p.z - 0.40) / 0.85
-    return mix(PINK, OCHRE, t * 2) if t < .5 else mix(OCHRE, OLIVE, (t-.5)*2)
+    base = mix(PINK, OCHRE, t * 2) if t < .5 else mix(OCHRE, OLIVE, (t-.5)*2)
+    mottle = 1+.045*math.sin(p.x*31+p.z*13)*math.sin(p.y*27-p.z*21)
+    return tuple(c*mottle for c in base)
 
 
 verts, faces, colors, weights, materials = [], [], [], [], []
@@ -52,8 +49,6 @@ verts, faces, colors, weights, materials = [], [], [], [], []
 def vertex(p, color, weight):
     p = Vector(p)
     assignment = weight(p) if callable(weight) else weight
-    if set(assignment) <= {'Neck', 'Head', 'Jaw'}:
-        p.x *= JAW_WIDTH_SCALE if 'Jaw' in assignment else HEAD_WIDTH_SCALE
     verts.append(tuple(p))
     colors.append(tuple(color(p) if callable(color) else color) + (1,))
     weights.append(assignment)
@@ -114,6 +109,17 @@ def tube(points, radii, color, weight, sides=10, mat=0, flatten=1):
     face(tuple(rows[-1]), mat)
 
 
+def sweep_surface(points, radii, segment, t, angle, offset=0):
+    """A point/normal on the same limb sweep, for attached creases and nodules."""
+    a, b = Vector(points[segment]), Vector(points[segment+1])
+    tangent = (b-a).normalized()
+    u = tangent.cross(Vector((0,1,0))).normalized()
+    v = tangent.cross(u).normalized()
+    normal = u*math.cos(angle)+v*math.sin(angle)
+    radius = radii[segment]*(1-t)+radii[segment+1]*t
+    return a.lerp(b,t)+normal*(radius+offset)
+
+
 def torso_weights(p):
     t = min(1, max(0, (p.y+.5)/1.5))
     return {'Chest': 1-t, 'Pelvis': t}
@@ -160,9 +166,32 @@ for side, s in [('L', 1), ('R', -1)]:
         t = min(1, max(0, (1.32-p.z)/.53))
         return {f'Arm.{side}': 1-t, f'Forearm.{side}': t}
 
-    tube([(s*.40,-.30,2.00), (s*.62,-.43,2.01), shoulder, shoulder.lerp(elbow,.4), elbow,
-          elbow.lerp(wrist,.4), elbow.lerp(wrist,.75), wrist],
-         [.10, .25, .36, .33, .23, .22, .14, .115], skin_color, arm_weights, sides=20)
+    # Rounded deltoid cap with a continuous downward sweep; no folded top ring.
+    arm_path = [(s*.72,-.52,2.18),(s*.72,-.52,2.135),
+                (s*.735,-.53,2.045),(s*.765,-.55,1.90),
+                (s*.81,-.58,1.70),(s*.865,-.62,1.40),
+                elbow,elbow.lerp(wrist,.4),elbow.lerp(wrist,.75),wrist]
+    arm_radii = [.015,.13,.235,.32,.34,.30,.23,.22,.14,.115]
+    tube(arm_path, arm_radii, skin_color, arm_weights, sides=20)
+    # Pebbled deltoids visible in the new front/three-quarter references.
+    for j in range(10):
+        segment = 2 if j < 4 else 3
+        t = .28+.6*((j*7)%13)/13
+        angle = .48+(j%5)*.35
+        p = sweep_surface(arm_path,arm_radii,segment,t,angle,.016)
+        radius = .024+.014*((j*3)%7)/7
+        ellipsoid(p,(radius,radius,radius*.95),LIGHT_OLIVE,arm_weights,12,8)
+    # Branching cords wrap the muscles, with smaller creases reaching the forearm.
+    for j in range(5):
+        segment = 3+j//3
+        t = .15+(j%3)*.28
+        path = [sweep_surface(arm_path,arm_radii,segment,t+.04*math.sin(k+j),
+                              .12+k*.30,.012) for k in range(7)]
+        tube(path,[.026,.025,.025,.021,.018,.013,.004],DARK,arm_weights,6,mat=1)
+    for j in range(3):
+        path = [sweep_surface(arm_path,arm_radii,6+k//3,.14+(k%3)*.22,
+                              .7+j*.45+.12*math.sin(k),.01) for k in range(6)]
+        tube(path,[.018,.02,.018,.015,.011,.003],DARK,arm_weights,5,mat=1)
     ellipsoid((s*.91, -1.04, .19), (.18, .23, .15), PINK, {f'Hand.{side}':1}, 16, 8)
 
     def leg_weights(p, side=side):
@@ -195,18 +224,20 @@ for side, s in [('L', 1), ('R', -1)]:
 
 
 def head_color(p):
-    t = min(1, max(0, (-p.y-.69)/1.15))
-    return mix(OLIVE, OCHRE, t*1.8) if t < .52 else mix(OCHRE, PINK, (t-.52)/.48)
+    t = min(1, max(0, (-p.y-.65)/.95))
+    return mix(OLIVE,OCHRE,t/.22) if t < .22 else mix(OCHRE,PINK,(t-.22)/.52)
 
 
-def muzzle(sections, bone, lower=False):
+def skull(sections):
     rows = []
     for y, width, z, height in sections:
         row = []
         for i in range(24):
             angle = i*math.tau/24
-            p = Vector((math.cos(angle)*width, y, z+math.sin(angle)*height))
-            row.append(vertex(p, PINK if lower else head_color, {bone:1}))
+            # A tall tapering crown over a thin palate, rather than a round snout cap.
+            sine = math.sin(angle)
+            p = Vector((math.cos(angle)*width,y,z+max(sine,0)*height+min(sine,0)*.035))
+            row.append(vertex(p,head_color,{'Head':1}))
         rows.append(row)
     face(tuple(reversed(rows[0])))
     for j in range(len(rows)-1):
@@ -216,38 +247,82 @@ def muzzle(sections, bone, lower=False):
     face(tuple(rows[-1]))
 
 
-# Narrow eyeless skull and tapered jaw; vertex() also narrows the mouth details.
-ellipsoid((0,-.65,2.10), (.60,.48,.39), head_color, {'Neck':.3,'Head':.7}, 24, 12)
-muzzle([(-.72,.49,2.14,.31), (-1.04,.61,2.17,.28), (-1.40,.57,2.15,.22),
-        (-1.69,.47,2.12,.15), (-1.86,.37,2.10,.105), (-1.91,.29,2.10,.085)], 'Head')
-ellipsoid((0,-1.42,1.975), (.48,.49,.075), MOUTH, {'Head':1}, 24, 8, mat=2)
-muzzle([(-.94,.34,1.91,.085), (-1.27,.49,1.855,.095), (-1.61,.46,1.84,.08),
-        (-1.83,.34,1.87,.065), (-1.89,.25,1.895,.04)], 'Jaw', lower=True)
+# Rebuilt from the two open-mouth reference views: a long wedge above two slim
+# mandibular rails meeting at a point. No broad lower plate or flat front tooth bar.
+HEAD_SECTIONS = [(-.65,.265,2.005,.43),(-.92,.255,2.01,.44),
+                 (-1.20,.205,2.02,.34),(-1.50,.140,2.025,.235),
+                 (-1.78,.078,2.03,.125),(-1.97,.026,2.035,.045),
+                 (-2.025,.006,2.04,.014)]
+JAW_RAIL = [(.185,-.99,1.955),(.172,-1.17,1.925),(.130,-1.40,1.91),
+            (.077,-1.65,1.915),(.025,-1.88,1.93),(0,-2.025,1.95)]
+skull(HEAD_SECTIONS)
+ellipsoid((0,-.64,2.11),(.265,.36,.28),head_color,{'Neck':.3,'Head':.7},20,10)
+
+
+def profile_at(sections,y):
+    for a,b in zip(sections,sections[1:]):
+        if a[0] >= y >= b[0]:
+            t = (y-a[0])/(b[0]-a[0])
+            return tuple(a[i]*(1-t)+b[i]*t for i in range(1,len(a)))
+    return sections[0][1:] if y > sections[0][0] else sections[-1][1:]
+
+
+def skull_surface(y,angle,offset=.006):
+    width,z,height = profile_at(HEAD_SECTIONS,y)
+    return (math.cos(angle)*(width+offset),y,z+math.sin(angle)*(height+offset))
+
+
+# Dark palate and throat; concave lower lining is skinned to the moving jaw.
+ellipsoid((0,-1.02,1.975),(.174,.13,.13),MOUTH,{'Head':1},16,8,mat=2)
+lining_rows = []
+for x,y,z in JAW_RAIL:
+    row = [vertex((x*t,y,z-.018-.035*(1-t*t)),MOUTH,{'Jaw':1})
+           for t in [-1,-.5,0,.5,1]]
+    lining_rows.append(row)
+for j in range(len(lining_rows)-1):
+    for k in range(4):
+        face((lining_rows[j][k],lining_rows[j+1][k],lining_rows[j+1][k+1],lining_rows[j][k+1]),2)
 
 for s in [-1,1]:
-    lip_points = [(s*.38,-.98,1.99),(s*.54,-1.26,2.00),(s*.48,-1.54,2.005),
-                  (s*.37,-1.77,2.015),(s*.25,-1.89,2.025)]
-    tube(lip_points, [.045,.05,.047,.043,.03], PINK, {'Head':1}, sides=8)
-    tube([(s*.36,-1.0,1.91),(s*.48,-1.25,1.91),(s*.43,-1.58,1.90),(s*.28,-1.83,1.925)],
-         [.035,.04,.04,.025], PINK, {'Jaw':1}, sides=8)
-    # Stubby ochre teeth follow each side of the mouth, upper and lower.
-    for i in range(10):
-        t = i/9
-        y = -1.10-.72*t
-        x = s*(.51-.23*t*t)
-        size = .045 + .015*math.sin(t*math.pi)
-        tube([(x,y,2.025),(x-s*.013,y-.008,1.985),(x-s*.018,y-.005,1.96)],
-             [size,size*.70,.008], IVORY, {'Head':1}, sides=7, mat=3)
-        tube([(x*.92,y+.012,1.92),(x*.92-s*.012,y,1.96),(x*.92-s*.015,y,1.975)],
-             [size*.85,size*.55,.005], IVORY, {'Jaw':1}, sides=7, mat=3)
+    lower = [(s*x,y,z) for x,y,z in JAW_RAIL]
+    tube(lower,[.043,.041,.033,.027,.019,.009],PINK,{'Jaw':1},sides=10)
+    tube([(s*x*.90,y,z+.018) for x,y,z in JAW_RAIL],
+         [.014,.014,.012,.01,.008,.003],mix(PINK,IVORY,.12),{'Jaw':1},sides=6)
+    upper = [(s*profile_at(HEAD_SECTIONS,y)[0]*.96,y,2.012)
+             for y in [-1.0,-1.17,-1.40,-1.65,-1.88,-2.02]]
+    tube(upper,[.022,.022,.018,.014,.010,.003],PINK,{'Head':1},sides=8)
+    # Cheek cartilage and the deep corner of the open mouth.
+    tube([(s*.19,-.94,2.08),(s*.22,-1.01,2.04),(s*.195,-1.09,1.97)],
+         [.040,.042,.026],PINK,{'Head':1},sides=9)
+    for i in range(22):
+        t = (i+.4)/22
+        y = -1.035-.95*t
+        width,_,_ = profile_at(HEAD_SECTIONS,y)
+        x = s*width*.94
+        size = .011+.004*math.sin(t*math.pi)
+        height = .035+.02*math.sin(t*math.pi)**2
+        tube([(x,y,2.004),(x-s*.004,y-.003,2.004-height*.6),
+              (x-s*.007,y,2.004-height)], [size,size*.68,.0025],IVORY,{'Head':1},sides=6,mat=3)
+        # The lower row follows the actual taper of each mandibular rail.
+        width,z = profile_at([(p[1],p[0],p[2]) for p in JAW_RAIL],y)
+        x = s*width*.91
+        tube([(x,y,z+.015),(x-s*.004,y,z+.015+height*.6),
+              (x-s*.007,y,z+.015+height)], [size,size*.65,.0025],IVORY,{'Jaw':1},sides=6,mat=3)
+    # Fine mucosal folds read inside the open V instead of an empty black gap.
+    for i in range(3):
+        factor = .3+i*.2
+        path = [(s*x*factor,y,z-.025) for x,y,z in JAW_RAIL[:-1]]
+        tube(path,[.008,.010,.009,.006,.002],(.085,.025,.10),{'Jaw':1},sides=5)
 
-for i in range(7):
-    x = (i-3)*.068
-    y = -1.915+.025*abs(i-3)/3
-    tube([(x,y,2.025),(x,y-.012,1.985),(x,y-.01,1.965)],
-         [.036,.025,.007], IVORY, {'Head':1}, sides=7, mat=3)
-    tube([(x,y+.014,1.93),(x,y+.005,1.965),(x,y+.008,1.98)],
-         [.030,.018,.005], IVORY, {'Jaw':1}, sides=7, mat=3)
+# A short curved red tongue with a center groove and small paired nostril recesses.
+tube([(0,-1.10,1.935),(0,-1.45,1.92),(0,-1.76,1.935),(0,-1.98,1.95),(0,-2.04,1.975)],
+     [.020,.026,.030,.025,.012],TONGUE,{'Head':1},sides=12,flatten=2.7)
+tube([(0,-1.25,1.954),(0,-1.56,1.953),(0,-1.90,1.979)],
+     [.005,.006,.002],(.21,.013,.025),{'Head':1},sides=5)
+for s in [-1,1]:
+    ellipsoid((s*.018,-1.985,2.077),(.009,.021,.008),MOUTH,{'Head':1},8,5,mat=2)
+tube([(0,-1.00,2.455),(0,-1.25,2.345),(0,-1.52,2.262),(0,-1.91,2.092)],
+     [.014,.017,.012,.002],mix(PINK,LIGHT_OLIVE,.12),{'Head':1},sides=6)
 
 
 def ridge(points, radius=.032, weight=torso_weights):
@@ -287,22 +362,62 @@ for i in range(12):
         path.append(rump_surface(math.cos(bend)*radius,1.40+math.sin(bend)*radius))
     ridge(path,.047,{'Pelvis':1})
 
-# Chest scratches/ribs and shoulder branches retain the photographic silhouette.
+def chest_surface(x,z,offset=.015):
+    # Project every cord onto the actual overlapping chest/trunk surfaces.
+    ys = []
+    for center,scale in [((0,.12,1.67),(.83,1,.78)),
+                         ((0,-.54,1.69),(.69,.42,.59))]:
+        rest = 1-((x-center[0])/scale[0])**2-((z-center[2])/scale[2])**2
+        if rest >= 0:
+            ys.append(center[1]-scale[1]*math.sqrt(rest))
+    return (x,min(ys,default=-.5)-offset,z)
+
+
+# Dense overlapping cords, rather than a handful of marks on a bare belly.
+for j in range(19):
+    z = 1.14+j*.05
+    width = .43+.19*math.sin((j+1)/21*math.pi)
+    path = [chest_surface(width*(k/4-1),z+.04*abs(k/4-1)+
+            .028*math.sin(j*.73+k*1.5)+.012*math.sin(k*3.2+j)) for k in range(9)]
+    thickness = .021+.007*(j%4)/3
+    tube(path,[thickness*(.65+.35*math.sin(k/8*math.pi)) for k in range(9)],
+         DARK,{'Chest':1},sides=6,mat=1)
+    if j%2 == 0:
+        # A forked strand bridges adjacent layers, breaking the horizontal rhythm.
+        s = 1 if j%4 else -1
+        ridge([chest_surface(s*.10,z),chest_surface(s*.21,z+.07,.024),
+               chest_surface(s*.34,z+.09,.024),chest_surface(s*.45,z+.14)],
+              .018,{'Chest':1})
+
 for s in [-1,1]:
-    for j in range(4):
-        z = 1.45+j*.15
-        ridge([(s*.11,-.935,z),(s*.29,-.91,z-.025),(s*.51,-.81,z+.015)],
-              .026, {'Chest':1})
+    # Thicker crooked strands weave over the smaller rib cords and fork sideways.
     for j in range(3):
-        z = 1.55+j*.18
-        ridge([(s*.80,-.90,z+.13),(s*.92,-.83,z),
-               (s*1.01,-.67,z-.04)], .031, {f'Arm.{"L" if s>0 else "R"}':1})
-    # Black vein branches on the olive forehead; face remains eyeless.
-    for y in [-.80,-1.03,-1.26]:
-        ridge([(s*.08,y,2.435-(abs(y)-.8)*.25),
-               (s*.27,y-.07,2.43-(abs(y)-.8)*.22),
-               (s*.43,y+.02,2.36-(abs(y)-.8)*.20),
-               (s*.52,y-.09,2.24-(abs(y)-.8)*.17)], .024, {'Head':1})
+        path = [chest_surface(s*x,z,.042) for x,z in
+                [(.48+j*.035,2.08-j*.04),(.36+j*.045,1.96-j*.055),
+                 (.42-j*.07,1.79-j*.07),(.17+j*.08,1.59-j*.08),
+                 (.23-j*.04,1.39-j*.07),(.08+j*.07,1.20+j*.015)]]
+        ridge(path,.040-j*.004,{'Chest':1})
+        ridge([path[2],chest_surface(s*(.44+j*.05),1.65-j*.07,.04),
+               chest_surface(s*.58,1.53-j*.06,.032)],.023,{'Chest':1})
+    for j in range(4):
+        ridge([chest_surface(s*(.23+j*.035),2.28-j*.035),
+               chest_surface(s*(.32+j*.04),2.15-j*.04,.025),
+               chest_surface(s*(.48+j*.03),1.98-j*.05,.026),
+               chest_surface(s*(.57+j*.015),1.83-j*.04)],.035,{'Chest':1})
+
+    def on_head(y,angle):
+        p = Vector(skull_surface(y,angle))
+        p.x *= s
+        return p
+
+    for j,y in enumerate([-.73,-.90,-1.07,-1.24]):
+        path = [on_head(y-.095*k,.95-.15*k+.08*math.sin(j+k)) for k in range(5)]
+        ridge(path,.016+.003*(j%2),{'Head':1})
+        ridge([path[2],on_head(y-.20,.96),on_head(y-.28,1.14)],.010,{'Head':1})
+    # Thin skin creases down the pink cheek, separate from the large dark cords.
+    for j in range(3):
+        ridge([on_head(-1.22-j*.12,.20),on_head(-1.29-j*.12,.14),
+               on_head(-1.37-j*.12,.08)],.006,{'Head':1})
 
 # Build a single multi-material skinned mesh, rather than loose animated objects.
 mesh = bpy.data.meshes.new('MulliganSkin')
@@ -362,7 +477,11 @@ modifier.object = rig
 def aim_bone(name, head, tail):
     bone = rig.pose.bones[name]
     direction = Vector(tail)-Vector(head)
-    matrix = direction.to_track_quat('Y','Z').to_matrix().to_4x4()
+    # Preserve the authored bind roll: a fresh track quaternion would twist the
+    # arms/hands even in frame 1, hiding front-facing detail and turning toes down.
+    rest_direction = bone.bone.tail_local-bone.bone.head_local
+    rotation = rest_direction.normalized().rotation_difference(direction.normalized())
+    matrix = rotation.to_matrix().to_4x4() @ bone.bone.matrix_local
     matrix.translation = head
     bone.matrix = matrix
 
@@ -409,7 +528,8 @@ for frame in range(1,146):
     head.rotation_euler = (.025*math.sin(phase*2), .045*math.sin(phase), .10*math.sin(phase))
     jaw = rig.pose.bones['Jaw']
     jaw.rotation_mode = 'XYZ'
-    jaw.rotation_euler.x = .075*(1-math.cos(phase))/2
+    # Hold the characteristic open V and breathe through it; no snap/attack clip.
+    jaw.rotation_euler.x = .68+.18*(1-math.cos(phase))/2
     bpy.context.view_layer.update()
     for side in ['L','R']:
         for names in [(f'Arm.{side}',f'Forearm.{side}',f'Hand.{side}'),
@@ -451,7 +571,9 @@ triangles = sum(len(p.vertices)-2 for p in mesh.polygons)
 report = dict(bones=len(bones), vertices=len(verts), triangles=triangles,
               clip='Idle', fps=24, firstFrame=1, lastFrame=145, durationSeconds=6,
               source='build-mulligan.py', objectAnimation=False,
-              headWidthScale=HEAD_WIDTH_SCALE, jawWidthScale=JAW_WIDTH_SCALE,
+              skullProfile=HEAD_SECTIONS, mandibularRail=JAW_RAIL,
+              teeth=88, shoulderNodules=20, chestCordLayers=19,
+              jawOpeningDegrees=[round(math.degrees(.68),2),round(math.degrees(.86),2)],
               motions=['breathing','head turn and nod','jaw movement','planted-foot weight shift','toe flex'])
 (HERE/'authoring-record.json').write_text(json.dumps(report,indent=2)+'\n')
 print('AUTHORED MULLIGAN',json.dumps(report),flush=True)
