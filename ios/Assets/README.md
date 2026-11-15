@@ -145,3 +145,8 @@ Each treasure also has its own sound, which the child picks when inventing one. 
 | `fanfare.m4a` | A tiny "ta-daa!" (1.1 s) |
 
 They are synthesized by `tools/sounds.mjs` (mono, 44.1 kHz, AAC 96 kbps). They are placeholders until someone listens to them on a phone.
+
+## Optional map characters
+
+Character exploration uses the same collected models and saved appearances. Gait metadata and
+rebuilding are documented in [CHARACTER_MOVEMENT.md](CHARACTER_MOVEMENT.md).

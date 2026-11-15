@@ -7,6 +7,9 @@ struct HuntView: View {
     @Environment(AppModel.self) private var app
     @Environment(FamilyModel.self) private var family
     @Environment(LocationService.self) private var location
+    @Environment(MapExperienceSettings.self) private var mapExperience
+    @Environment(PlaySettings.self) private var playSettings
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var camera: MapCameraPosition = .automatic
@@ -22,6 +25,16 @@ struct HuntView: View {
     @State private var confirmingFound = false
     @State private var pause = HuntPause()
     @State private var screenAwake = ScreenAwake()
+    @State private var showingMapSettings = false
+    @State private var movement = CharacterMovement()
+    @State private var currentMapCamera: MapCamera?
+    @State private var regularCamera: MapCameraPosition?
+    @State private var mapVisible = false
+    @State private var followingCharacter = false
+    @State private var pendingTransformation: CharacterChange?
+    @State private var transformation: CharacterChange?
+
+    private var calm: Bool { playSettings.reducesMotion(system: systemReduceMotion) }
 
     private var selected: ChestPlacement? {
         family.unfoundPlacements.first { $0.id == selectedID }
@@ -37,8 +50,11 @@ struct HuntView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
-        .onAppear { frameMapIfNeeded(); tick(); keepScreenAwake() }
-        .onDisappear { screenAwake.update(huntActive: false) }
+        .onAppear {
+            mapVisible = true; frameMapIfNeeded(); tick(); keepScreenAwake()
+            if regularCamera == nil { adjustMapMode() }
+        }
+        .onDisappear { mapVisible = false; screenAwake.update(huntActive: false) }
         .onChange(of: scenePhase) { phaseChanged() }
         .task {
             while !Task.isCancelled {
@@ -50,6 +66,10 @@ struct HuntView: View {
         .onChange(of: app.demoFix) { tick() }
         .onChange(of: selectedID) { resetTarget() }
         .onChange(of: family.child?.id) {
+            movement = CharacterMovement()
+            pendingTransformation = nil
+            transformation = nil
+            reveal = nil
             selectedID = nil
             framedMap = false
             resetTarget()
@@ -61,11 +81,19 @@ struct HuntView: View {
             frameMapIfNeeded()
         }
         .sheet(isPresented: $choosing) { treasureChooser }
+        .onChange(of: mapExperience.enabled) { movement = CharacterMovement(); tick(); adjustMapMode() }
+        .onChange(of: mapExperience.useFlatMap) { adjustMapMode() }
+        .sheet(isPresented: $showingMapSettings) { MapSettingsView() }
         .fullScreenCover(isPresented: $mapExpanded) { expandedMap }
-        .fullScreenCover(item: $reveal) { reveal in
+        .fullScreenCover(item: $reveal, onDismiss: finishReveal) { reveal in
             ChestOpeningView(look: reveal.record.savedCopy, foundAgain: reveal.foundAgain,
                              hiddenBy: family.parent?.displayName) {
                 self.reveal = nil
+            }
+        }
+        .fullScreenCover(item: $transformation) { change in
+            CharacterTransformationView(previous: change.previous, character: change.character) {
+                transformation = nil
             }
         }
         .confirmationDialog("Grown-ups: are you at the treasure spot together?",
@@ -76,8 +104,11 @@ struct HuntView: View {
     }
 
     private var map: some View {
-        Map(position: $camera, interactionModes: [.pan, .zoom]) {
-            if let fix = app.isDemo ? app.demoFix : nil {
+        Map(position: $camera, interactionModes: mapExperience.uses3D ? [.pan, .zoom, .rotate] : [.pan, .zoom]) {
+            if mapExperience.enabled, let coordinate = movement.coordinate {
+                Annotation("You", coordinate: coordinate.clCoordinate, anchor: .bottom) { characterMarker }
+                    .annotationTitles(.hidden)
+            } else if let fix = app.isDemo ? app.demoFix : nil {
                 Annotation("You", coordinate: fix.coordinate.clCoordinate) {
                     Image(systemName: "sailboat.fill")
                         .font(.title2)
@@ -102,20 +133,87 @@ struct HuntView: View {
                 .annotationTitles(.hidden)
             }
         }
-        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
+        .mapStyle(.standard(elevation: mapExperience.uses3D ? .realistic : .flat,
+                            pointsOfInterest: .excludingAll, showsTraffic: false))
+        .onMapCameraChange { context in
+            currentMapCamera = context.camera
+            if camera.positionedByUser { followingCharacter = false }
+        }
         // The parchment tint keeps roads, paths, water and buildings readable.
         .environment(\.colorScheme, .light)
-        .colorMultiply(Color(hex: 0xF6EBD0))
+        .colorMultiply(mapExperience.enabled ? .white : Color(hex: 0xF6EBD0))
         .mapControls {
             MapUserLocationButton()
             MapScaleView()
         }
+        .overlay(alignment: .bottomLeading) {
+            if mapExperience.enabled {
+                HStack(spacing: 6) {
+                    Image(systemName: "map")
+                    Text(mapExperience.uses3D ? "3D exploration" : "2D exploration")
+                    if movement.isUncertain { Text("· Location uncertain") }
+                }
+                .font(.caption.weight(.semibold))
+                .accessibilityElement(children: .combine)
+                .padding(8)
+                .foregroundStyle(Palette.mapInk)
+                .background(Palette.parchment, in: Capsule())
+                .padding(10)
+                .accessibilityIdentifier("characterMapMode")
+                .allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if mapExperience.enabled, let coordinate = movement.coordinate {
+                Button {
+                    followingCharacter = true
+                    followCharacter(at: coordinate)
+                } label: {
+                    Image(systemName: followingCharacter ? "location.fill" : "location")
+                        .frame(width: 44, height: 44)
+                        .background(Palette.parchment, in: Circle())
+                }
+                .foregroundStyle(Palette.mapInk)
+                .padding(10)
+                .padding(.top, mapExpanded ? 54 : 0)
+                .accessibilityLabel("Follow character")
+                .accessibilityIdentifier("followCharacter")
+            }
+        }
+    }
+
+    private var characterMarker: some View {
+        VStack(spacing: 0) {
+            if let character = family.activeCharacter, (mapVisible || mapExpanded), reveal == nil, transformation == nil {
+                WalkingCharacterView(look: character.savedCopy, walking: movement.isWalking,
+                                     heading: movement.heading - (currentMapCamera?.heading ?? 0), calm: calm)
+                    .frame(width: 82, height: 92)
+            } else {
+                Image(systemName: "figure.walk.circle.fill")
+                    .font(.system(size: 42))
+                    .foregroundStyle(Palette.gold)
+            }
+            Ellipse().fill(Palette.mapInk.opacity(0.25)).frame(width: 28, height: 5)
+        }
+        .opacity(movement.isUncertain ? 0.5 : 1)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(family.activeCharacter.map { "Playing as \($0.savedCopy.name)" } ?? "Your explorer")
+        .accessibilityValue(movement.isUncertain ? "Location uncertain" : (movement.isWalking && !calm ? "Walking" : "Standing"))
+        .accessibilityIdentifier("mapCharacter")
     }
 
     private var header: some View {
         HStack {
             Overline(text: "Treasure Map")
             Spacer()
+            Button { showingMapSettings = true } label: {
+                Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
+            }
+            .foregroundStyle(Palette.gold)
+            .accessibilityLabel("Map settings")
+            .accessibilityIdentifier("mapSettings")
+            .disabled(saving)
             if !family.mapPlacements.isEmpty {
                 Text("\(family.mapPlacements.count - family.unfoundPlacements.count) of \(family.mapPlacements.count) found")
                     .font(Typeface.body(18, weight: .semibold))
@@ -352,12 +450,25 @@ struct HuntView: View {
     }
 
     private func tick() {
-        guard !pause.isPaused, let selected else { return }
-        if tracker?.target != selected.spot { tracker = DigRangeTracker(target: selected.spot) }
+        guard !pause.isPaused else { return }
         let now = Date.now
         let fix = app.isDemo ? app.demoFix.map {
             LocationFix(coordinate: $0.coordinate, horizontalAccuracy: 5, timestamp: now)
         } ?? location.currentFix(now: now) : location.currentFix(now: now)
+        if mapExperience.enabled {
+            var next = movement
+            next.update(fix, now: now)
+            let moved = next.coordinate != movement.coordinate
+            if !calm, next.isWalking, let old = movement.coordinate, let new = next.coordinate,
+               Geo.distance(old, new) < 20 {
+                withAnimation(.linear(duration: 0.7)) { movement = next }
+            } else {
+                movement = next
+            }
+            if followingCharacter, moved, let coordinate = next.coordinate { followCharacter(at: coordinate) }
+        }
+        guard let selected else { return }
+        if tracker?.target != selected.spot { tracker = DigRangeTracker(target: selected.spot) }
         guard let state = tracker?.update(with: fix, now: now) else { return }
         dig = state
         distance = fix.flatMap { FindRules.standard.trusts($0, now: now) ? Geo.distance($0.coordinate, selected.spot) : nil }
@@ -369,14 +480,51 @@ struct HuntView: View {
         guard method != .dig || (dig.showsDig && dig.signal == .good) else { return }
         if method == .dig { app.sounds.play(.dig) }
         saving = true
+        let equipCharacter = mapExperience.enabled
+        let previous = family.activeCharacter?.savedCopy
         Task {
-            if let result = await family.recordFind(selected, method: method),
+            if let result = await family.recordFind(selected, method: method, equipCharacter: equipCharacter),
                result.record.childID == family.child?.id {
+                if equipCharacter, case .newTreasure = result {
+                    pendingTransformation = CharacterChange(childID: result.record.childID,
+                                                            previous: previous, character: result.record.savedCopy)
+                }
                 reveal = Reveal(result)
                 selectedID = nil
             }
             saving = false
         }
+    }
+
+    private func finishReveal() {
+        defer { pendingTransformation = nil }
+        guard mapExperience.enabled, let pendingTransformation,
+              pendingTransformation.childID == family.child?.id else { return }
+        transformation = pendingTransformation
+    }
+
+    private func adjustMapMode() {
+        guard mapExperience.enabled else {
+            followingCharacter = false
+            if let regularCamera { camera = regularCamera; self.regularCamera = nil }
+            return
+        }
+        if regularCamera == nil { regularCamera = camera }
+        let center = currentMapCamera?.centerCoordinate
+            ?? movement.coordinate?.clCoordinate
+            ?? family.unfoundPlacements.first?.spot.clCoordinate
+        guard let center else { return }
+        camera = .camera(MapCamera(centerCoordinate: center,
+                                   distance: min(max(currentMapCamera?.distance ?? 700, 250), 2_000),
+                                   heading: currentMapCamera?.heading ?? 0,
+                                   pitch: mapExperience.uses3D ? 55 : 0))
+    }
+
+    private func followCharacter(at coordinate: Coordinate) {
+        camera = .camera(MapCamera(centerCoordinate: coordinate.clCoordinate,
+                                   distance: min(max(currentMapCamera?.distance ?? 500, 250), 1_200),
+                                   heading: currentMapCamera?.heading ?? 0,
+                                   pitch: mapExperience.uses3D ? 55 : 0))
     }
 }
 

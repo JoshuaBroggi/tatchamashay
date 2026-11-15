@@ -23,6 +23,51 @@
         "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
         "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
         "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      },
+      "locomotion": {
+        "parts": [],
+        "joints": [
+          {
+            "name": "thighL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 22,
+            "phase": 0
+          },
+          {
+            "name": "thighR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 22,
+            "phase": 3.1415927
+          },
+          {
+            "name": "upperArmL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 3.141592653589793
+          },
+          {
+            "name": "upperArmR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 0
+          }
+        ]
       }
     },
     {
@@ -47,6 +92,51 @@
         "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
         "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
         "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      },
+      "locomotion": {
+        "parts": [],
+        "joints": [
+          {
+            "name": "humerusL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 20,
+            "phase": 0
+          },
+          {
+            "name": "humerusR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 20,
+            "phase": 3.141592653589793
+          },
+          {
+            "name": "femurL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 20,
+            "phase": 3.141592653589793
+          },
+          {
+            "name": "femurR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 20,
+            "phase": 0
+          }
+        ]
       }
     },
     {
@@ -71,6 +161,71 @@
         "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
         "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
         "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      },
+      "locomotion": {
+        "parts": [],
+        "joints": [
+          {
+            "name": "humerusL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 0
+          },
+          {
+            "name": "humerusR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 3.1415927
+          },
+          {
+            "name": "humerusML",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 3.141592653589793
+          },
+          {
+            "name": "humerusMR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 16,
+            "phase": 0
+          },
+          {
+            "name": "femurL",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 22,
+            "phase": 0
+          },
+          {
+            "name": "femurR",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "degrees": 22,
+            "phase": 3.1415927
+          }
+        ]
       }
     },
     {

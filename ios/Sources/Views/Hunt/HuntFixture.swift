@@ -35,6 +35,15 @@ enum HuntFixture {
             else { newer.placementIDs.append(placement.id) }
         }
         data.adventures = [older, newer]
+        if ProcessInfo.processInfo.arguments.contains("-characterFixture") {
+            // Owned discoveries for character-map UI tests; real phone launches never use fixtures.
+            for model in [BuiltInModel.vineDog, .demogorgon] {
+                data.collections.append(CollectionRecord(
+                    familyID: parent.id, childID: child.id, placementID: UUID(), versionID: UUID(),
+                    savedCopy: TreasureLook(model: model, color: model.defaultColor, name: model.displayName),
+                    foundAt: .now, method: .parentConfirmed, firstRunID: UUID()))
+            }
+        }
         return data
     }
 

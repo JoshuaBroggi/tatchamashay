@@ -57,6 +57,8 @@ def catalog_entry(spec, height):
         entry['tintMaterial'] = spec['tintMaterial']
     if spec.get('attribution'):
         entry['attribution'] = spec['attribution']
+    if spec.get('locomotion'):
+        entry['locomotion'] = spec['locomotion']
     return entry
 
 

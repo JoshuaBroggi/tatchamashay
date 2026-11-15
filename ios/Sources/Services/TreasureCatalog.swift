@@ -89,11 +89,24 @@ struct TreasureCatalog: Sendable {
         let movingParts: [MovingPart]
         /// Chest only.
         let namedParts: ChestParts?
+        /// Optional gait for the opt-in character map. Existing idle motion is unchanged.
+        var locomotion: Locomotion? = nil
         var paintRegions: [PaintRegion]? = nil
         var skeletalAnimation: SkeletalAnimation? = nil
         var provenance: Provenance? = nil
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
+    }
+
+    struct Locomotion: Decodable, Hashable, Sendable {
+        struct Part: Decodable, Hashable, Sendable {
+            let name: String
+            let axis: [Float]
+            let degrees: Float
+            let phase: Float
+        }
+        let parts: [Part]
+        var joints: [Part]? = nil
     }
 
     struct PaintRegion: Codable, Hashable, Identifiable, Sendable {
