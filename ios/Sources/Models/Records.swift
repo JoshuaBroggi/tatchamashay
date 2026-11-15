@@ -128,14 +128,14 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
     case potion
     case dragonEgg
     case turtle, doubloon, spider
-    /// Original six-legged creature restored from the earlier iPhone build.
-    case vineDog
+    case demogorgon, demodog, vineDog
     /// Keep models saved by another app version intact, even when their assets aren't bundled.
     case unavailable(String)
 
     /// Only bundled models can be chosen for a new beast.
     static let allCases: [BuiltInModel] = [
-        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider, .vineDog
+        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider,
+        .demogorgon, .demodog, .vineDog
     ]
 
     var rawValue: String {
@@ -150,13 +150,14 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "turtle"
         case .doubloon: "doubloon"
         case .spider: "spider"
+        case .demogorgon: "demogorgon"
+        case .demodog: "demodog"
         case .vineDog: "vine-dog"
         case .unavailable(let savedID): savedID
         }
     }
 
     init?(rawValue: String) {
-        if rawValue == "vine-dog" { self = .vineDog; return }
         guard let model = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
         self = model
     }
@@ -195,6 +196,8 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
         case .spider: "Silky the Spider"
+        case .demogorgon: "Demogorgon"
+        case .demodog: "Demodog"
         case .vineDog: "Vine Dog"
         case .unavailable: "Saved beast"
         }
@@ -213,7 +216,9 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "turtle"
         case .doubloon: "coin"
         case .spider: "spider"
-        case .vineDog: "dog"
+        case .demogorgon: "Demogorgon"
+        case .demodog: "Demodog"
+        case .vineDog: "vine dog"
         case .unavailable: "treasure"
         }
     }
@@ -231,7 +236,9 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .turtle: "tortoise.fill"
         case .doubloon: "circle.circle.fill"
         case .spider: "ladybug.fill"
-        case .vineDog: "dog.fill"
+        case .demogorgon: "figure.stand"
+        case .demodog: "pawprint.fill"
+        case .vineDog: "leaf.fill"
         case .unavailable: "shippingbox.fill"
         }
     }
@@ -248,6 +255,8 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
         case .spider: .chestnut
+        case .demogorgon: .coral
+        case .demodog: .moss
         case .unavailable: .gold
         }
     }

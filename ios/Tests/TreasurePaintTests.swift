@@ -63,12 +63,22 @@ struct TreasurePaintTests {
         for model in BuiltInModel.allCases {
             let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: model.defaultColor, name: "x"))
             let regions = TreasureCatalog.bundled.paintRegions(for: model)
-            // The restored skinned Vine dog has one bound body material.
             let countRange = loaded.entry?.idleMotion == .skeletal ? 1...3 : 2...3
             #expect(countRange.contains(regions.count), "\(model)")
             let names = regions.flatMap(\.parts)
             #expect(Set(names).count == names.count, "\(model) has overlapping paint areas")
             for name in names { #expect(loaded.entity.findEntity(named: name) != nil, "\(model): \(name)") }
+            for region in regions {
+                if let materialName = region.materialName {
+                    var hasMaterial = false
+                    TreasureEntities.visit(loaded.entity) { entity in
+                        if entity.components[ModelComponent.self]?.materials.contains(where: { $0.name == materialName }) == true {
+                            hasMaterial = true
+                        }
+                    }
+                    #expect(hasMaterial, "\(model): \(region.name) must reach a rendered material")
+                }
+            }
         }
     }
 

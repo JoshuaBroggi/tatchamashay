@@ -89,9 +89,9 @@ struct TreasureCatalog: Sendable {
         let movingParts: [MovingPart]
         /// Chest only.
         let namedParts: ChestParts?
-        var skeletalAnimation: SkeletalAnimation?
-        var provenance: Provenance?
         var paintRegions: [PaintRegion]? = nil
+        var skeletalAnimation: SkeletalAnimation? = nil
+        var provenance: Provenance? = nil
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
     }
@@ -100,11 +100,14 @@ struct TreasureCatalog: Sendable {
         let id: String
         let name: String
         let parts: [String]
+        /// Skinned meshes may be combined under their armature when RealityKit loads the asset.
+        var materialName: String? = nil
     }
 
     func paintRegions(for model: BuiltInModel) -> [PaintRegion] {
         guard let entry = entry(for: model) else { return [] }
-        return entry.paintRegions ?? [PaintRegion(id: "body", name: "Main color", parts: entry.tintableParts)]
+        return entry.paintRegions ?? [PaintRegion(id: "body", name: "Main color", parts: entry.tintableParts,
+                                                 materialName: entry.tintMaterial)]
     }
 
     struct SkeletalAnimation: Decodable, Hashable, Sendable {
@@ -150,7 +153,7 @@ struct TreasureCatalog: Sendable {
     }
 }
 
-/// Procedural motions and the baked idle in a rigged USDZ.
+/// Procedural idle motions and the baked skeletal clip used by rigged creatures.
 enum IdleMotion: String, Decodable, Hashable, Sendable {
     case spin, bob, wiggle, flap, none, skeletal
 }

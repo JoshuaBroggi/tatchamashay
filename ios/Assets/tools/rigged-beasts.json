@@ -2,6 +2,50 @@
   "version": 1,
   "beasts": [
     {
+      "id": "demogorgon",
+      "displayName": "Demogorgon",
+      "file": "Models/Demogorgon.usdz",
+      "thumbnail": "Thumbnails/demogorgon.png",
+      "description": "A flower-faced treasure stretching after a little nap.",
+      "defaultColor": "#CDBFB4",
+      "source": "../Sources/FlowerBeasts/demogorgon.glb",
+      "clip": "Idle",
+      "speed": 1,
+      "triangleBudget": 12000,
+      "tintMaterial": "Material_0",
+      "tintableParts": ["DemogorgonBody"],
+      "provenance": {
+        "title": "Demogorgon",
+        "creator": "Joshua Broggi / procedural web source",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/2b397b3cad58d17722b5bd907433863b4881c9df/game/components",
+        "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
+        "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
+        "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      }
+    },
+    {
+      "id": "demodog",
+      "displayName": "Demodog",
+      "file": "Models/Demodog.usdz",
+      "thumbnail": "Thumbnails/demodog.png",
+      "description": "A four-legged treasure with a gently swishing tail.",
+      "defaultColor": "#9A8A80",
+      "source": "../Sources/FlowerBeasts/demodog.glb",
+      "clip": "Idle",
+      "speed": 1,
+      "triangleBudget": 12000,
+      "tintMaterial": "Material_0",
+      "tintableParts": ["DemodogBody"],
+      "provenance": {
+        "title": "Demodog",
+        "creator": "Joshua Broggi / procedural web source",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/2b397b3cad58d17722b5bd907433863b4881c9df/game/components",
+        "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
+        "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
+        "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      }
+    },
+    {
       "id": "vine-dog",
       "displayName": "Vine Dog",
       "file": "Models/VineDog.usdz",
@@ -13,9 +57,7 @@
       "speed": 1,
       "triangleBudget": 12000,
       "tintMaterial": "Material_0",
-      "tintableParts": [
-        "VineDogBody"
-      ],
+      "tintableParts": ["VineDogBody"],
       "provenance": {
         "title": "Vine Dog",
         "creator": "Joshua Broggi / procedural web source",
