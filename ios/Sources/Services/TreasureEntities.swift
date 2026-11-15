@@ -33,8 +33,7 @@ enum TreasureEntities {
             tint(loaded.entity, parts: entry.tintableParts, materialName: entry.tintMaterial, color: look.color)
             if let paint = look.paint {
                 for region in catalog.paintRegions(for: look.model) {
-                    paintParts(loaded.entity, parts: region.parts,
-                               materialName: entry.idleMotion == .skeletal ? entry.tintMaterial : nil,
+                    paintParts(loaded.entity, parts: region.parts, materialName: region.materialName,
                                color: paint.color(for: region.id), texture: paint.texture)
                 }
             }
@@ -60,16 +59,16 @@ enum TreasureEntities {
         return ChestEntity(root: entity, entry: catalog.chest)
     }
 
-    /// Sets the base color of every material on the named parts and the meshes inside them.
+    /// Match a skinned body's rendered material even when its named object has no mesh component.
     static func tint(_ root: Entity, parts: [String], materialName: String? = nil, color: TreasureColor) {
         paintParts(root, parts: parts, materialName: materialName, color: PaintColor(color), texture: .natural)
     }
 
-    static func paintParts(_ root: Entity, parts: [String], materialName: String? = nil, color: PaintColor, texture: TreasureTexture) {
+    static func paintParts(_ root: Entity, parts: [String], materialName: String? = nil,
+                           color: PaintColor, texture: TreasureTexture) {
         let c = color.rgb
         let uiColor = UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
         let surface = PaintSurface.texture(texture)
-        // RealityKit can merge skinned parts under their armature. Match the bound material there.
         let targets = materialName == nil ? parts.compactMap { root.findEntity(named: $0) } : [root]
         for part in targets {
             visit(part) { entity in
@@ -109,8 +108,6 @@ enum TreasureEntities {
         for child in entity.children { visit(child, body) }
     }
 
-    /// USD importers may attach the clip to the root or its armature child. Play it on its owner.
-    /// Each beast exports only its chosen idle, so an attack clip can never be picked by accident.
     static func skeletalClip(in entity: Entity) -> (entity: Entity, animation: AnimationResource)? {
         if let animation = entity.availableAnimations.first { return (entity, animation) }
         for child in entity.children {
@@ -128,13 +125,13 @@ struct LoadedTreasure {
     let isFallback: Bool
     let originalModels: [OriginalModel]
 
+    var hasRequiredAnimation: Bool {
+        entry?.idleMotion != .skeletal || TreasureEntities.skeletalClip(in: entity) != nil
+    }
+
     struct OriginalModel {
         let entity: Entity
         let model: ModelComponent
-    }
-
-    var hasRequiredAnimation: Bool {
-        entry?.idleMotion != .skeletal || TreasureEntities.skeletalClip(in: entity) != nil
     }
 
     /// The manifest's idle motion for this treasure, ready to drive each frame.
@@ -143,7 +140,7 @@ struct LoadedTreasure {
     }
 }
 
-/// Plays procedural motions or a baked skeletal clip. Both obey the same Less motion switch.
+/// Plays a treasure's `idleMotion` in code: the USDZ files carry no animation.
 /// Create it after placing the entity, since it remembers each moving part's resting pose.
 @MainActor
 final class IdleMotionPlayer {
@@ -206,7 +203,7 @@ final class IdleMotionPlayer {
                 controller.speed = skeletalSpeed
                 skeletalController = controller
             }
-            return // The skeleton owns its pose; never overwrite it with a whole-model transform.
+            return
         }
         body.entity.transform = pose
     }

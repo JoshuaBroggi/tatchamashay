@@ -495,6 +495,64 @@
       ]
     },
     {
+      "id": "demogorgon",
+      "displayName": "Demogorgon",
+      "file": "Models/Demogorgon.usdz",
+      "thumbnail": "Thumbnails/demogorgon.png",
+      "description": "A flower-faced treasure stretching after a little nap.",
+      "defaultColor": "#CDBFB4",
+      "kind": "treasure",
+      "heightMeters": 0.32,
+      "tintMaterial": "Material_0",
+      "tintableParts": [
+        "DemogorgonBody"
+      ],
+      "idleMotion": "skeletal",
+      "movingParts": [],
+      "skeletalAnimation": {
+        "name": "GentleIdle",
+        "sourceClip": "Idle",
+        "speed": 1
+      },
+      "provenance": {
+        "title": "Demogorgon",
+        "creator": "Joshua Broggi / procedural web source",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/2b397b3cad58d17722b5bd907433863b4881c9df/game/components",
+        "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
+        "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
+        "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      }
+    },
+    {
+      "id": "demodog",
+      "displayName": "Demodog",
+      "file": "Models/Demodog.usdz",
+      "thumbnail": "Thumbnails/demodog.png",
+      "description": "A four-legged treasure with a gently swishing tail.",
+      "defaultColor": "#9A8A80",
+      "kind": "treasure",
+      "heightMeters": 0.1073,
+      "tintMaterial": "Material_0",
+      "tintableParts": [
+        "DemodogBody"
+      ],
+      "idleMotion": "skeletal",
+      "movingParts": [],
+      "skeletalAnimation": {
+        "name": "GentleIdle",
+        "sourceClip": "Idle",
+        "speed": 1
+      },
+      "provenance": {
+        "title": "Demodog",
+        "creator": "Joshua Broggi / procedural web source",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/2b397b3cad58d17722b5bd907433863b4881c9df/game/components",
+        "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
+        "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
+        "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      }
+    },
+    {
       "id": "vine-dog",
       "displayName": "Vine Dog",
       "file": "Models/VineDog.usdz",
