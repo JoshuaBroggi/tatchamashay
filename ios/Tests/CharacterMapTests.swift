@@ -148,6 +148,29 @@ struct CharacterMapTests {
         player.reset()
         #expect(flipper.transform == original)
     }
+
+    @MainActor
+    @Test("Requested skeletal characters move real joints without changing their idle resources")
+    func skeletalMovement() async throws {
+        for model in [BuiltInModel.vineDog, .demogorgon] {
+            let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: .green, name: "Walker"))
+            #expect(!loaded.isFallback)
+            #expect(loaded.entry?.provenance?.sourceCommit == "2b397b3cad58d17722b5bd907433863b4881c9df")
+            #expect(loaded.hasRequiredAnimation)
+            let player = CharacterWalkPlayer(root: loaded.entity, entry: loaded.entry)
+            #expect(player.partCount >= (model == .vineDog ? 6 : 4))
+            var rigs: [ModelEntity] = []
+            TreasureEntities.visit(loaded.entity) { entity in
+                if let model = entity as? ModelEntity, !model.jointTransforms.isEmpty { rigs.append(model) }
+            }
+            #expect(!rigs.isEmpty)
+            let original = rigs.map(\.jointTransforms)
+            player.update(0.15)
+            #expect(rigs.map(\.jointTransforms) != original)
+            player.reset()
+            #expect(rigs.map(\.jointTransforms) == original)
+        }
+    }
 }
 
 @Suite("Character location presentation")

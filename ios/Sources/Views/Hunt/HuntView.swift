@@ -30,6 +30,7 @@ struct HuntView: View {
     @State private var currentMapCamera: MapCamera?
     @State private var regularCamera: MapCameraPosition?
     @State private var mapVisible = false
+    @State private var followingCharacter = false
     @State private var pendingTransformation: CharacterChange?
     @State private var transformation: CharacterChange?
 
@@ -49,7 +50,10 @@ struct HuntView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
-        .onAppear { mapVisible = true; frameMapIfNeeded(); tick(); keepScreenAwake(); adjustMapMode() }
+        .onAppear {
+            mapVisible = true; frameMapIfNeeded(); tick(); keepScreenAwake()
+            if regularCamera == nil { adjustMapMode() }
+        }
         .onDisappear { mapVisible = false; screenAwake.update(huntActive: false) }
         .onChange(of: scenePhase) { phaseChanged() }
         .task {
@@ -131,10 +135,13 @@ struct HuntView: View {
         }
         .mapStyle(.standard(elevation: mapExperience.uses3D ? .realistic : .flat,
                             pointsOfInterest: .excludingAll, showsTraffic: false))
-        .onMapCameraChange { context in currentMapCamera = context.camera }
+        .onMapCameraChange { context in
+            currentMapCamera = context.camera
+            if camera.positionedByUser { followingCharacter = false }
+        }
         // The parchment tint keeps roads, paths, water and buildings readable.
         .environment(\.colorScheme, .light)
-        .colorMultiply(Color(hex: 0xF6EBD0))
+        .colorMultiply(mapExperience.enabled ? .white : Color(hex: 0xF6EBD0))
         .mapControls {
             MapUserLocationButton()
             MapScaleView()
@@ -147,6 +154,7 @@ struct HuntView: View {
                     if movement.isUncertain { Text("· Location uncertain") }
                 }
                 .font(.caption.weight(.semibold))
+                .accessibilityElement(children: .combine)
                 .padding(8)
                 .foregroundStyle(Palette.mapInk)
                 .background(Palette.parchment, in: Capsule())
@@ -155,11 +163,28 @@ struct HuntView: View {
                 .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .topLeading) {
+            if mapExperience.enabled, let coordinate = movement.coordinate {
+                Button {
+                    followingCharacter = true
+                    followCharacter(at: coordinate)
+                } label: {
+                    Image(systemName: followingCharacter ? "location.fill" : "location")
+                        .frame(width: 44, height: 44)
+                        .background(Palette.parchment, in: Circle())
+                }
+                .foregroundStyle(Palette.mapInk)
+                .padding(10)
+                .padding(.top, mapExpanded ? 54 : 0)
+                .accessibilityLabel("Follow character")
+                .accessibilityIdentifier("followCharacter")
+            }
+        }
     }
 
     private var characterMarker: some View {
         VStack(spacing: 0) {
-            if let character = family.activeCharacter, mapVisible, reveal == nil, transformation == nil {
+            if let character = family.activeCharacter, (mapVisible || mapExpanded), reveal == nil, transformation == nil {
                 WalkingCharacterView(look: character.savedCopy, walking: movement.isWalking,
                                      heading: movement.heading - (currentMapCamera?.heading ?? 0), calm: calm)
                     .frame(width: 82, height: 92)
@@ -422,7 +447,18 @@ struct HuntView: View {
         let fix = app.isDemo ? app.demoFix.map {
             LocationFix(coordinate: $0.coordinate, horizontalAccuracy: 5, timestamp: now)
         } ?? location.currentFix(now: now) : location.currentFix(now: now)
-        if mapExperience.enabled { movement.update(fix, now: now) }
+        if mapExperience.enabled {
+            var next = movement
+            next.update(fix, now: now)
+            let moved = next.coordinate != movement.coordinate
+            if !calm, next.isWalking, let old = movement.coordinate, let new = next.coordinate,
+               Geo.distance(old, new) < 20 {
+                withAnimation(.linear(duration: 0.7)) { movement = next }
+            } else {
+                movement = next
+            }
+            if followingCharacter, moved, let coordinate = next.coordinate { followCharacter(at: coordinate) }
+        }
         guard let selected else { return }
         if tracker?.target != selected.spot { tracker = DigRangeTracker(target: selected.spot) }
         guard let state = tracker?.update(with: fix, now: now) else { return }
@@ -461,6 +497,7 @@ struct HuntView: View {
 
     private func adjustMapMode() {
         guard mapExperience.enabled else {
+            followingCharacter = false
             if let regularCamera { camera = regularCamera; self.regularCamera = nil }
             return
         }
@@ -471,6 +508,13 @@ struct HuntView: View {
         guard let center else { return }
         camera = .camera(MapCamera(centerCoordinate: center,
                                    distance: min(max(currentMapCamera?.distance ?? 700, 250), 2_000),
+                                   heading: currentMapCamera?.heading ?? 0,
+                                   pitch: mapExperience.uses3D ? 55 : 0))
+    }
+
+    private func followCharacter(at coordinate: Coordinate) {
+        camera = .camera(MapCamera(centerCoordinate: coordinate.clCoordinate,
+                                   distance: min(max(currentMapCamera?.distance ?? 500, 250), 1_200),
                                    heading: currentMapCamera?.heading ?? 0,
                                    pitch: mapExperience.uses3D ? 55 : 0))
     }

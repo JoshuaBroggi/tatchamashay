@@ -4,7 +4,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 11 treasures |
+| `Models/` | One USDZ per model: the chest and 12 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -142,3 +142,8 @@ Each treasure also has its own sound, which the child picks when inventing one. 
 | `fanfare.m4a` | A tiny "ta-daa!" (1.1 s) |
 
 They are synthesized by `tools/sounds.mjs` (mono, 44.1 kHz, AAC 96 kbps). They are placeholders until someone listens to them on a phone.
+
+## Optional map characters
+
+The restored Demogorgon joins Vine Dog as a selectable discovered character. Source history,
+gait metadata and rebuilding are documented in [CHARACTER_MOVEMENT.md](CHARACTER_MOVEMENT.md).

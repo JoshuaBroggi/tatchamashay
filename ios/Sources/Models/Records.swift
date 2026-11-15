@@ -132,12 +132,13 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
     case turtle, doubloon, spider
     /// Original six-legged creature restored from the earlier iPhone build.
     case vineDog
+    case demogorgon
     /// Keep models saved by another app version intact, even when their assets aren't bundled.
     case unavailable(String)
 
     /// Only bundled models can be chosen for a new beast.
     static let allCases: [BuiltInModel] = [
-        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider, .vineDog
+        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider, .vineDog, .demogorgon
     ]
 
     var rawValue: String {
@@ -153,6 +154,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .doubloon: "doubloon"
         case .spider: "spider"
         case .vineDog: "vine-dog"
+        case .demogorgon: "demogorgon"
         case .unavailable(let savedID): savedID
         }
     }
@@ -198,6 +200,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .doubloon: "Lucky Doubloon"
         case .spider: "Silky the Spider"
         case .vineDog: "Vine Dog"
+        case .demogorgon: "Demogorgon"
         case .unavailable: "Saved beast"
         }
     }
@@ -216,6 +219,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .doubloon: "coin"
         case .spider: "spider"
         case .vineDog: "dog"
+        case .demogorgon: "flower beast"
         case .unavailable: "treasure"
         }
     }
@@ -234,6 +238,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .doubloon: "circle.circle.fill"
         case .spider: "ladybug.fill"
         case .vineDog: "dog.fill"
+        case .demogorgon: "figure.walk"
         case .unavailable: "shippingbox.fill"
         }
     }
@@ -250,6 +255,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
         case .spider: .chestnut
+        case .demogorgon: .cream
         case .unavailable: .gold
         }
     }

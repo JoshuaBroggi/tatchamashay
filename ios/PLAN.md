@@ -44,6 +44,18 @@ controls and explain any missing models or sounds; playable fallbacks remain ava
 
 ## Product rules
 
+### Optional character exploration
+
+Map settings includes **Show 3D**, initially off. Enabling it adds a tilted street map and the child's
+selected discovered character. **Use 2D map** retains character exploration on a flat map. Turning
+the mode off restores the regular map and existing chest flow. Treasure selection, placement, GPS
+eligibility and collection rules stay the same in either mode.
+
+While enabled, a new find atomically becomes the child's active character. My Chest offers **Be this
+character** for any earlier discovery, with a rising-flame transition. Selections are per child and
+use collected snapshots. Sound and Reduced Motion controls apply. See
+[character movement](Assets/CHARACTER_MOVEMENT.md) for the canonical asset contract.
+
 ### Map and collection
 
 - Unfound means a valid saved, nonremoved family placement that the selected child has never collected.

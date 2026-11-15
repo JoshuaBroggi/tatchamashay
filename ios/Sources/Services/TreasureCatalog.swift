@@ -106,6 +106,7 @@ struct TreasureCatalog: Sendable {
             let phase: Float
         }
         let parts: [Part]
+        var joints: [Part]? = nil
     }
 
     struct PaintRegion: Codable, Hashable, Identifiable, Sendable {

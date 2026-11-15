@@ -48,6 +48,16 @@ private struct CharacterStage: View {
             content.add(scene.pivot)
             scene.idle = loaded.idleMotion()
             scene.walk = CharacterWalkPlayer(root: entity, entry: loaded.entry)
+            if look.sparkles != .none {
+                let count = look.sparkles == .some ? 6 : 12
+                for index in 0..<count {
+                    let dot = ModelEntity(mesh: .generateSphere(radius: 0.005),
+                                          materials: [UnlitMaterial(color: .init(white: 1, alpha: 1))])
+                    let angle = Float(index) * .pi * 2 / Float(count)
+                    dot.position = [cos(angle) * 0.22, sin(angle * 3) * 0.08, sin(angle) * 0.22]
+                    scene.pivot.addChild(dot)
+                }
+            }
             scene.walking = walking
             scene.calm = calm
             scene.heading = heading
@@ -87,13 +97,18 @@ private final class CharacterScene {
     var calm = false
     var heading: Double = 0
     var time: Double = 0
+    private var previousState: Int?
 
     func update(_ delta: Double) {
         time += min(delta, 0.1)
-        idle?.reset()
-        walk?.reset()
+        let state = calm ? 0 : (walking ? 1 : 2)
+        if previousState != state {
+            idle?.reset()
+            walk?.reset()
+            previousState = state
+        }
         pivot.position = .zero
-        pivot.orientation = simd_quatf(angle: Float(-heading * .pi / 180), axis: [0, 1, 0])
+        pivot.orientation = simd_quatf(angle: Float((180 - heading) * .pi / 180), axis: [0, 1, 0])
         guard !calm else { return }
         if walking {
             walk?.update(time)
@@ -115,7 +130,19 @@ final class CharacterWalkPlayer {
         let phase: Float
     }
     private let parts: [Part]
-    var partCount: Int { parts.count }
+    private struct Joint {
+        let index: Int
+        let axis: SIMD3<Float>
+        let amplitude: Float
+        let phase: Float
+    }
+    private struct Skeleton {
+        let entity: ModelEntity
+        let rest: [Transform]
+        let joints: [Joint]
+    }
+    private let skeletons: [Skeleton]
+    var partCount: Int { parts.count + skeletons.reduce(0) { $0 + $1.joints.count } }
 
     init(root: Entity, entry: TreasureCatalog.Entry?) {
         if let locomotion = entry?.locomotion {
@@ -137,9 +164,34 @@ final class CharacterWalkPlayer {
                             amplitude: (part.degrees ?? 25) * .pi / 180, phase: Float(index % 2) * .pi)
             }
         }
+        var rigs: [Skeleton] = []
+        if let joints = entry?.locomotion?.joints {
+            TreasureEntities.visit(root) { entity in
+                guard let model = entity as? ModelEntity, !model.jointTransforms.isEmpty else { return }
+                let targets: [Joint] = joints.compactMap { joint in
+                    guard joint.axis.count == 3, joint.axis.allSatisfy(\.isFinite),
+                          let index = model.jointNames.firstIndex(where: { $0.split(separator: "/").last.map(String.init) == joint.name }),
+                          index < model.jointTransforms.count else { return nil }
+                    let axis = SIMD3<Float>(joint.axis[0], joint.axis[1], joint.axis[2])
+                    guard simd_length_squared(axis) > 0 else { return nil }
+                    return Joint(index: index, axis: simd_normalize(axis),
+                                 amplitude: joint.degrees * .pi / 180, phase: joint.phase)
+                }
+                if !targets.isEmpty { rigs.append(Skeleton(entity: model, rest: model.jointTransforms, joints: targets)) }
+            }
+        }
+        skeletons = rigs
     }
 
     func update(_ time: Double) {
+        for skeleton in skeletons {
+            var transforms = skeleton.rest
+            for joint in skeleton.joints {
+                transforms[joint.index].rotation = skeleton.rest[joint.index].rotation * simd_quatf(
+                    angle: sin(Float(time) * .pi * 3 + joint.phase) * joint.amplitude, axis: joint.axis)
+            }
+            skeleton.entity.jointTransforms = transforms
+        }
         for part in parts {
             var pose = part.rest
             pose.rotation = part.rest.rotation * simd_quatf(
@@ -148,5 +200,8 @@ final class CharacterWalkPlayer {
         }
     }
 
-    func reset() { for part in parts { part.entity.transform = part.rest } }
+    func reset() {
+        for part in parts { part.entity.transform = part.rest }
+        for skeleton in skeletons { skeleton.entity.jointTransforms = skeleton.rest }
+    }
 }
