@@ -13,6 +13,7 @@ struct HuntView: View {
     @State private var framedMap = false
     @State private var selectedID: ChestPlacement.ID?
     @State private var choosing = false
+    @State private var mapExpanded = false
     @State private var tracker: DigRangeTracker?
     @State private var dig = DigState(showsDig: false, signal: .foggy, warmth: nil)
     @State private var distance: Double?
@@ -29,7 +30,10 @@ struct HuntView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            PirateMapFrame(title: nil) { map }
+            PirateMapFrame(title: nil) {
+                // Keep one live MapKit view so covered annotations cannot remain accessible.
+                if mapExpanded { Palette.parchment } else { map }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
@@ -57,6 +61,7 @@ struct HuntView: View {
             frameMapIfNeeded()
         }
         .sheet(isPresented: $choosing) { treasureChooser }
+        .fullScreenCover(isPresented: $mapExpanded) { expandedMap }
         .fullScreenCover(item: $reveal) { reveal in
             ChestOpeningView(look: reveal.record.savedCopy, foundAgain: reveal.foundAgain,
                              hiddenBy: family.parent?.displayName) {
@@ -91,7 +96,7 @@ struct HuntView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(saving)
-                    .accessibilityLabel("Find \(name(of: placement))")
+                    .accessibilityLabel("Find \(hiddenLabel(for: placement))")
                     .accessibilityIdentifier("treasureMarker-\(placement.id)")
                 }
                 .annotationTitles(.hidden)
@@ -116,17 +121,52 @@ struct HuntView: View {
                     .font(Typeface.body(18, weight: .semibold))
                     .foregroundStyle(Palette.textPrimary)
                     .accessibilityIdentifier("huntProgress")
-                Button { frameAllTreasures() } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .frame(width: 44, height: 44)
-                }
-                .foregroundStyle(Palette.gold)
-                .accessibilityLabel("Show all treasures")
-                .accessibilityIdentifier("showAllTreasures")
             }
+            Button { mapExpanded = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+            }
+            .foregroundStyle(Palette.gold)
+            .accessibilityLabel("Expand map to full screen")
+            .accessibilityIdentifier("expandMap")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    private var expandedMap: some View {
+        ZStack {
+            map.ignoresSafeArea(edges: .bottom)
+            VStack(alignment: .leading) {
+                Button { mapExpanded = false } label: {
+                    Label("Done", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .background(Palette.parchment, in: Capsule())
+                }
+                .accessibilityLabel("Close full-screen map")
+                .accessibilityIdentifier("closeFullScreenMap")
+                Spacer()
+                if !family.unfoundPlacements.isEmpty {
+                    HStack {
+                        Spacer()
+                        Button { frameAllTreasures() } label: {
+                            Label("Show all treasures", systemImage: "viewfinder")
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 44)
+                                .background(Palette.parchment, in: Capsule())
+                        }
+                        .accessibilityIdentifier("showAllTreasures")
+                    }
+                }
+            }
+            .font(Typeface.body(17, weight: .semibold))
+            .foregroundStyle(Palette.mapInk)
+            .buttonStyle(.plain)
+            .padding(16)
+        }
+        .background(Palette.parchment.ignoresSafeArea())
+        .preferredColorScheme(.light)
     }
 
     private var bottomPanel: some View {
@@ -172,7 +212,7 @@ struct HuntView: View {
     @ViewBuilder
     private func hunting(_ placement: ChestPlacement) -> some View {
         HStack {
-            Text(name(of: placement))
+            Text(hiddenLabel(for: placement))
                 .font(Typeface.headline(26))
                 .accessibilityIdentifier("selectedTreasure")
             Spacer()
@@ -225,7 +265,7 @@ struct HuntView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.gold)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(name(of: placement)).font(Typeface.body(18, weight: .semibold))
+                            Text(hiddenLabel(for: placement)).font(Typeface.body(18, weight: .semibold))
                             if !placement.hint.isEmpty {
                                 Text(placement.hint).font(Typeface.body(14)).foregroundStyle(Palette.textSecondary)
                             }
@@ -236,7 +276,7 @@ struct HuntView: View {
                     .foregroundStyle(Palette.textPrimary)
                     .padding(.vertical, 6)
                 }
-                .accessibilityLabel("Choose \(name(of: placement))")
+                .accessibilityLabel("Choose \(hiddenLabel(for: placement))")
                 .accessibilityIdentifier("chooseTreasure-\(placement.id)")
                 .listRowBackground(Palette.ground2)
             }
@@ -250,8 +290,12 @@ struct HuntView: View {
         .tint(Palette.gold)
     }
 
-    private func name(of placement: ChestPlacement) -> String {
-        family.design(for: placement)?.version(placement.versionID)?.look.name ?? "Treasure"
+    /// Use all placements so collecting another treasure doesn't renumber the remaining Xs.
+    private func hiddenLabel(for placement: ChestPlacement) -> String {
+        guard let index = family.mapPlacements.firstIndex(where: { $0.id == placement.id }) else {
+            return "Hidden treasure"
+        }
+        return "Hidden treasure \(index + 1)"
     }
 
     private func select(_ placement: ChestPlacement) {

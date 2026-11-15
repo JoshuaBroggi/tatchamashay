@@ -79,7 +79,7 @@ final class FamilySliceUITests: XCTestCase {
         XCUIDevice.shared.location = XCUILocation(location: CLLocation(latitude: 37.7724, longitude: -122.4862))
         app.tabBars.buttons["Map"].tap()
         app.buttons["chooseTreasure"].tap()
-        app.buttons["Choose Wobbly Crown"].tap()
+        app.buttons["Choose Hidden treasure 1"].tap()
         let dig = app.buttons["dig"]
         sleep(4)
         XCTAssertFalse(dig.exists, "no Dig! 330 m away")

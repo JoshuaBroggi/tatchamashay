@@ -40,7 +40,7 @@ final class ChildCreationUITests: XCTestCase {
         let choose = app.buttons["chooseTreasure"]
         XCTAssertTrue(choose.waitForExistence(timeout: 5))
         choose.tap()
-        app.buttons["Choose Star Compass"].tap()
+        app.buttons["Choose Hidden treasure 1"].tap()
         app.buttons["weFoundIt"].tap()
         app.buttons["Yes, we found it"].tap()
         let open = app.buttons["openChest"]

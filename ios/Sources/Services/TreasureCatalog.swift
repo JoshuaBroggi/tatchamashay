@@ -120,7 +120,7 @@ struct TreasureCatalog: Sendable {
         let title: String
         let creator: String
         let source: URL
-        let sourceCommit: String
+        let sourceCommit: String?
         let usage: String
         let changes: String
     }

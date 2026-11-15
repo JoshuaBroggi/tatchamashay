@@ -63,7 +63,8 @@ struct TreasurePaintTests {
         for model in BuiltInModel.allCases {
             let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: model.defaultColor, name: "x"))
             let regions = TreasureCatalog.bundled.paintRegions(for: model)
-            #expect((1...3).contains(regions.count), "\(model)")
+            let countRange = loaded.entry?.idleMotion == .skeletal ? 1...3 : 2...3
+            #expect(countRange.contains(regions.count), "\(model)")
             let names = regions.flatMap(\.parts)
             #expect(Set(names).count == names.count, "\(model) has overlapping paint areas")
             for name in names { #expect(loaded.entity.findEntity(named: name) != nil, "\(model): \(name)") }

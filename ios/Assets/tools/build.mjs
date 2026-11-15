@@ -177,7 +177,8 @@ async function main() {
     });
   }
 
-  const models = ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id));
+  const models = [...ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id)),
+    ...[...entries.values()].filter((entry) => !ORDER.includes(entry.id))];
   for (const model of models) if (PAINT_REGIONS[model.id]) model.paintRegions = PAINT_REGIONS[model.id];
   fs.writeFileSync(manifestPath, JSON.stringify({ ...old, version: 1, models }, null, 2) + '\n');
   if (failed) { console.error('Some models failed their checks.'); process.exit(1); }

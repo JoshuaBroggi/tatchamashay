@@ -252,12 +252,11 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .crown, .doubloon: .gold
         case .starCompass: .yellow
         case .potion: .purple
-        case .dragonEgg: .moss
+        case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
         case .spider: .chestnut
         case .demogorgon: .coral
         case .demodog: .moss
-        case .vineDog: .green
         case .unavailable: .gold
         }
     }
