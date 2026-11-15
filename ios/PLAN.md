@@ -1,5 +1,12 @@
 # Tatchamashay 2.0 — Product plan
 
+## Platform and content authority
+
+The iPhone app is the sole supported game. Browser gameplay and its PartyKit server are retired in
+`archive/browser/`. All new characters and features must be integrated and tested in the iPhone app.
+The iPhone manifest, catalog and record types define the content contract. Any future web tool is
+admin-only and must use that same contract and validation rules; no parallel game is maintained.
+
 ## The journey
 
 The child is always the player. A parent prepares beasts and chooses safe locations; the child opens

@@ -1,8 +1,8 @@
 # Tatchamashay 2.0 — iOS app
 
 SwiftUI iPhone app (iOS 18+, MapKit, RealityKit): a private family treasure map. Read `PLAN.md` for
-current product rules. The repository root guidelines describe the old 1.x web multiplayer game;
-the iOS app has no live multiplayer backend.
+current product rules. This is the sole supported game; `archive/browser/` is retired reference
+source. The app has no live multiplayer backend.
 
 ## Product invariants
 
