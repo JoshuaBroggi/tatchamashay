@@ -28,6 +28,22 @@ struct CreditsView: View {
                     }
                 }
             }
+            ForEach(catalog.sourcedModels) { entry in
+                if let source = entry.provenance {
+                    Section(entry.displayName) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(source.title).font(.headline)
+                            Text(source.creator)
+                            Text(source.changes)
+                                .font(.subheadline)
+                                .foregroundStyle(Palette.textSecondary)
+                            creditLink("Model source", to: source.source)
+                        }
+                        .padding(.vertical, 8)
+                        .accessibilityIdentifier("credit-\(entry.id)")
+                    }
+                }
+            }
             Section("Lettering") {
                 Text("Barlow Condensed — Copyright 2017 The Barlow Project Authors")
                 creditLink("Barlow font project", to: URL(string: "https://github.com/jpt/barlow")!)

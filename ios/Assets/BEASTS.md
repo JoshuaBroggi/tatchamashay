@@ -10,7 +10,7 @@ Joshua explicitly requested the rigged beasts and **no testing** for this change
 | Scooter the Scorpion / `scorpion` | Scorpion — anthonyvanoo | Only `Idle`, played at 0.65 speed; no Attack, Defend, Death or Walk clips. Purple toy body and oversized eyes. |
 | Button the Spider / `spider` | hi-fi-spider — jonmariano21 | `walk cycle` at 0.3 speed, in place; no circular travel. Pink body, oversized eyes, fewer polygons and no hair cards. |
 
-Every source's embedded `asset.extras` supplies the exact title, author, profile, source and CC-BY-4.0 license. The converted body is tintable; eyes and pupils stay readable in every color. The full attribution and adaptation statements are in `manifest.json` and are shown offline under Grown-ups → Settings → Treasure makers & credits. No source textures ship.
+For the three CC-BY creatures, each source's embedded `asset.extras` supplies the exact title, author, profile, source and CC-BY-4.0 license. The converted body is tintable; eyes and pupils stay readable in every color. The full attribution and adaptation statements are in `manifest.json` and are shown offline under Grown-ups → Settings → Treasure makers & credits. No source textures ship.
 
 - [Rigged T-Rex Fabulous](https://sketchfab.com/3d-models/rigged-t-rex-fabulous-4083ead8f9aa49b5b10407717bf6f60a), [TAREK SAAD](https://sketchfab.com/Tarek.Saad.Khalifa)
 - [Scorpion](https://sketchfab.com/3d-models/scorpion-4c0fd62d33ab4d2592ee0a1d985a480d), [anthonyvanoo](https://sketchfab.com/anthonyvanoo)
@@ -18,6 +18,20 @@ Every source's embedded `asset.extras` supplies the exact title, author, profile
 - All three: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 The scorpion and spider are presented as small, silly toy companions. Their anatomy is still recognizable; whether Emmanuel enjoys them remains a family judgment, not a claim from an unperformed play session.
+
+## Family-requested procedural creatures
+
+On 15 November 2026 Joshua explicitly requested **Demogorgon, Demodog and Vine Dog**, superseding the earlier exclusion of these three for this private family build. Their source rigs and baked idle clips are preserved from commit `2b397b3cad58d17722b5bd907433863b4881c9df` on `claude/demogorgon-rig-animate-6a2474`. This records the request and source history; it does not label the characters original or CC-BY.
+
+| ID | Rig | iPhone adaptation |
+|---|---|---|
+| `demogorgon` | 56 bones | Original flower face, anatomy colors and Idle; simplified mesh and no browser wrinkle maps |
+| `demodog` | 46 bones | Original four-legged rig and Idle; same material and size treatment |
+| `vine-dog` | 58 bones | Original six-legged rig, vine colors, closed snout and Idle; same size treatment |
+
+`tools/export-flower-beasts.mjs` reproduces the intermediate GLBs from pinned source without switching branches. `tools/convert-rigged-beasts.py` converts them to USDZ and adds the manifest records. The USDZs are 1,705,055 bytes (Demogorgon), 1,673,088 bytes (Demodog), and 1,675,111 bytes (Vine Dog). Each has one UsdSkel animation, and is available in the live picker, previews, reveal and collection detail through the shared model code. Source details appear in the credits screen from `provenance`, separate from the CC-BY license credits.
+
+See [RIGGED_BEAST_WORKFLOW.md](RIGGED_BEAST_WORKFLOW.md) for adding future converted GLBs, native Blender rigs, or directly authored iPhone USDZs. No future creatures are initiated by this change. Simulator and signed device builds succeeded. The expanded app installed and launched on Joshua’s iPhone on 15 November 2026; visible playback has not been inspected. No local tests were run.
 
 ## Excluded
 
@@ -28,7 +42,7 @@ The scorpion and spider are presented as small, silly toy companions. Their anat
 | `war_dinosaur_-_rigged.glb` — Lezalit | No animation clips despite its rigged name; combat presentation. |
 | `banana_tree.glb` — DJMiddi | No animation clips; scenery rather than a creature. |
 | `jungle_tree.glb` — kobaltsecond6c7d6150917a4267 | No animation clips; scenery rather than a creature. Author name above is the exact embedded value. |
-| `deathvader*`, `distortus_rex`, `jurassic_world_mosasaurus`, `rigged_mosasaurus_lego`, `scorpion/` FBX, every Demogorgon asset | Explicitly prohibited. No imports or derivatives. |
+| `deathvader*`, `distortus_rex`, `jurassic_world_mosasaurus`, `rigged_mosasaurus_lego`, `scorpion/` FBX | Explicitly prohibited. No imports or derivatives. |
 | `fluffy unicorn.glb`, `super lobster.glb` | On hold pending Joshua's confirmation of Tripo commercial terms. |
 
 Original sources remain recoverable from `v1-web-final` if the web directory moves or is retired.

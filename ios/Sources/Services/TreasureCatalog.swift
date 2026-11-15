@@ -44,6 +44,7 @@ struct TreasureCatalog: Sendable {
 
     /// The credits screen reads the same entries as the model loader, so attribution cannot drift.
     var creditedModels: [Entry] { (treasures + [chest]).filter { $0.attribution != nil } }
+    var sourcedModels: [Entry] { (treasures + [chest]).filter { $0.provenance != nil } }
 
     /// The file for a manifest path, if it is in the bundle.
     func url(for path: String?) -> URL? {
@@ -95,6 +96,8 @@ struct TreasureCatalog: Sendable {
         /// A single gentle skeletal clip, baked into the USDZ. Absent for procedural treasures.
         var skeletalAnimation: SkeletalAnimation?
         var attribution: Attribution?
+        /// Source history for family-authored/imported models without a CC-BY attribution claim.
+        var provenance: Provenance?
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
     }
@@ -112,6 +115,15 @@ struct TreasureCatalog: Sendable {
         let source: URL
         let license: String
         let licenseURL: URL
+        let changes: String
+    }
+
+    struct Provenance: Decodable, Hashable, Sendable {
+        let title: String
+        let creator: String
+        let source: URL
+        let sourceCommit: String?
+        let usage: String
         let changes: String
     }
 

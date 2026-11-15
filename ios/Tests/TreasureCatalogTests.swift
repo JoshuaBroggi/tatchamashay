@@ -82,8 +82,8 @@ struct TreasureCatalogTests {
     @Test("Every beast loads a real skeletal animation, including a cloned cached model")
     @MainActor
     func beastsHaveSkeletalAnimations() async throws {
-        for model in [BuiltInModel.tRex, .scorpion, .spider] {
-            let entry = try #require(catalog.entry(for: model))
+        for entry in catalog.treasures where entry.idleMotion == .skeletal {
+            let model = try #require(entry.model)
             #expect(entry.idleMotion == .skeletal)
             let specification = try #require(entry.skeletalAnimation)
             #expect(specification.name == "GentleIdle")
@@ -107,18 +107,35 @@ struct TreasureCatalogTests {
     @Test("The credits screen includes every imported model with complete attribution")
     func creditsMatchManifest() throws {
         let expected = ["t-rex": "TAREK SAAD", "scorpion": "anthonyvanoo", "spider": "jonmariano21"]
-        #expect(Set(catalog.creditedModels.map(\.id)) == Set(expected.keys))
-        #expect(Set(catalog.creditedModels.map(\.id)) == Set(catalog.treasures.filter {
-            $0.skeletalAnimation != nil
-        }.map(\.id)))
-        for entry in catalog.creditedModels {
-            let credit = try #require(entry.attribution)
-            #expect(credit.author == expected[entry.id])
-            #expect(!credit.title.isEmpty && !credit.changes.isEmpty)
+        for (id, author) in expected {
+            let credit = try #require(catalog.creditedModels.first { $0.id == id }?.attribution)
+            #expect(credit.author == author)
             #expect(credit.source.host() == "sketchfab.com")
             #expect(credit.authorURL.host() == "sketchfab.com")
             #expect(credit.license == "CC BY 4.0")
             #expect(credit.licenseURL.absoluteString == "https://creativecommons.org/licenses/by/4.0/")
+        }
+        #expect(Set((catalog.creditedModels + catalog.sourcedModels).map(\.id)) == Set(catalog.treasures.filter {
+            $0.skeletalAnimation != nil
+        }.map(\.id)))
+        for entry in catalog.creditedModels {
+            let credit = try #require(entry.attribution)
+            #expect(!credit.author.isEmpty && !credit.title.isEmpty && !credit.changes.isEmpty)
+            #expect(credit.source.host() != nil && credit.authorURL.host() != nil)
+            #expect(!credit.license.isEmpty && credit.licenseURL.host() != nil)
+        }
+    }
+
+    @Test("The three family-requested procedural creatures keep their exact source history")
+    func proceduralCreatureSources() throws {
+        for model in [BuiltInModel.demogorgon, .demodog, .vineDog] {
+            let entry = try #require(catalog.entry(for: model))
+            let source = try #require(entry.provenance)
+            #expect(source.sourceCommit == "2b397b3cad58d17722b5bd907433863b4881c9df")
+            #expect(source.source.host() == "github.com")
+            #expect(!source.creator.isEmpty && !source.changes.isEmpty)
+            #expect(entry.attribution == nil, "Do not label character adaptations CC-BY")
+            #expect(entry.skeletalAnimation?.sourceClip == "Idle")
         }
     }
 

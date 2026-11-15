@@ -1,10 +1,10 @@
 # Tatchamashay 2.0 assets
 
-The treasure chest, built-in treasures and sound effects for the iPhone app. The chest, nine original treasures and sounds are made from scratch by `tools/`. Three CC-BY creatures from the old game are converted by `tools/import-beasts.py`, with their original attribution in `manifest.json` and the grown-up's **Treasure makers & credits** screen. See [BEASTS.md](BEASTS.md) for provenance, tone choices and exclusions.
+The treasure chest, built-in treasures and sound effects for the iPhone app. The chest, nine original treasures and sounds are made from scratch by `tools/`. Three CC-BY creatures from the old game are converted by `tools/import-beasts.py`, with their original attribution in `manifest.json` and the grown-up's **Treasure makers & credits** screen. Three more family-requested procedural creatures (Demogorgon, Demodog and Vine Dog) use the generic rigged converter. See [BEASTS.md](BEASTS.md) for provenance, tone choices and exclusions, and [RIGGED_BEAST_WORKFLOW.md](RIGGED_BEAST_WORKFLOW.md) for future converted or native iPhone beasts.
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 12 treasures |
+| `Models/` | One USDZ per model: the chest and 15 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -26,6 +26,9 @@ The treasure chest, built-in treasures and sound effects for the iPhone app. The
 | `t-rex` | Buddy Rex | skeletal greeting | BeastBody |
 | `scorpion` | Scooter the Scorpion | skeletal idle | BeastBody |
 | `spider` | Button the Spider | skeletal tiptoe | BeastBody |
+| `demogorgon` | Demogorgon | skeletal idle | original colors |
+| `demodog` | Demodog | skeletal idle | original colors |
+| `vine-dog` | Vine Dog | skeletal idle | original colors |
 
 Original treasures are 0.13–0.35 m tall and stand on y = 0, facing +Z. Their files are 80–400 KB; the chest is about 690 KB. The creatures fit a 0.32 m box and stay below 2 MB each. Their white eyes and dark pupils stay fixed while the body takes the child's color.
 

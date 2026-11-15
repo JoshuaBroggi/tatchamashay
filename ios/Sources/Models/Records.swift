@@ -128,6 +128,8 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case turtle, doubloon
     case tRex = "t-rex"
     case scorpion, spider
+    case demogorgon, demodog
+    case vineDog = "vine-dog"
 
     var id: String { rawValue }
 
@@ -164,6 +166,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tRex: "Buddy Rex"
         case .scorpion: "Scooter the Scorpion"
         case .spider: "Button the Spider"
+        case .demogorgon: "Demogorgon"
+        case .demodog: "Demodog"
+        case .vineDog: "Vine Dog"
         }
     }
 
@@ -182,6 +187,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tRex: "dinosaur"
         case .scorpion: "scorpion"
         case .spider: "spider"
+        case .demogorgon: "Demogorgon"
+        case .demodog: "Demodog"
+        case .vineDog: "vine dog"
         }
     }
 
@@ -200,6 +208,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tRex: "pawprint.fill"
         case .scorpion: "ant.fill"
         case .spider: "ladybug.fill"
+        case .demogorgon: "figure.stand"
+        case .demodog: "pawprint.fill"
+        case .vineDog: "leaf.fill"
         }
     }
 
@@ -217,6 +228,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tRex: .green
         case .scorpion: .purple
         case .spider: .pink
+        case .demogorgon: .coral
+        case .demodog: .moss
+        case .vineDog: .green
         }
     }
 }
