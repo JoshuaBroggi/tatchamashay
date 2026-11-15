@@ -13,6 +13,7 @@ struct LegacyVineDogTests {
         let restored = try JSONDecoder().decode(TreasureLook.self, from: encoded)
         #expect(restored == look)
         #expect(restored.model.rawValue == "vine-dog")
-        #expect(!BuiltInModel.allCases.contains(.vineDog))
+        #expect(BuiltInModel.allCases.contains(.vineDog))
+        #expect(TreasureCatalog.bundled.entry(for: .vineDog) != nil)
     }
 }

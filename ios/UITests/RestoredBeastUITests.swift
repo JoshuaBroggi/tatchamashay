@@ -30,11 +30,10 @@ final class RestoredBeastUITests: XCTestCase {
                 reveal(swatch, in: app, upwards: true)
                 swatch.tap()
                 let painted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                    (try? Self.coloredFraction(preview.screenshot(), color: color)) ?? 0 > 0.015
+                    (try? Self.coloredFraction(Self.previewImage(in: app), color: color)) ?? 0 > 0.015
                 }, object: nil)
                 let result = XCTWaiter.wait(for: [painted], timeout: 10)
-                let screenshot = preview.screenshot()
-                let attachment = XCTAttachment(screenshot: screenshot)
+                let attachment = XCTAttachment(image: try Self.previewImage(in: app))
                 attachment.name = "\(name)-\(color)"
                 attachment.lifetime = .keepAlways
                 add(attachment)
@@ -58,8 +57,20 @@ final class RestoredBeastUITests: XCTestCase {
         XCTAssertTrue(element.isHittable)
     }
 
-    private static func coloredFraction(_ screenshot: XCUIScreenshot, color: String) throws -> Double {
-        let image = try XCTUnwrap(screenshot.image.cgImage)
+    @MainActor
+    private static func previewImage(in app: XCUIApplication) throws -> UIImage {
+        // RealityKit can expose an empty accessibility frame after changing models. Capture the
+        // visible 220-point preview below the navigation bar from the full screen instead.
+        let screenshot = app.screenshot().image
+        let image = try XCTUnwrap(screenshot.cgImage)
+        let scale = CGFloat(image.width) / app.frame.width
+        let frame = CGRect(x: 0, y: app.navigationBars.firstMatch.frame.maxY * scale,
+                           width: CGFloat(image.width), height: 220 * scale)
+        return UIImage(cgImage: try XCTUnwrap(image.cropping(to: frame)))
+    }
+
+    private static func coloredFraction(_ screenshot: UIImage, color: String) throws -> Double {
+        let image = try XCTUnwrap(screenshot.cgImage)
         let size = 128
         var pixels = [UInt8](repeating: 0, count: size * size * 4)
         return pixels.withUnsafeMutableBytes { bytes in
