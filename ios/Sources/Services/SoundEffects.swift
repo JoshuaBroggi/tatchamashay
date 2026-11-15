@@ -13,12 +13,18 @@ protocol SoundEffects: AnyObject {
 final class BundledSoundEffects: SoundEffects {
     private let settings: PlaySettings
     private var players: [SoundEffect: AVAudioPlayer] = [:]
+    private let audio: AudioSessionController
+    private let finish = PlayerFinish()
 
-    init(catalog: TreasureCatalog = .bundled, settings: PlaySettings) {
+    init(catalog: TreasureCatalog = .bundled, settings: PlaySettings, audio: AudioSessionController = .shared) {
         self.settings = settings
+        self.audio = audio
+        finish.onQuiet = { [weak self] in self?.wentQuiet() }
+        audio.onSilence { [weak self] in self?.players.values.forEach { $0.stop() } }
         for effect in SoundEffect.allCases {
             guard let url = catalog.soundURL(for: effect),
                   let player = try? AVAudioPlayer(contentsOf: url) else { continue }
+            player.delegate = finish
             player.prepareToPlay()
             players[effect] = player
         }
@@ -28,14 +34,30 @@ final class BundledSoundEffects: SoundEffects {
     var available: Set<SoundEffect> { Set(players.keys) }
 
     func play(_ effect: SoundEffect) {
-        guard settings.soundOn, let player = players[effect] else { return }
-        AudioSessionSetup.activate()
+        // During a phone call or while the app isn't in front, the effect is dropped.
+        guard settings.soundOn, let player = players[effect], audio.begin(.effects) else { return }
         player.currentTime = 0
         player.play()
     }
 
     func stopAll() {
         players.values.forEach { $0.stop() }
+        audio.end(.effects)
+    }
+
+    /// An effect finished. Once none is playing, let the audio session rest.
+    private func wentQuiet() {
+        if !players.values.contains(where: \.isPlaying) { audio.end(.effects) }
+    }
+}
+
+/// Tells `BundledSoundEffects` when an effect finishes.
+@MainActor
+private final class PlayerFinish: NSObject, AVAudioPlayerDelegate {
+    var onQuiet: (@MainActor () -> Void)?
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in self.onQuiet?() }
     }
 }
 
@@ -53,24 +75,4 @@ final class SilentSoundEffects: SoundEffects {
     }
 
     func stopAll() {}
-}
-
-/// One audio session for the guide and the effects: plays with the ringer switch on silent (the
-/// grown-up's switches in `PlaySettings` are the volume control) and mixes with other audio.
-@MainActor
-enum AudioSessionSetup {
-    private static var active = false
-
-    static func activate() {
-        guard !active else { return }
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.mixWithOthers, .duckOthers])
-            try session.setActive(true)
-            active = true
-        } catch {
-            // Sound is a bonus: without a session the hunt still plays, just quietly.
-            print("Audio session unavailable: \(error)")
-        }
-    }
 }

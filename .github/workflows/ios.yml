@@ -1,0 +1,88 @@
+name: iOS
+
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests
+    # The Xcode 27 image (preview). The app is built with Xcode 27; the
+    # general "macos-26" image only ships Xcode 26.x.
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: ./.github/workflows/ios-setup.sh xcode
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Pick an iPhone simulator
+        run: ./.github/workflows/ios-setup.sh simulator
+      - name: Generate project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Run unit tests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Tatchamashay.xcodeproj \
+            -scheme Tatchamashay \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath build \
+            -resultBundlePath build/unit.xcresult \
+            -only-testing:TatchamashayTests
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-xcresult
+          path: ios/build/unit.xcresult
+
+  walkthrough:
+    name: Walkthrough (UI tests)
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: ./.github/workflows/ios-setup.sh xcode
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Pick an iPhone simulator
+        run: ./.github/workflows/ios-setup.sh simulator
+      - name: Generate project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Run UI tests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Tatchamashay.xcodeproj \
+            -scheme Tatchamashay \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath build \
+            -resultBundlePath build/walkthrough.xcresult \
+            -only-testing:TatchamashayUITests
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-xcresult
+          path: ios/build/walkthrough.xcresult

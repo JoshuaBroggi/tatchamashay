@@ -10,7 +10,9 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
-    CODE_SIGNING_ALLOWED: NO
+    "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
+    DEVELOPMENT_TEAM: RAADXJAY3M
+    CODE_SIGN_STYLE: Automatic
 targets:
   Tatchamashay:
     type: application
@@ -30,6 +32,7 @@ targets:
       - path: Assets/Thumbnails
         type: folder
         buildPhase: resources
+      - path: Resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tatchamashay.app
