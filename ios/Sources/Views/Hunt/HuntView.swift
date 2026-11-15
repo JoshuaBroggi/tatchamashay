@@ -136,7 +136,7 @@ struct HuntView: View {
 
     private var expandedMap: some View {
         ZStack {
-            map.ignoresSafeArea()
+            map.ignoresSafeArea(edges: .bottom)
             VStack(alignment: .leading) {
                 Button { mapExpanded = false } label: {
                     Label("Done", systemImage: "arrow.down.right.and.arrow.up.left")
@@ -165,6 +165,7 @@ struct HuntView: View {
             .buttonStyle(.plain)
             .padding(16)
         }
+        .background(Palette.parchment.ignoresSafeArea())
         .preferredColorScheme(.light)
     }
 
