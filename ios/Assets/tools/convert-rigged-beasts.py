@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 import bpy
 from mathutils import Vector
-from pxr import Usd, UsdSkel, UsdGeom
+from pxr import Usd, UsdSkel, UsdGeom, UsdShade
 
 HERE = Path(__file__).resolve().parent
 ASSETS = HERE.parent
@@ -29,6 +29,10 @@ def inspect_package(path, spec):
                    UsdSkel.BindingAPI(p).GetJointIndicesPrimvar().HasValue()]
     if not skin_meshes:
         raise ValueError('No skinned mesh weights/indices in USDZ')
+    if tint_name := spec.get('tintMaterial'):
+        bound_materials = [UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()[0] for mesh in skin_meshes]
+        if not any(material and material.GetPrim().GetName() == tint_name for material in bound_materials):
+            raise ValueError('No skinned mesh uses the configured tint material: ' + tint_name)
     rotations = animations[0].GetRotationsAttr()
     if not rotations.GetTimeSamples():
         raise ValueError('Skeletal animation was lost during export')
@@ -49,6 +53,8 @@ def catalog_entry(spec, height):
                  tintableParts=spec.get('tintableParts', []), idleMotion='skeletal', movingParts=[],
                  skeletalAnimation=dict(name=spec.get('animationName', 'GentleIdle'), sourceClip=spec['clip'],
                                         speed=spec.get('speed', 1)), provenance=spec['provenance'])
+    if spec.get('tintMaterial'):
+        entry['tintMaterial'] = spec['tintMaterial']
     if spec.get('attribution'):
         entry['attribution'] = spec['attribution']
     return entry

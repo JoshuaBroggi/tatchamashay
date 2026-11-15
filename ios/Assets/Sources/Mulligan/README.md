@@ -60,8 +60,8 @@ mouth interior, shoulder/chest detail and moving head/jaw poses.
 This is art/conversion evidence, not observed RealityKit playback.
 
 Simulator compilation and signed iPhone compilation both succeeded. No local tests, UI tests,
-walkthroughs or runtime animation checks were run. The app was **not installed or launched** for
-this change; on-phone appearance, animation and performance remain unobserved. Existing generic
+walkthroughs or runtime animation checks were run. These authoring checks predate phone delivery. See [PR #24](https://github.com/JoshuaBroggi/tatchamashay/pull/24)
+for the latest installation/launch result; the art renders alone do not prove phone playback. Existing generic
 catalog coverage already enumerates every `BuiltInModel` and skeletal manifest entry for CI.
 
 ![Blender source idle, not app playback](idle-preview.gif)

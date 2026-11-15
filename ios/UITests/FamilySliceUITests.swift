@@ -2,7 +2,7 @@ import CoreLocation
 import XCTest
 
 /// Milestone 1 end to end: a parent hides one treasure on a reviewed spot, the child walks up, digs
-/// (twice, fast), opens the chest, and the treasure is still in the chest after the app restarts.
+/// (twice, fast), opens the chest, and the treasure stays collected after the app restarts.
 ///
 /// Start the simulator at the spot first, e.g. `xcrun simctl location booted set 37.7694,-122.4862`.
 /// Set SCREENSHOT_DIR (via TEST_RUNNER_SCREENSHOT_DIR) to also save screenshots as PNG files.
@@ -33,16 +33,21 @@ final class FamilySliceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No treasure is hidden yet."].waitForExistence(timeout: 5))
 
         // Parent hides a treasure
-        app.tabBars.buttons["Grown-ups"].tap()
+        app.buttons["parents"].tap()
+        let gateAnswer = app.textFields["parentGateAnswer"]
+        XCTAssertTrue(gateAnswer.waitForExistence(timeout: 5))
+        gateAnswer.tap()
+        gateAnswer.typeText("25")
+        app.buttons["parentGateContinue"].tap()
         app.buttons["hideTreasure"].tap()
-        let nameField = app.textFields["Funny name"]
+        let nameField = app.textFields["beastName"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
         nameField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "Wobbly Crown")
         snap("choose-treasure")
         app.buttons["chooseSpot"].tap()
 
-        let map = app.maps.firstMatch
+        let map = app.otherElements["spotMap"]
         XCTAssertTrue(map.waitForExistence(timeout: 5))
         sleep(3)
         let zoomHint = app.staticTexts["Zoom in until you can see paths, roads and water."]
@@ -56,7 +61,7 @@ final class FamilySliceUITests: XCTestCase {
 
         let hideHere = app.buttons["hideHere"]
         XCTAssertFalse(hideHere.isEnabled, "can't hide before the parent confirms the spot")
-        let clue = app.textFields.matching(NSPredicate(format: "placeholderValue BEGINSWITH 'Clue'")).firstMatch
+        let clue = app.textFields["spotHint"]
         clue.tap()
         clue.typeText("By the big tree\n")
         let checked = app.switches["spotChecked"]
@@ -67,11 +72,14 @@ final class FamilySliceUITests: XCTestCase {
         hideHere.tap()
         XCTAssertTrue(app.staticTexts["Wobbly Crown"].waitForExistence(timeout: 5))
         snap("parent-list")
+        app.buttons["parentDone"].tap()
 
         // Far from the spot: no Dig!
         let here = CLLocation(latitude: 37.7694, longitude: -122.4862)
         XCUIDevice.shared.location = XCUILocation(location: CLLocation(latitude: 37.7724, longitude: -122.4862))
         app.tabBars.buttons["Map"].tap()
+        app.buttons["chooseTreasure"].tap()
+        app.buttons["Choose Hidden treasure 1"].tap()
         let dig = app.buttons["dig"]
         sleep(4)
         XCTAssertFalse(dig.exists, "no Dig! 330 m away")
@@ -98,7 +106,7 @@ final class FamilySliceUITests: XCTestCase {
         sleep(2)
         snap("chest-revealed")
         done.tap()
-        XCTAssertTrue(app.buttons["Play again"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["huntComplete"].waitForExistence(timeout: 5))
         snap("finale")
 
         app.tabBars.buttons["My Chest"].tap()
@@ -117,27 +125,13 @@ final class FamilySliceUITests: XCTestCase {
         sleep(2)
         snap("chest-detail")
 
-        // Replay: found again, still one treasure
+        // Returning to the map never resets collection status or offers a parent-player turn.
         app.tabBars.buttons["Map"].tap()
-        app.buttons["Play again"].tap()
-        // The simulator sends nothing new for a fixed location, so the last fix goes stale:
-        // the map turns foggy and offers We found it instead of trusting an old position.
-        XCTAssertTrue(app.staticTexts["The map's a bit foggy here, matey!"].waitForExistence(timeout: 15))
-        XCTAssertFalse(dig.exists, "a stale location never shows Dig!")
-        snap("stale-location-foggy")
-        // A fresh fix a few meters away, like real GPS jitter, brings Dig! back.
-        XCUIDevice.shared.location = XCUILocation(location: CLLocation(latitude: 37.76943, longitude: -122.48621))
-        XCTAssertTrue(dig.waitForExistence(timeout: 15))
-        dig.tap()
-        XCTAssertTrue(app.buttons["openChest"].waitForExistence(timeout: 5))
-        app.buttons["openChest"].tap()
-        XCTAssertTrue(app.buttons["revealDone"].waitForExistence(timeout: 5))
-        sleep(2)
-        snap("found-again")
-        app.buttons["revealDone"].tap()
-        app.tabBars.buttons["My Chest"].tap()
-        app.navigationBars.buttons.firstMatch.tap()   // back from the detail page
-        XCTAssertTrue(app.staticTexts["1 treasure"].waitForExistence(timeout: 5), "a replay never duplicates")
+        XCTAssertTrue(app.staticTexts["huntComplete"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["dig"].exists)
+        XCTAssertFalse(app.buttons["chooseTreasure"].exists)
+        XCTAssertFalse(app.buttons["Play again"].exists)
+
     }
 
     @MainActor

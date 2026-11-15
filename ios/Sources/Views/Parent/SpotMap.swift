@@ -20,7 +20,7 @@ struct SpotMap: View {
             Map(position: $camera) {
                 UserAnnotation()
                 ForEach(Array(marks.enumerated()), id: \.offset) { _, mark in
-                    Annotation("", coordinate: mark.clCoordinate) { XMark(found: false, isNext: false) }
+                    Annotation("", coordinate: mark.clCoordinate) { XMark(isNext: false) }
                 }
             }
             .mapStyle(satellite

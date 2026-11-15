@@ -3,3 +3,5 @@
 build/
 DerivedData/
 xcuserdata/
+
+build-device/

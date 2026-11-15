@@ -12,7 +12,10 @@
       "clip": "Idle",
       "speed": 1,
       "triangleBudget": 12000,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": [
+        "DemogorgonBody"
+      ],
       "provenance": {
         "title": "Demogorgon",
         "creator": "Joshua Broggi / procedural web source",
@@ -33,7 +36,10 @@
       "clip": "Idle",
       "speed": 1,
       "triangleBudget": 12000,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": [
+        "DemodogBody"
+      ],
       "provenance": {
         "title": "Demodog",
         "creator": "Joshua Broggi / procedural web source",
@@ -54,7 +60,10 @@
       "clip": "Idle",
       "speed": 1,
       "triangleBudget": 12000,
-      "tintableParts": [],
+      "tintMaterial": "Material_0",
+      "tintableParts": [
+        "VineDogBody"
+      ],
       "provenance": {
         "title": "Vine Dog",
         "creator": "Joshua Broggi / procedural web source",

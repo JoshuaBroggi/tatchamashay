@@ -1,11 +1,8 @@
 import MapKit
 import SwiftUI
 
-/// The child's treasure map: real streets inside a parchment frame, only the next X, a dashed trail
-/// through the spots already found, the parent's place hint, a warm/cold signal, a big Dig! when
-/// close, and the parent's We found it. No direction arrows; the parent guides.
-///
-/// The hunt doesn't speak. It publishes each moment on `AppModel.huntMoment` for the guide.
+/// Every treasure the child has yet to collect, with a freely chosen target. Finding a treasure
+/// saves it before the reveal; stories and adventure order never gate exploration.
 struct HuntView: View {
     @Environment(AppModel.self) private var app
     @Environment(FamilyModel.self) private var family
@@ -13,32 +10,36 @@ struct HuntView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var camera: MapCameraPosition = .automatic
+    @State private var framedMap = false
+    @State private var selectedID: ChestPlacement.ID?
+    @State private var choosing = false
+    @State private var mapExpanded = false
     @State private var tracker: DigRangeTracker?
     @State private var dig = DigState(showsDig: false, signal: .foggy, warmth: nil)
-    @State private var moments = HuntMomentTracker()
-    @State private var momentLog: [GuideMoment] = []
+    @State private var distance: Double?
     @State private var reveal: Reveal?
     @State private var saving = false
     @State private var confirmingFound = false
     @State private var pause = HuntPause()
     @State private var screenAwake = ScreenAwake()
 
+    private var selected: ChestPlacement? {
+        family.unfoundPlacements.first { $0.id == selectedID }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
-            PirateMapFrame(title: family.adventure?.title) { map }
+            PirateMapFrame(title: nil) {
+                // Keep one live MapKit view so covered annotations cannot remain accessible.
+                if mapExpanded { Palette.parchment } else { map }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
         .background(Palette.ground1)
-        .onAppear {
-            family.startRunIfNeeded()
-            startMoments()
-            frameNextSpot()
-            keepScreenAwake()
-        }
+        .onAppear { frameMapIfNeeded(); tick(); keepScreenAwake() }
         .onDisappear { screenAwake.update(huntActive: false) }
         .onChange(of: scenePhase) { phaseChanged() }
-        .onChange(of: family.isRunComplete) { keepScreenAwake() }
         .task {
             while !Task.isCancelled {
                 tick()
@@ -47,19 +48,24 @@ struct HuntView: View {
         }
         .onChange(of: location.latestFix) { tick() }
         .onChange(of: app.demoFix) { tick() }
-        .onChange(of: family.currentRun?.id) { startMoments() }
-        .onChange(of: family.nextPlacement?.id) {
-            tracker = nil
-            dig = DigState(showsDig: false, signal: dig.signal, warmth: nil)
-            tick()
-            frameNextSpot()
-            keepScreenAwake()
+        .onChange(of: selectedID) { resetTarget() }
+        .onChange(of: family.child?.id) {
+            selectedID = nil
+            framedMap = false
+            resetTarget()
+            frameMapIfNeeded()
         }
+        .onChange(of: family.unfoundPlacements.map(\.id)) {
+            keepScreenAwake()
+            if selected == nil { selectedID = nil; resetTarget() }
+            frameMapIfNeeded()
+        }
+        .sheet(isPresented: $choosing) { treasureChooser }
+        .fullScreenCover(isPresented: $mapExpanded) { expandedMap }
         .fullScreenCover(item: $reveal) { reveal in
             ChestOpeningView(look: reveal.record.savedCopy, foundAgain: reveal.foundAgain,
                              hiddenBy: family.parent?.displayName) {
                 self.reveal = nil
-                publish(moments.revealClosed(reveal.record.placementID, progress: family.progress, now: .now))
             }
         }
         .confirmationDialog("Grown-ups: are you at the treasure spot together?",
@@ -68,8 +74,6 @@ struct HuntView: View {
             Button("Not yet", role: .cancel) {}
         }
     }
-
-    // MARK: Map
 
     private var map: some View {
         Map(position: $camera, interactionModes: [.pan, .zoom]) {
@@ -84,31 +88,23 @@ struct HuntView: View {
             } else {
                 UserAnnotation()
             }
-
-            // The trail joins the spots already found, in play order (the order they were found).
-            // It never reaches toward the next X.
-            if foundSpots.count > 1 {
-                MapPolyline(coordinates: foundSpots.map(\.spot.clCoordinate))
-                    .stroke(Palette.mapRed, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [9, 9]))
-            }
-            ForEach(foundSpots) { placement in
+            ForEach(family.unfoundPlacements) { placement in
                 Annotation("", coordinate: placement.spot.clCoordinate, anchor: .center) {
-                    FoundMark()
-                }
-                .annotationTitles(.hidden)
-            }
-            // Only the next X shows; the rest stay a surprise.
-            if let next = family.nextPlacement {
-                Annotation("", coordinate: next.spot.clCoordinate, anchor: .center) {
-                    XMark()
+                    Button { select(placement) } label: {
+                        XMark(isNext: selectedID == placement.id)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(saving)
+                    .accessibilityLabel("Find \(hiddenLabel(for: placement))")
+                    .accessibilityIdentifier("treasureMarker-\(placement.id)")
                 }
                 .annotationTitles(.hidden)
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
-        // Light map tiles keep streets and water readable outdoors, whatever the phone's appearance.
+        // The parchment tint keeps roads, paths, water and buildings readable.
         .environment(\.colorScheme, .light)
-        // A light parchment tint. Streets, water and buildings stay readable.
         .colorMultiply(Color(hex: 0xF6EBD0))
         .mapControls {
             MapUserLocationButton()
@@ -116,61 +112,95 @@ struct HuntView: View {
         }
     }
 
-    private var foundSpots: [ChestPlacement] {
-        family.adventurePlacements.filter { family.isFoundThisRun($0) }
-    }
-
     private var header: some View {
-        HStack(alignment: .center) {
+        HStack {
             Overline(text: "Treasure Map")
             Spacer()
-            if !family.adventurePlacements.isEmpty {
-                let progress = family.progress
-                HStack(spacing: 10) {
-                    ProgressPips(found: progress.foundCount, total: progress.total)
-                    Text("\(progress.foundCount) of \(progress.total) found")
-                        .font(Typeface.body(18, weight: .semibold))
-                        .foregroundStyle(Palette.textPrimary)
-                        .accessibilityIdentifier("huntProgress")
-                }
+            if !family.mapPlacements.isEmpty {
+                Text("\(family.mapPlacements.count - family.unfoundPlacements.count) of \(family.mapPlacements.count) found")
+                    .font(Typeface.body(18, weight: .semibold))
+                    .foregroundStyle(Palette.textPrimary)
+                    .accessibilityIdentifier("huntProgress")
             }
+            Button { mapExpanded = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+            }
+            .foregroundStyle(Palette.gold)
+            .accessibilityLabel("Expand map to full screen")
+            .accessibilityIdentifier("expandMap")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Palette.ground1)
-        .overlay(alignment: .topLeading) { momentProbe }
     }
 
-    /// Debug builds: the moments published so far, for the UI test. Invisible.
-    @ViewBuilder
-    private var momentProbe: some View {
-        #if DEBUG
-        Color.clear
-            .frame(width: 1, height: 1)
-            .accessibilityElement()
-            .accessibilityIdentifier("huntMoments")
-            .accessibilityValue(momentLog.map(\.rawValue).joined(separator: ","))
-        #endif
+    private var expandedMap: some View {
+        ZStack {
+            map.ignoresSafeArea(edges: .bottom)
+            VStack(alignment: .leading) {
+                Button { mapExpanded = false } label: {
+                    Label("Done", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .background(Palette.parchment, in: Capsule())
+                }
+                .accessibilityLabel("Close full-screen map")
+                .accessibilityIdentifier("closeFullScreenMap")
+                Spacer()
+                if !family.unfoundPlacements.isEmpty {
+                    HStack {
+                        Spacer()
+                        Button { frameAllTreasures() } label: {
+                            Label("Show all treasures", systemImage: "viewfinder")
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 44)
+                                .background(Palette.parchment, in: Capsule())
+                        }
+                        .accessibilityIdentifier("showAllTreasures")
+                    }
+                }
+            }
+            .font(Typeface.body(17, weight: .semibold))
+            .foregroundStyle(Palette.mapInk)
+            .buttonStyle(.plain)
+            .padding(16)
+        }
+        .background(Palette.parchment.ignoresSafeArea())
+        .preferredColorScheme(.light)
     }
 
-    // MARK: Bottom panel
-
-    @ViewBuilder
     private var bottomPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if family.adventurePlacements.isEmpty {
-                Text("No treasure is hidden yet.")
-                    .font(Typeface.headline(28))
-                Text("Grown-ups: hide one from the Grown-ups tab.")
-                    .font(Typeface.body(16))
-                    .foregroundStyle(Palette.textSecondary)
-            } else if family.isRunComplete {
-                finale
-            } else if let next = family.nextPlacement {
-                hunting(next)
+        VStack(alignment: .leading, spacing: 12) {
+            if family.mapPlacements.isEmpty {
+                Text("No treasure is hidden yet.").font(Typeface.headline(28))
+                Text("Ask a grown-up to add a beast from Parents.")
+                    .font(Typeface.body(16)).foregroundStyle(Palette.textSecondary)
+            } else if family.unfoundPlacements.isEmpty {
+                Text("You found them all!")
+                    .font(Typeface.headline(32))
+                    .accessibilityIdentifier("huntComplete")
+                Button("My Chest") { app.selectedTab = .chest }
+                    .buttonStyle(GoldButtonStyle())
+                    .accessibilityIdentifier("showMyChest")
+            } else {
+                Button { choosing = true } label: {
+                    Label(selected == nil ? "Choose a treasure" : "Choose another treasure", systemImage: "map")
+                }
+                .buttonStyle(OutlineButtonStyle(height: 44))
+                .disabled(saving)
+                .accessibilityIdentifier("chooseTreasure")
+                if let selected {
+                    hunting(selected)
+                } else {
+                    Text("Tap any X to explore.")
+                        .font(Typeface.body(20, weight: .semibold))
+                    Text("\(family.unfoundPlacements.count) treasures waiting")
+                        .font(Typeface.body(15)).foregroundStyle(Palette.textSecondary)
+                }
             }
             if let error = family.errorMessage {
                 Text(error).font(Typeface.body(15)).foregroundStyle(Palette.invented)
+                    .accessibilityIdentifier("huntError")
             }
         }
         .foregroundStyle(Palette.textPrimary)
@@ -180,96 +210,126 @@ struct HuntView: View {
     }
 
     @ViewBuilder
-    private func hunting(_ next: ChestPlacement) -> some View {
-        if !next.hint.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Overline(text: "Clue · treasure \(family.progress.nextNumber ?? 1)")
-                Text(next.hint)
-                    .font(Typeface.body(22, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("huntHint")
+    private func hunting(_ placement: ChestPlacement) -> some View {
+        HStack {
+            Text(hiddenLabel(for: placement))
+                .font(Typeface.headline(26))
+                .accessibilityIdentifier("selectedTreasure")
+            Spacer()
+            if let distance {
+                Text("\(Int(distance.rounded())) m away")
+                    .font(Typeface.body(15)).foregroundStyle(Palette.textSecondary)
+                    .accessibilityIdentifier("treasureDistance")
             }
         }
-
+        if !placement.hint.isEmpty {
+            Text(placement.hint)
+                .font(Typeface.body(20, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("huntHint")
+        }
         if dig.signal == .foggy {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("The map's a bit foggy here, matey!")
-                    .font(Typeface.body(19, weight: .semibold))
-                    .foregroundStyle(Palette.rune)
-                Text(location.isDenied
-                     ? "Location is off. Grown-ups: tap We found it when you reach the spot."
-                     : "Grown-ups: tap We found it when you reach the spot.")
-                    .font(Typeface.body(15))
-                    .foregroundStyle(Palette.textSecondary)
-            }
+            Text("The map's a bit foggy here, matey!")
+                .font(Typeface.body(17, weight: .semibold)).foregroundStyle(Palette.rune)
+            Text(location.isDenied
+                 ? "Location is off. Grown-ups: tap We found it at the spot."
+                 : "Grown-ups: tap We found it at the spot.")
+                .font(Typeface.body(14)).foregroundStyle(Palette.textSecondary)
         } else {
             WarmthBar(warmth: dig.warmth)
         }
-
-        if dig.showsDig {
+        if dig.showsDig && dig.signal == .good {
             Button("Dig!") { find(method: .dig) }
-                .buttonStyle(GoldButtonStyle(height: 96, fontSize: 44))
+                .buttonStyle(GoldButtonStyle(height: 72, fontSize: 36))
                 .disabled(saving)
-                .transition(.scale.combined(with: .opacity))
                 .accessibilityIdentifier("dig")
         }
-
-        // Always there, always works: a reward never depends on GPS.
         Button("We found it") { confirmingFound = true }
-            .buttonStyle(OutlineButtonStyle(height: 56))
+            .buttonStyle(OutlineButtonStyle(height: 48))
             .disabled(saving)
             .accessibilityIdentifier("weFoundIt")
-
         if app.isDemo {
-            Button("Sail here (demo only)") { app.sail(to: next.spot) }
+            Button("Sail here (demo only)") { app.sail(to: placement.spot) }
                 .buttonStyle(OutlineButtonStyle(height: 40))
         }
-
         Text("Stay on paths · play with a grown-up nearby")
-            .font(Typeface.body(13))
-            .foregroundStyle(Palette.textSecondary)
+            .font(Typeface.body(12)).foregroundStyle(Palette.textSecondary)
             .frame(maxWidth: .infinity)
     }
 
-    private var finale: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Overline(text: family.adventure?.goal ?? "Hunt complete")
-            Text(family.adventure?.finale ?? "Back to the ship!")
-                .font(Typeface.headline(44))
-                .textCase(.uppercase)
-                .accessibilityIdentifier("huntFinale")
-            Text("Every treasure is safe in \(family.child?.pirateName ?? "your")'s chest.")
-                .font(Typeface.body(16))
-                .foregroundStyle(Palette.textSecondary)
-            Button("Play again") { family.startNewRun() }
-                .buttonStyle(OutlineButtonStyle())
+    /// A list makes even treasures at exactly the same coordinate individually reachable.
+    private var treasureChooser: some View {
+        NavigationStack {
+            List(family.unfoundPlacements) { placement in
+                Button { select(placement); choosing = false } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.gold)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(hiddenLabel(for: placement)).font(Typeface.body(18, weight: .semibold))
+                            if !placement.hint.isEmpty {
+                                Text(placement.hint).font(Typeface.body(14)).foregroundStyle(Palette.textSecondary)
+                            }
+                        }
+                        Spacer()
+                        if selectedID == placement.id { Image(systemName: "checkmark") }
+                    }
+                    .foregroundStyle(Palette.textPrimary)
+                    .padding(.vertical, 6)
+                }
+                .accessibilityLabel("Choose \(hiddenLabel(for: placement))")
+                .accessibilityIdentifier("chooseTreasure-\(placement.id)")
+                .listRowBackground(Palette.ground2)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Palette.ground1)
+            .navigationTitle("Choose a treasure")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { choosing = false } }
+            }
         }
+        .tint(Palette.gold)
     }
 
-    // MARK: Logic
-
-    /// Opens the map at street level around the next X, so roads and paths nearby are visible.
-    /// At the finale, shows the whole trail instead.
-    private func frameNextSpot() {
-        if let next = family.nextPlacement {
-            camera = .camera(MapCamera(centerCoordinate: next.spot.clCoordinate, distance: 700))
-        } else if family.isRunComplete, !foundSpots.isEmpty {
-            let rect = foundSpots
-                .map { MKMapRect(origin: MKMapPoint($0.spot.clCoordinate), size: MKMapSize(width: 1, height: 1)) }
-                .reduce(MKMapRect.null) { $0.union($1) }
-            let pad = max(rect.width, rect.height) * 0.35 + 300
-            camera = .rect(rect.insetBy(dx: -pad, dy: -pad))
+    /// Use all placements so collecting another treasure doesn't renumber the remaining Xs.
+    private func hiddenLabel(for placement: ChestPlacement) -> String {
+        guard let index = family.mapPlacements.firstIndex(where: { $0.id == placement.id }) else {
+            return "Hidden treasure"
         }
+        return "Hidden treasure \(index + 1)"
     }
 
-    private func startMoments() {
-        guard let run = family.currentRun else { return }
-        publish(moments.start(run: run.id, progress: family.progress, now: .now))
+    private func select(_ placement: ChestPlacement) {
+        guard !saving else { return }
+        selectedID = placement.id
+    }
+
+    private func resetTarget() {
+        tracker = selected.map { DigRangeTracker(target: $0.spot) }
+        dig = DigState(showsDig: false, signal: .foggy, warmth: nil)
+        distance = nil
+        confirmingFound = false
+        tick()
+    }
+
+    /// Fit every remaining treasure once; selecting or walking never overrides the child's pan/zoom.
+    private func frameMapIfNeeded() {
+        guard !framedMap else { return }
+        frameAllTreasures()
+    }
+
+    private func frameAllTreasures() {
+        guard !family.unfoundPlacements.isEmpty else { return }
+        let rect = family.unfoundPlacements
+            .map { MKMapRect(origin: MKMapPoint($0.spot.clCoordinate), size: MKMapSize(width: 1, height: 1)) }
+            .reduce(MKMapRect.null) { $0.union($1) }
+        let pad = max(rect.width, rect.height) * 0.25 + 300
+        camera = .rect(rect.insetBy(dx: -pad, dy: -pad))
+        framedMap = true
     }
 
     /// The screen stays on while there is a treasure left to find and the hunt is in front.
     private func keepScreenAwake() {
-        screenAwake.update(huntActive: scenePhase == .active && family.nextPlacement != nil && !family.isRunComplete)
+        screenAwake.update(huntActive: scenePhase == .active && !family.unfoundPlacements.isEmpty)
     }
 
     /// Away from the screen (another app, the lock screen): stop the voice and sounds and stop
@@ -285,7 +345,6 @@ struct HuntView: View {
         } else {
             pause.pause(now: .now)
             if scenePhase == .background {
-                app.voice.stop()
                 app.sounds.stopAll()
             }
         }
@@ -293,41 +352,35 @@ struct HuntView: View {
     }
 
     private func tick() {
-        guard !pause.isPaused, let next = family.nextPlacement else { return }
-        if tracker?.target != next.spot { tracker = DigRangeTracker(target: next.spot) }
+        guard !pause.isPaused, let selected else { return }
+        if tracker?.target != selected.spot { tracker = DigRangeTracker(target: selected.spot) }
         let now = Date.now
-        let fix = app.isDemo ? app.demoFix.map { LocationFix(coordinate: $0.coordinate, horizontalAccuracy: 5, timestamp: now) }
-                                ?? location.currentFix(now: now)
-                             : location.currentFix(now: now)
+        let fix = app.isDemo ? app.demoFix.map {
+            LocationFix(coordinate: $0.coordinate, horizontalAccuracy: 5, timestamp: now)
+        } ?? location.currentFix(now: now) : location.currentFix(now: now)
         guard let state = tracker?.update(with: fix, now: now) else { return }
-        if state != dig {
-            withAnimation(.spring(duration: 0.3)) { dig = state }
-        }
-        for event in moments.observe(state, progress: family.progress, now: now) { publish(event) }
+        dig = state
+        distance = fix.flatMap { FindRules.standard.trusts($0, now: now) ? Geo.distance($0.coordinate, selected.spot) : nil }
     }
 
     private func find(method: FindMethod) {
-        guard let next = family.nextPlacement, !saving else { return }
+        guard let selected, !saving else { return }
+        tick()
+        guard method != .dig || (dig.showsDig && dig.signal == .good) else { return }
         if method == .dig { app.sounds.play(.dig) }
         saving = true
-        let before = family.progress
         Task {
-            if let result = await family.recordFind(next, method: method) {
-                publish(moments.found(next.id, method: method, progress: before, now: .now))
+            if let result = await family.recordFind(selected, method: method),
+               result.record.childID == family.child?.id {
                 reveal = Reveal(result)
+                selectedID = nil
             }
             saving = false
         }
     }
-
-    private func publish(_ event: HuntMomentEvent?) {
-        guard let event else { return }
-        app.huntMoment = event
-        momentLog.append(event.moment)
-    }
 }
 
-/// What the chest reveal shows after a find.
+/// What the chest reveal shows after a successfully saved find.
 struct Reveal: Identifiable {
     let record: CollectionRecord
     let foundAgain: Bool
@@ -379,52 +432,17 @@ struct PirateMapFrame<Content: View>: View {
     }
 }
 
-/// The red X that marks a spot, with a parchment halo so it reads on any street. The hunt shows
-/// only the next one; parent setup shows every hidden spot.
+/// Every unfound treasure has an X; the selected one is larger.
 struct XMark: View {
-    var found = false
     var isNext = true
 
     var body: some View {
-        if found {
-            FoundMark()
-        } else {
-            Text("✕")
-                .font(Typeface.mapScript(isNext ? 52 : 34))
-                .foregroundStyle(Palette.mapRed)
-                .shadow(color: Palette.parchment, radius: 0, x: 1.5, y: 1.5)
-                .shadow(color: Palette.parchment, radius: 3)
-                .accessibilityLabel("Treasure spot")
-        }
-    }
-}
-
-/// A spot already found this run.
-struct FoundMark: View {
-    var body: some View {
-        Image(systemName: "checkmark.seal.fill")
-            .font(.system(size: 28))
-            .foregroundStyle(Palette.mapInk)
-            .background(Palette.parchment, in: Circle())
-            .accessibilityLabel("Treasure found here")
-    }
-}
-
-/// One dot per treasure, filled for each found.
-struct ProgressPips: View {
-    let found: Int
-    let total: Int
-
-    var body: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<total, id: \.self) { i in
-                Circle()
-                    .fill(i < found ? Palette.gold : Color.clear)
-                    .overlay(Circle().stroke(Palette.gold, lineWidth: 2))
-                    .frame(width: 12, height: 12)
-            }
-        }
-        .accessibilityHidden(true)
+        Text("✕")
+            .font(Typeface.mapScript(isNext ? 52 : 34))
+            .foregroundStyle(Palette.mapRed)
+            .shadow(color: Palette.parchment, radius: 0, x: 1.5, y: 1.5)
+            .shadow(color: Palette.parchment, radius: 3)
+            .accessibilityLabel("Treasure spot")
     }
 }
 

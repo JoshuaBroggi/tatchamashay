@@ -2,125 +2,96 @@ import Foundation
 import Testing
 @testable import Tatchamashay
 
-@Suite("A child's invention, hidden for the grown-up")
+@Suite("Parents create and place beasts")
 @MainActor
-struct ChildCreationTests {
+struct ParentCreationTests {
     let spot = Coordinate(latitude: 37.7694, longitude: -122.4862)
-    let look = TreasureLook(model: .starCompass, color: .blue, sparkles: .rainbow, name: "Snorty Muffin",
-                            sound: .snore, story: "It fell off the moon.")
+    let look = TreasureLook(model: .starCompass, color: .blue, sparkles: .rainbow,
+                            name: "Snorty Muffin", sound: .snore)
 
-    /// A family with a parent and a child, and nothing hidden.
-    func makeFamily(persistence: any FamilyPersistence = MemoryPersistence()) async -> FamilyModel {
-        let model = FamilyModel(store: LocalFamilyStore(persistence: persistence))
+    private func family(persistence: any FamilyPersistence = MemoryPersistence()) async -> FamilyModel {
+        let model = FamilyModel(store: LocalFamilyStore(persistence: persistence), isDemo: true)
         await model.load()
         await model.createFamily(parentName: "Dad", pirateName: "Captain E")
         return model
     }
 
-    @Test("Saving an invention makes a child-made design at version 1, and nothing is hidden")
-    func newDesign() async throws {
-        let family = await makeFamily()
-        let child = try #require(family.child)
-        let design = try #require(await family.saveInvention(look))
-
-        #expect(design.maker == .child(child.id))
-        #expect(design.versions.count == 1 && design.current.number == 1)
+    @Test("A single parent-made treasure is immediately available")
+    func singleTreasure() async throws {
+        let family = await family()
+        #expect(await family.hideTreasure(look, at: spot, hint: "", reviewedAt: .now))
+        let design = try #require(family.parentDesigns.first)
+        #expect(design.maker == .parent(try #require(family.parent).id))
         #expect(design.current.look == look)
-        #expect(family.inventions.map(\.id) == [design.id])
-        #expect(family.data.placements.isEmpty, "saving an invention never places it")
+        #expect(family.unfoundPlacements.count == 1)
+        #expect(family.chest.isEmpty)
+    }
+
+    @Test("A failed placement writes neither a design nor an empty adventure")
+    func failedReview() async {
+        let family = await family()
+        let before = family.data
+        #expect(!(await family.hideTreasure(look, at: spot, hint: "", reviewedAt: .now.addingTimeInterval(3_600))))
+        #expect(family.data == before)
+        #expect(family.errorMessage != nil)
+    }
+
+    @Test("A failed disk write keeps all data unchanged; retry adds exactly one beast")
+    func failedWrite() async throws {
+        let persistence = FlakyPersistence()
+        let family = await family(persistence: persistence)
+        let before = family.data
+        persistence.failNextWrites(1)
+        #expect(!(await family.hideTreasure(look, at: spot, hint: "", reviewedAt: .now)))
+        #expect(family.data == before)
+        #expect(try persistence.read() == before)
+        #expect(await family.hideTreasure(look, at: spot, hint: "", reviewedAt: .now))
+        #expect(family.data.designs.count == 1)
+        #expect(family.mapPlacements.count == 1)
+        #expect(family.data.adventures.count == 1)
+    }
+
+    @Test("Editing keeps placement identity and saved chest copies")
+    func editAfterCollection() async throws {
+        let family = await family()
+        #expect(await family.hideTreasure(look, at: spot, hint: "Tree", reviewedAt: .now))
+        let placement = try #require(family.mapPlacements.first)
+        _ = try #require(await family.recordFind(placement, method: .dig))
+        var edited = look
+        edited.name = "Sleepy Sprout"
+        edited.color = .gold
+        #expect(await family.hideTreasure(edited, at: spot, hint: "Gate", reviewedAt: .now, editing: placement.designID))
+        let design = try #require(family.data.design(placement.designID))
+        #expect(design.versions.count == 2)
+        #expect(design.version(placement.versionID)?.look == look)
+        #expect(family.mapPlacements.map(\.id) == [placement.id])
+        #expect(family.mapPlacements.first?.versionID == design.current.id)
+        #expect(family.unfoundPlacements.isEmpty)
+        #expect(family.chest.first?.savedCopy == look)
+    }
+
+    @Test("Legacy child-made drafts can be managed by parents without changing provenance")
+    func legacyChildDesign() async throws {
+        let fixture = Fixture()
+        let store = try await fixture.makeStore()
+        let draft = TreasureDesign(familyID: fixture.parent.id, maker: .child(fixture.child.id), look: look)
+        _ = try await store.saveDesign(draft)
+        let family = FamilyModel(store: store, isDemo: true)
+        await family.load()
+        #expect(family.parentDesigns.contains { $0.id == draft.id })
+        #expect(await family.hideTreasure(look, at: spot, hint: "", reviewedAt: .now, editing: draft.id))
+        #expect(family.data.design(draft.id)?.maker == .child(fixture.child.id))
+        #expect(family.mapPlacements.contains { $0.designID == draft.id })
+    }
+
+    @Test("Draft save creates no placement; editing an unknown ID cannot create a replacement")
+    func draftSave() async throws {
+        let family = await family()
+        let draft = try #require(await family.saveParentDesign(look))
+        #expect(family.mapPlacements.isEmpty)
         #expect(family.data.adventures.isEmpty)
-    }
-
-    @Test("Making a new version keeps the old one unchanged")
-    func newVersion() async throws {
-        let family = await makeFamily()
-        let first = try #require(await family.saveInvention(look))
-        var changed = look
-        changed.color = .gold
-        changed.name = "Snorty Biscuit"
-        let edited = try #require(await family.saveInvention(changed, editing: first.id))
-
-        #expect(edited.id == first.id)
-        #expect(edited.versions.map(\.number) == [1, 2])
-        #expect(edited.version(first.current.id)?.look == look, "old versions never change")
-        #expect(edited.current.look == changed)
-        #expect(family.inventions.count == 1, "an edit is not a second treasure")
-    }
-
-    @Test("Nothing is hidden until the grown-up confirms a reviewed spot")
-    func confirmationRequired() async throws {
-        let family = await makeFamily()
-        let design = try #require(await family.saveInvention(look))
-
-        let future = await family.hideForGrownUp(design: design.id, version: design.current.id, at: spot,
-                                                 hint: "Look near the back step.", reviewedAt: .now.addingTimeInterval(3_600))
-        #expect(!future, "a spot can't be reviewed in the future")
-        #expect(family.data.placements.isEmpty)
-        #expect(family.data.adventures.isEmpty, "a failed placement leaves no empty adventure behind")
-
-        let hidden = await family.hideForGrownUp(design: design.id, version: design.current.id, at: spot,
-                                                 hint: "Look near the back step.", reviewedAt: .now, guideID: "captain-tumblebeard")
-        #expect(hidden)
-        let adventure = try #require(family.adventure)
-        let placement = try #require(family.adventurePlacements.first)
-        #expect(adventure.placementIDs == [placement.id], "a one-treasure adventure")
-        #expect(family.hiddenBy(adventure)?.pirateName == "Captain E")
-        #expect(adventure.guideID == "captain-tumblebeard")
-        #expect(placement.designID == design.id && placement.versionID == design.current.id)
-        #expect(placement.placedBy == family.parent?.id, "the grown-up places it")
-        #expect(placement.hint == "Look near the back step.")
-    }
-
-    @Test("Hiding an unknown version saves nothing")
-    func unknownVersion() async throws {
-        let family = await makeFamily()
-        let design = try #require(await family.saveInvention(look))
-        let hidden = await family.hideForGrownUp(design: design.id, version: UUID(), at: spot, hint: "", reviewedAt: .now)
-        #expect(!hidden)
-        #expect(family.data.adventures.isEmpty && family.data.placements.isEmpty)
-    }
-
-    @Test("An adventure can't name a child outside the family as its hider")
-    func hiddenByMustBeInFamily() throws {
-        let parent = ParentAccount(displayName: "Dad")
-        var data = FamilyData()
-        try data.createFamily(parent: parent, child: ChildProfile(parentID: parent.id, pirateName: "E"))
-        let stranger = Adventure(familyID: parent.id, title: "?", goal: "?", hiddenBy: UUID())
-        #expect(throws: FamilyStoreError.unknownChild) { try data.saveAdventure(stranger) }
-    }
-
-    @Test("The grown-up finds it; a new version later never changes the found copy")
-    func findThenEdit() async throws {
-        let url = temporaryFileURL()
-        let family = await makeFamily(persistence: JSONFilePersistence(url: url))
-        let design = try #require(await family.saveInvention(look))
-        _ = await family.hideForGrownUp(design: design.id, version: design.current.id, at: spot, hint: "", reviewedAt: .now)
-        let placement = try #require(family.nextPlacement)
-
-        let result = try #require(await family.recordFind(placement, method: .parentConfirmed))
-        #expect(result.record.savedCopy == look)
-        #expect(family.isRunComplete, "one treasure, then the finale")
-
-        var changed = look
-        changed.model = .turtle
-        changed.name = "Sleepy Sprout"
-        let edited = try #require(await family.saveInvention(changed, editing: design.id))
-        #expect(edited.current.number == 2)
-        #expect(family.chest.first?.savedCopy == look, "the found copy keeps the look it had")
-        #expect(family.data.placement(placement.id)?.versionID == design.current.id, "the hidden spot keeps version 1")
-
-        let reopened = try await LocalFamilyStore(persistence: JSONFilePersistence(url: url)).load()
-        #expect(reopened.collections.first?.savedCopy == look)
-        #expect(reopened.design(design.id)?.versions.count == 2)
-        #expect(reopened.adventures.first?.hiddenBy == family.child?.id)
-    }
-
-    @Test("Adventures saved before hiddenBy existed still load")
-    func oldAdventuresDecode() throws {
-        let old = Adventure(familyID: UUID(), title: "Old", goal: "Find it")
-        var json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.family.encode(old)) as? [String: Any])
-        json.removeValue(forKey: "hiddenBy")
-        let decoded = try JSONDecoder.family.decode(Adventure.self, from: JSONSerialization.data(withJSONObject: json))
-        #expect(decoded.hiddenBy == nil && decoded.title == "Old")
+        #expect(draft.maker == .parent(try #require(family.parent).id))
+        #expect(await family.saveParentDesign(look, editing: UUID()) == nil)
+        #expect(family.parentDesigns.count == 1)
     }
 }

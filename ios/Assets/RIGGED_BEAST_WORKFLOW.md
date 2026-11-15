@@ -4,9 +4,9 @@ This is the shared delivery contract for new creatures, regardless of authoring 
 
 ## Worktree and coordination
 
-Never switch branches in `/Users/joshuabroggi/tatchamashay`. Fetch origin and create a fresh `codex/<task>` worktree from `origin/main`. If PR #22 is not merged, apply its dependency commits to your own branch before using this pipeline, or explicitly coordinate a stacked branch from `origin/codex/rigged-beast-treasures`. Do not edit another agent's worktree. You are not alone in the repo; preserve others' changes and keep shared edits additive.
+Never switch branches in `/Users/joshuabroggi/tatchamashay`. Fetch origin and create a fresh `codex/<task>` worktree from `origin/main`, which now contains the restored shared skeletal pipeline. Do not edit another agent's worktree. You are not alone in the repo; preserve others' changes and keep shared edits additive.
 
-Own your new creature's source, USDZ, thumbnail and config entries. Coordinate the small additions to `Records.swift`, `manifest.json` and shared tooling. Keep creature-specific rig logic out of SwiftUI screens. No signing or release-script changes. Do not merge your own PR.
+Own your new creature's source, USDZ, thumbnail and config entries. Coordinate the small additions to `Records.swift`, `manifest.json` and shared tooling. Keep creature-specific rig logic out of SwiftUI screens. No signing or release-script changes. Follow the current root `AGENTS.md` delivery rules and the user’s explicit merge/install instructions.
 
 ## Choose the authoring route
 
@@ -28,7 +28,7 @@ A Swift file containing primitive shapes is not by itself a rigged beast. The co
 - Provide a transparent 512×512 PNG thumbnail. The GLB/.blend route renders it; direct USDZ packaging requires a supplied PNG.
 - Preserve original materials unless a redesign is requested. List exact mesh names in `tintableParts` only when recoloring the entire mesh is sensible; leave eyes/mouth details out of those meshes. Empty lists are supported. The three flower creatures preserve their authored colors.
 - Record creator, source URL, source revision, modifications and usage in `provenance`. For CC-BY inputs also supply full `attribution` (original author/title/profile/source/license links and changes). Do not invent a license or call a character adaptation original.
-- Motion is visible in the picker, large preview, chest reveal and collection detail. Reuse `TreasureModelView`, `TreasureEntities` and `IdleMotionPlayer`. Respect the parent's Less motion and iOS Reduce Motion settings; avoid animated views for offscreen tiles.
+- Motion uses the parent editor preview, chest reveal and collection detail. Reuse `TreasureModelView`, `TreasureEntities` and `IdleMotionPlayer`. Respect the parent's Less motion and iOS Reduce Motion settings; avoid animated views for offscreen tiles.
 
 ## Config and build
 
@@ -83,7 +83,7 @@ The generic converter refuses missing rigs/actions, missing skin weights/bind/re
 1. Add the `BuiltInModel` enum case and its display name, spoken name, SF Symbol and default color in `Sources/Models/Records.swift`. Keep the display name identical to the generated manifest.
 2. Build/package with the config above. `Models/`, `Thumbnails/` and `manifest.json` are already bundled; `Sources/` and tooling are not.
 3. Keep provenance/attribution in the manifest. Credits render those records directly; do not maintain another handwritten list in the view.
-4. The picker discovers the enum case; skeletal entries use live `TreasureModelView` tiles. `Get ready` calls the same loader and requires an available animation for skeletal entries. Keep those shared paths generic.
+4. The picker discovers the enum case; skeletal entries use live `TreasureModelView` tiles. Automatic asset checks call the same loader and require an available animation for skeletal entries. Keep those shared paths generic.
 5. Keep old saves loading. Adding a creature must not change GPS rules, parent-confirmed placement, collection uniqueness or the saved copies of existing treasures.
 
 ## Build, delivery and evidence

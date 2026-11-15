@@ -44,7 +44,7 @@ struct ChestScreen: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header(shelf)
                     if shelf.items.isEmpty {
-                        Text("Your chest is empty. Follow the X on the map to find your first treasure!")
+                        Text("Your chest is empty. Choose an X on the map to find your first treasure!")
                             .font(Typeface.body(15))
                             .foregroundStyle(Palette.textSecondary)
                             .padding(.top, 40)
@@ -94,22 +94,20 @@ struct ChestTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ZStack(alignment: .topTrailing) {
-                RadialGradient(colors: [Color(item.look.color).opacity(0.5), .clear],
+                RadialGradient(colors: [Color(item.look.primaryPaintColor).opacity(0.5), .clear],
                                center: .center, startRadius: 0, endRadius: 45)
                 thumbnail.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if item.stickers > 0 {
                     StickerBadge(count: item.stickers)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 84)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Text(item.look.name)
-                .font(Typeface.body(14, weight: .semibold))
+                .font(Typeface.body(11, weight: .semibold))
                 .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(8)
-        .frame(minHeight: 140)
+        .frame(height: 118)
         .background(Palette.ground2)
         .overlay(Rectangle().stroke(Palette.borderQuiet, lineWidth: 1))
     }
@@ -126,7 +124,7 @@ struct ChestTile: View {
         } else {
             Image(systemName: item.look.model.symbol)
                 .font(.system(size: 32))
-                .foregroundStyle(Color(item.look.color))
+                .foregroundStyle(Color(item.look.primaryPaintColor))
         }
     }
 }
@@ -165,11 +163,6 @@ struct ChestDetailView: View {
                 Text(record.savedCopy.name)
                     .font(Typeface.headline(36))
                     .textCase(.uppercase)
-                if !record.savedCopy.story.isEmpty {
-                    Text(record.savedCopy.story)
-                        .font(Typeface.body(16))
-                        .foregroundStyle(Palette.textSecondary)
-                }
                 Text("Found \(record.foundAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(Typeface.body(13))
                     .foregroundStyle(Palette.textMuted)
@@ -203,11 +196,9 @@ struct SpinnableTreasure: View {
     /// Off while another tab is showing, so a hidden 3D view never competes with the chest reveal.
     @State private var onScreen = false
 
-    private var still: Bool { settings?.reducesMotion(system: systemReduceMotion) ?? systemReduceMotion }
-
     var body: some View {
         ZStack {
-            if onScreen { stage.id(still) }
+            if onScreen { stage }
         }
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false }
@@ -242,12 +233,8 @@ struct SpinnableTreasure: View {
             content.add(fill)
 
             let spinner = spinner
-            spinner.coast = !still
-            let idle = !still && loaded.entry?.idleMotion == .skeletal ? loaded.idleMotion() : nil
-            var elapsed: TimeInterval = 0
+            spinner.coast = !(settings?.reducesMotion(system: systemReduceMotion) ?? systemReduceMotion)
             spinner.subscription = content.subscribe(to: SceneEvents.Update.self) { event in
-                elapsed += event.deltaTime
-                idle?.update(time: elapsed)
                 spinner.step(event.deltaTime)
                 pivot.orientation = simd_quatf(angle: spinner.angle, axis: [0, 1, 0])
             }

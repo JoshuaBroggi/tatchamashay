@@ -47,10 +47,8 @@ struct AudioSessionControllerTests {
     func switchesOffStaySilent() {
         let settings = PlaySettings(defaults: nil, systemReduceMotion: { false })
         settings.soundOn = false
-        settings.spokenGuideOn = false
         let audio = AudioSessionController(driver: session)
         BundledSoundEffects(settings: settings, audio: audio).play(.dig)
-        SpeechGuideVoice(settings: settings, audio: audio).speak("Ahoy!", rate: 0.5)
         #expect(session.configures == 0)
         #expect(session.activations.isEmpty)
         #expect(!audio.isActive)

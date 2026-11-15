@@ -3,9 +3,8 @@ import SwiftUI
 
 /// The chest reveal, after the mockups' Chest 1–4 and Magic Reveal frames, with our own treasures and
 /// no rarity: the chest rattles, the child taps, the lid opens with glowing runes, light and sparkles
-/// rise, and the treasure floats out with its funny name, who hid it and its story.
+/// rise, and the treasure floats out with its funny name and who hid it.
 /// The find is already saved before this appears, so closing it early never loses the treasure.
-/// While it shows, `AppModel.isRevealing` is true so the guide stays quiet.
 struct ChestOpeningView: View {
     let look: TreasureLook
     let foundAgain: Bool
@@ -42,9 +41,7 @@ struct ChestOpeningView: View {
             let calm = settings?.reducesMotion(system: systemReduceMotion) ?? systemReduceMotion
             if scene == nil { scene = ChestRevealScene(look: look, calm: calm) }
             flow = RevealFlow(canSkip: memory.hasSeenReveal)
-            app?.isRevealing = true
         }
-        .onDisappear { app?.isRevealing = false }
         .onChange(of: scene?.isRising) { _, rising in
             if rising == true { app?.sounds.play(.revealSparkle) }
         }
@@ -95,7 +92,7 @@ struct ChestOpeningView: View {
                     await scene.make(&content)
                 }
                 .accessibilityElement()
-                .accessibilityLabel(look.name)
+                .accessibilityLabel(flow.phase >= .revealed ? look.name : "Sealed treasure chest")
                 .accessibilityValue(scene.treasureShown)
                 .accessibilityIdentifier("treasureModel")
             }
@@ -144,12 +141,6 @@ struct ChestOpeningView: View {
         if let hiddenBy {
             Text("Hidden by \(hiddenBy)").font(Typeface.label(13)).foregroundStyle(Palette.gold)
         }
-        if !look.story.isEmpty {
-            Text(look.story)
-                .font(Typeface.body(15))
-                .foregroundStyle(Palette.textSecondary)
-                .lineLimit(4)
-        }
         if foundAgain {
             Label("Found-it-again sticker!", systemImage: "star.circle.fill")
                 .font(Typeface.label(14))
@@ -188,7 +179,6 @@ struct ChestOpeningView: View {
 
     private func add() {
         guard flow.add() else { return }
-        app?.isRevealing = false
         onDone()
     }
 }

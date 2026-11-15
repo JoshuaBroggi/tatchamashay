@@ -42,10 +42,6 @@ struct TreasureCatalog: Sendable {
 
     func entry(for model: BuiltInModel) -> Entry? { treasures.first { $0.id == model.rawValue } }
 
-    /// The credits screen reads the same entries as the model loader, so attribution cannot drift.
-    var creditedModels: [Entry] { (treasures + [chest]).filter { $0.attribution != nil } }
-    var sourcedModels: [Entry] { (treasures + [chest]).filter { $0.provenance != nil } }
-
     /// The file for a manifest path, if it is in the bundle.
     func url(for path: String?) -> URL? {
         guard let path, !path.isEmpty else { return nil }
@@ -93,29 +89,31 @@ struct TreasureCatalog: Sendable {
         let movingParts: [MovingPart]
         /// Chest only.
         let namedParts: ChestParts?
-        /// A single gentle skeletal clip, baked into the USDZ. Absent for procedural treasures.
-        var skeletalAnimation: SkeletalAnimation?
-        var attribution: Attribution?
-        /// Source history for family-authored/imported models without a CC-BY attribution claim.
-        var provenance: Provenance?
+        var paintRegions: [PaintRegion]? = nil
+        var skeletalAnimation: SkeletalAnimation? = nil
+        var provenance: Provenance? = nil
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
+    }
+
+    struct PaintRegion: Codable, Hashable, Identifiable, Sendable {
+        let id: String
+        let name: String
+        let parts: [String]
+        /// Skinned meshes may be combined under their armature when RealityKit loads the asset.
+        var materialName: String? = nil
+    }
+
+    func paintRegions(for model: BuiltInModel) -> [PaintRegion] {
+        guard let entry = entry(for: model) else { return [] }
+        return entry.paintRegions ?? [PaintRegion(id: "body", name: "Main color", parts: entry.tintableParts,
+                                                 materialName: entry.tintMaterial)]
     }
 
     struct SkeletalAnimation: Decodable, Hashable, Sendable {
         let name: String
         let sourceClip: String
         let speed: Float
-    }
-
-    struct Attribution: Decodable, Hashable, Sendable {
-        let title: String
-        let author: String
-        let authorURL: URL
-        let source: URL
-        let license: String
-        let licenseURL: URL
-        let changes: String
     }
 
     struct Provenance: Decodable, Hashable, Sendable {
@@ -155,7 +153,7 @@ struct TreasureCatalog: Sendable {
     }
 }
 
-/// Original treasures move procedurally; imported beasts use their USDZ's skeletal clip.
+/// Procedural idle motions and the baked skeletal clip used by rigged creatures.
 enum IdleMotion: String, Decodable, Hashable, Sendable {
     case spin, bob, wiggle, flap, none, skeletal
 }

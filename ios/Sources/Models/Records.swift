@@ -58,7 +58,7 @@ enum PirateAvatar: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Who made a treasure: a parent, or a child with the parent's help.
+/// Creation provenance. New designs are parent-made; child cases remain for legacy saves.
 enum TreasureMaker: Codable, Hashable, Sendable {
     case parent(ParentAccount.ID)
     case child(ChildProfile.ID)
@@ -114,23 +114,55 @@ struct TreasureLook: Codable, Hashable, Sendable {
     var sparkles: Sparkles = .some
     var name: String
     var sound: TreasureSound = .chime
-    /// A short story the parent types.
+    /// Legacy story text, retained for save compatibility and never shown in the journey.
     var story: String = ""
+    /// Optional so every previously saved, single-color look decodes unchanged.
+    var paint: TreasurePaint?
 }
 
 /// The built-in treasures. Raw values are the ids in `Assets/manifest.json`; `TreasureCatalog` has
 /// each one's files and parts. Never rename a raw value: saved looks store it.
-enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case octopus, clam, parrot, crown
-    case starCompass = "star-compass"
+    case starCompass
     case potion
-    case dragonEgg = "dragon-egg"
-    case turtle, doubloon
-    case tRex = "t-rex"
-    case scorpion, spider
-    case demogorgon, demodog
-    case vineDog = "vine-dog"
+    case dragonEgg
+    case turtle, doubloon, spider
+    case demogorgon, demodog, vineDog
     case mulligan
+    /// Keep models saved by another app version intact, even when their assets aren't bundled.
+    case unavailable(String)
+
+    /// Only bundled models can be chosen for a new beast.
+    static let allCases: [BuiltInModel] = [
+        .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider,
+        .demogorgon, .demodog, .vineDog, .mulligan
+    ]
+
+    var rawValue: String {
+        switch self {
+        case .octopus: "octopus"
+        case .clam: "clam"
+        case .parrot: "parrot"
+        case .crown: "crown"
+        case .starCompass: "star-compass"
+        case .potion: "potion"
+        case .dragonEgg: "dragon-egg"
+        case .turtle: "turtle"
+        case .doubloon: "doubloon"
+        case .spider: "spider"
+        case .demogorgon: "demogorgon"
+        case .demodog: "demodog"
+        case .vineDog: "vine-dog"
+        case .mulligan: "mulligan"
+        case .unavailable(let savedID): savedID
+        }
+    }
+
+    init?(rawValue: String) {
+        guard let model = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
+        self = model
+    }
 
     var id: String { rawValue }
 
@@ -145,11 +177,12 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
 
     init(from decoder: any Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        guard let model = BuiltInModel(savedID: raw) else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
-                                                    debugDescription: "Unknown built-in treasure \(raw)"))
-        }
-        self = model
+        self = BuiltInModel(savedID: raw) ?? .unavailable(raw)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 
     /// Matches the manifest's `displayName`; a test keeps them in step.
@@ -164,13 +197,12 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "Dragon Egg"
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
-        case .tRex: "Buddy Rex"
-        case .scorpion: "Scooter the Scorpion"
-        case .spider: "Button the Spider"
+        case .spider: "Silky the Spider"
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "Vine Dog"
         case .mulligan: "Mulligan"
+        case .unavailable: "Saved beast"
         }
     }
 
@@ -186,13 +218,12 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "dragon egg"
         case .turtle: "turtle"
         case .doubloon: "coin"
-        case .tRex: "dinosaur"
-        case .scorpion: "scorpion"
         case .spider: "spider"
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "vine dog"
         case .mulligan: "Mulligan"
+        case .unavailable: "treasure"
         }
     }
 
@@ -208,13 +239,12 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "oval.portrait.fill"
         case .turtle: "tortoise.fill"
         case .doubloon: "circle.circle.fill"
-        case .tRex: "pawprint.fill"
-        case .scorpion: "ant.fill"
         case .spider: "ladybug.fill"
         case .demogorgon: "figure.stand"
         case .demodog: "pawprint.fill"
         case .vineDog: "leaf.fill"
         case .mulligan: "pawprint.fill"
+        case .unavailable: "shippingbox.fill"
         }
     }
 
@@ -227,23 +257,26 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .crown, .doubloon: .gold
         case .starCompass: .yellow
         case .potion: .purple
-        case .dragonEgg: .moss
+        case .dragonEgg, .vineDog: .moss
         case .turtle: .sea
-        case .tRex: .green
-        case .scorpion: .purple
-        case .spider: .pink
+        case .spider: .chestnut
         case .demogorgon: .coral
         case .demodog: .moss
-        case .vineDog: .green
         case .mulligan: .moss
+        case .unavailable: .gold
         }
     }
 }
 
-/// Milestone 1's colors, then the eight the hide-for-parent flow offers (`hide-for-parent.md`).
+/// Saved color values, shared by the parent editor and legacy collections.
 enum TreasureColor: String, Codable, CaseIterable, Identifiable, Sendable {
     case gold, sea, coral, storm, moss, ruby
     case red, orange, yellow, green, blue, purple, pink
+    case charcoal, walnut, chestnut, copper, sand, cream, white
+    case burgundy, terracotta, amber, peach, lemon
+    case pine, emerald, olive, sage, mint, lime
+    case navy, cobalt, teal, turquoise, sky, ice
+    case plum, orchid, lavender, mauve, rose, blush
 
     var id: String { rawValue }
 
@@ -268,8 +301,46 @@ enum TreasureColor: String, Codable, CaseIterable, Identifiable, Sendable {
         case .blue: (0.20, 0.50, 0.95)
         case .purple: (0.60, 0.42, 1.00)
         case .pink: (1.00, 0.48, 0.61)
+        case .charcoal: (0.09, 0.10, 0.12)
+        case .walnut: (0.19, 0.14, 0.12)
+        case .chestnut: (0.36, 0.23, 0.17)
+        case .copper: (0.65, 0.36, 0.21)
+        case .sand: (0.80, 0.66, 0.46)
+        case .cream: (0.95, 0.88, 0.73)
+        case .white: (0.98, 0.98, 0.95)
+        case .burgundy: (0.33, 0.09, 0.16)
+        case .terracotta: (0.72, 0.30, 0.21)
+        case .amber: (0.89, 0.59, 0.16)
+        case .peach: (1.00, 0.72, 0.51)
+        case .lemon: (0.97, 0.92, 0.51)
+        case .pine: (0.08, 0.24, 0.20)
+        case .emerald: (0.12, 0.52, 0.36)
+        case .olive: (0.37, 0.42, 0.19)
+        case .sage: (0.58, 0.69, 0.49)
+        case .mint: (0.63, 0.88, 0.72)
+        case .lime: (0.70, 0.85, 0.30)
+        case .navy: (0.07, 0.14, 0.26)
+        case .cobalt: (0.12, 0.29, 0.70)
+        case .teal: (0.07, 0.43, 0.46)
+        case .turquoise: (0.18, 0.72, 0.72)
+        case .sky: (0.48, 0.71, 0.91)
+        case .ice: (0.76, 0.90, 0.94)
+        case .plum: (0.24, 0.11, 0.30)
+        case .orchid: (0.59, 0.32, 0.67)
+        case .lavender: (0.73, 0.63, 0.87)
+        case .mauve: (0.57, 0.33, 0.47)
+        case .rose: (0.80, 0.40, 0.54)
+        case .blush: (0.95, 0.75, 0.80)
         }
     }
+
+    static let paletteRows: [(name: String, colors: [TreasureColor])] = [
+        ("Earth & silk", [.charcoal, .walnut, .chestnut, .copper, .sand, .cream, .white]),
+        ("Ember & gold", [.burgundy, .ruby, .red, .terracotta, .orange, .amber, .gold, .peach, .yellow, .lemon]),
+        ("Forest & moss", [.pine, .emerald, .green, .olive, .moss, .sage, .mint, .lime]),
+        ("Ocean & cobalt", [.navy, .cobalt, .blue, .teal, .turquoise, .sea, .sky, .ice]),
+        ("Orchid & rose", [.plum, .purple, .storm, .orchid, .lavender, .mauve, .rose, .pink, .coral, .blush]),
+    ]
 }
 
 enum Sparkles: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -315,8 +386,7 @@ struct ChestPlacement: Identifiable, Codable, Hashable, Sendable {
     var hintBlank: String?
 }
 
-/// The familiar place a hunt happens in, chosen by the parent on a detailed map. Spot review starts
-/// there, and **Get ready** checks its map.
+/// A legacy hunt area, retained in saved records. Parents review each new placement individually.
 struct PlayArea: Codable, Hashable, Sendable {
     var center: Coordinate
     /// Roughly how far the hunt reaches from `center`, in meters.
@@ -325,27 +395,24 @@ struct PlayArea: Codable, Hashable, Sendable {
     var name: String = ""
 }
 
-/// A hunt: a guide, a goal, 3–5 placements in play order, and a finale.
-/// `AdventureRules.swift` has the size rules and `HuntProgress`, which walks a run through them.
+/// A legacy grouping of placements. The map combines all groups and ignores their story metadata.
 struct Adventure: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var familyID: ParentAccount.ID
     var title: String
     var guideName: String = "Captain Tumblebeard"
     var goal: String
-    /// Play order. The hunt always looks for the first one not yet found this run.
+    /// Saved membership order; it does not constrain discovery order.
     var placementIDs: [ChestPlacement.ID] = []
     /// The closing line shown when the last treasure is found ("Back to the ship!").
     var finale: String = "Back to the ship!"
-    /// The guide's id in `Content/Stories` (`guide:` in an adventure file). Nil before milestone 2.
+    /// Legacy guide identifier; runtime play does not load narrative content.
     var guideID: String?
-    /// The starter adventure this was made from (`id:` in its story file), whose goal, reveal and
-    /// finale lines the guide speaks. Nil for an adventure the parent wrote.
+    /// Legacy story identifier, retained for existing saved groups.
     var storyID: String?
     /// Where the hunt happens. Nil for milestone 1 adventures.
     var playArea: PlayArea?
-    /// The child who invented this adventure's treasure and hid it for the grown-up (the
-    /// hide-for-parent flow). The hunt can say who hid it. Nil for adventures the parent made.
+    /// Legacy creator metadata; the child remains the player regardless of who created a design.
     var hiddenBy: ChildProfile.ID?
     var createdAt = Date()
     var syncState: SyncState = .waitingToSync
@@ -386,7 +453,7 @@ struct CollectionRecord: Identifiable, Codable, Hashable, Sendable {
     var foundAgainCount: Int { foundAgainRunIDs.count }
 }
 
-/// One play-through of an adventure. Replaying starts a new run.
+/// Legacy run metadata retained for decoding older collections; new finds never reset progress.
 struct HuntRun: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var adventureID: Adventure.ID

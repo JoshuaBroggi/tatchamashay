@@ -27,12 +27,10 @@ final class AppModel {
     let real: FamilyModel
     private(set) var demo: FamilyModel?
 
-    /// The grown-up's sound, voice and motion switches, shared by every screen.
+    /// Parent sound and motion controls, shared by every screen.
     let settings: PlaySettings
     let sounds: any SoundEffects
-    let voice: any GuideVoice
     let catalog = TreasureCatalog.bundled
-    let stories = StoryLibrary.bundled
 
     init() {
         #if DEBUG
@@ -56,17 +54,13 @@ final class AppModel {
         // UI tests run quietly.
         if ProcessInfo.processInfo.arguments.contains("-silent") {
             sounds = SilentSoundEffects(settings: settings)
-            voice = SilentGuideVoice(settings: settings)
             return
         }
         #endif
         sounds = BundledSoundEffects(catalog: .bundled, settings: settings)
-        voice = SpeechGuideVoice(settings: settings)
     }
 
-    /// True while the chest reveal is on screen, from the sealed chest until the child closes it.
-    /// The spoken guide waits for it to turn false so it never talks over the reveal.
-    var isRevealing = false
+    var selectedTab: AppTab = .map
 
     /// The family the screens show: the demo one while Demo mode is on, otherwise the real one.
     var family: FamilyModel { demo ?? real }
@@ -88,11 +82,6 @@ final class AppModel {
         demoFix = nil
     }
 
-    /// The latest hunt moment (hunt start, getting close, foggy GPS, a find, next treasure, finale),
-    /// set by the hunt screen once per event. The guide watches it to speak and show its lines; the
-    /// hunt itself never speaks. `HuntMomentTracker` documents when each moment fires.
-    var huntMoment: HuntMomentEvent?
-
     /// Demo mode only: a pretend position, so testing doesn't need a walk.
     private(set) var demoFix: LocationFix?
 
@@ -102,10 +91,14 @@ final class AppModel {
     }
 }
 
+enum AppTab: Hashable { case map, chest }
+
 struct RootView: View {
     @Environment(AppModel.self) private var app
+    @State private var showingParents = false
 
     var body: some View {
+        @Bindable var app = app
         Group {
             if !app.real.isLoaded {
                 Palette.ground1.ignoresSafeArea()
@@ -114,20 +107,83 @@ struct RootView: View {
             } else {
                 VStack(spacing: 0) {
                     if app.isDemo { DemoBanner() }
-                    TabView {
-                        Tab("Map", systemImage: "map.fill") { HuntView().overlay { GuideLayer() } }
-                        Tab("My Chest", systemImage: "shippingbox.fill") { ChestScreen() }
-                        Tab("Make", systemImage: "wand.and.stars") { CreateView() }
-                        Tab("Grown-ups", systemImage: "person.2.fill") { GrownUpGate { ParentView() } }
+                    HStack {
+                        Text(app.family.child?.pirateName ?? "Tatchamashay")
+                            .font(Typeface.label(13))
+                            .foregroundStyle(Palette.textSecondary)
+                        Spacer()
+                        Button { showingParents = true } label: {
+                            Label("Parents", systemImage: "lock.fill")
+                                .font(Typeface.label(13))
+                                .frame(minHeight: 44)
+                        }
+                        .accessibilityIdentifier("parents")
+                    }
+                    .padding(.horizontal, 16)
+                    TabView(selection: $app.selectedTab) {
+                        Tab("Map", systemImage: "map.fill", value: AppTab.map) { HuntView() }
+                        Tab("My Chest", systemImage: "shippingbox.fill", value: AppTab.chest) { ChestScreen() }
                     }
                     .tint(Palette.gold)
                 }
                 .environment(app.family)
-                // Rebuilds every screen when switching between the real and demo families.
                 .id(app.isDemo)
+                .sheet(isPresented: $showingParents) {
+                    ParentAccessView()
+                        .environment(app.family)
+                        .id(app.isDemo)
+                }
             }
         }
         .background(Palette.ground1)
+    }
+}
+
+/// Parent tools are a temporary sheet; the child and their collection always remain the player.
+struct ParentAccessView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var unlocked = false
+    @State private var answer = ""
+    @State private var attempted = false
+
+    var body: some View {
+        if unlocked {
+            ParentView()
+        } else {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("For parents")
+                        .font(Typeface.headline(34))
+                    Text("Ask your grown-up to continue.")
+                        .font(Typeface.body(16))
+                    Text("What is 17 + 8?")
+                        .font(Typeface.body(22, weight: .semibold))
+                    TextField("Answer", text: $answer)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("parentGateAnswer")
+                    if attempted {
+                        Text("Try that sum again.")
+                            .font(Typeface.body(14))
+                    }
+                    Button("Continue") {
+                        if answer.trimmed == "25" { unlocked = true }
+                        else { attempted = true; answer = "" }
+                    }
+                    .buttonStyle(GoldButtonStyle())
+                    .accessibilityIdentifier("parentGateContinue")
+                    Spacer()
+                }
+                .padding(24)
+                .foregroundStyle(Palette.textPrimary)
+                .background(Palette.ground1.ignoresSafeArea())
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -137,51 +193,93 @@ struct WelcomeView: View {
     @State private var parentName = ""
     @State private var pirateName = ""
     @State private var saving = false
+    @FocusState private var focusedField: NameField?
+
+    private enum NameField: Hashable { case parent, pirate }
+
+    private var canSave: Bool {
+        !parentName.trimmed.isEmpty && !pirateName.trimmed.isEmpty && !saving
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Overline(text: "Tatchamashay")
-            Text("Ahoy! Let's set up your crew")
-                .font(Typeface.headline(40))
-                .foregroundStyle(Palette.textPrimary)
-            Text("For grown-ups. Everything stays on this phone. Your pirate has no account and no public name.")
-                .font(Typeface.body(14))
-                .foregroundStyle(Palette.textSecondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Overline(text: "Tatchamashay")
+                Text("Ahoy! Let's set up your crew")
+                    .font(Typeface.headline(40))
+                    .foregroundStyle(Palette.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("For grown-ups. Everything stays on this phone. Your pirate has no account and no public name.")
+                    .font(Typeface.body(14))
+                    .foregroundStyle(Palette.textSecondary)
 
-            field("Your name", text: $parentName, prompt: "Mom, Dad, Grandpa…")
-            field("Your pirate's name", text: $pirateName, prompt: "Captain Emmanuel")
-
-            Spacer()
-            Button("Start the adventure") {
-                saving = true
-                Task {
-                    await app.real.createFamily(
-                        parentName: parentName.trimmed,
-                        pirateName: pirateName.trimmed
-                    )
-                    saving = false
-                }
+                field("Your name", text: $parentName, prompt: "Mom, Dad, Grandpa…", focus: .parent)
+                field("Your pirate's name", text: $pirateName, prompt: "Captain Emmanuel", focus: .pirate)
             }
-            .buttonStyle(GoldButtonStyle())
-            .accessibilityIdentifier("startAdventure")
-            .disabled(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty || saving)
-            .opacity(parentName.trimmed.isEmpty || pirateName.trimmed.isEmpty ? 0.5 : 1)
+            .disabled(saving)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 24)
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 10) {
+                if let error = app.real.errorMessage {
+                    Text(error)
+                        .font(Typeface.body(14))
+                        .foregroundStyle(Palette.invented)
+                        .accessibilityIdentifier("crewSaveError")
+                }
+                Text(canSave || saving ? "Both names save on this iPhone." : "Enter both names to continue.")
+                    .font(Typeface.body(14))
+                    .foregroundStyle(Palette.textSecondary)
+                Button(action: saveCrew) {
+                    Text(saving ? "Saving crew…" : "Open the map")
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(GoldButtonStyle())
+                .accessibilityIdentifier("startAdventure")
+                .disabled(!canSave)
+                .opacity(canSave || saving ? 1 : 0.5)
+            }
+            .padding(16)
+            .background(Palette.ground1)
+        }
         .background(Palette.ground1.ignoresSafeArea())
     }
 
-    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
+    private func field(_ label: String, text: Binding<String>, prompt: String, focus: NameField) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(Typeface.label()).foregroundStyle(Palette.textSecondary)
             TextField("", text: text, prompt: Text(prompt).foregroundStyle(Palette.textMuted))
+                .textContentType(.nickname)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(focus == .parent ? .next : .done)
+                .focused($focusedField, equals: focus)
+                .onSubmit {
+                    if focus == .parent { focusedField = .pirate }
+                    else if parentName.trimmed.isEmpty { focusedField = .parent }
+                    else { saveCrew() }
+                }
+                .accessibilityLabel(label)
+                .accessibilityIdentifier(focus == .parent ? "crewParentName" : "crewPirateName")
                 .font(Typeface.body(16))
                 .padding(.horizontal, 12)
                 .frame(height: 48)
                 .background(Palette.ground2)
                 .overlay(Rectangle().stroke(Palette.borderStrong, lineWidth: 1))
                 .foregroundStyle(Palette.textPrimary)
+        }
+    }
+
+    private func saveCrew() {
+        guard canSave else { return }
+        focusedField = nil
+        saving = true
+        Task {
+            await app.real.createFamily(parentName: parentName.trimmed, pirateName: pirateName.trimmed)
+            saving = false
         }
     }
 }

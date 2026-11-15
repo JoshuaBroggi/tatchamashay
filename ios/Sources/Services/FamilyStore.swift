@@ -67,9 +67,9 @@ enum FamilyStoreError: Error, Equatable {
     case unknownTreasure
     /// A placement must record when the parent reviewed the spot, and that can't be in the future.
     case unreviewedSpot
-    /// An adventure holds at most `Adventure.treasureCount.upperBound` treasures, each once.
+    /// A saved group cannot contain a placement twice.
     case adventureFull
-    /// A new hunt needs at least `Adventure.treasureCount.lowerBound` treasures.
+    /// A saved group needs at least one treasure.
     case notEnoughTreasure
     /// `saveHuntSetup` only saves new adventures.
     case adventureAlreadySaved
@@ -90,6 +90,8 @@ protocol FamilyStore: Sendable {
     /// Saves a whole new hunt at once (adventure, treasures, placements in play order), or nothing.
     func saveHuntSetup(_ adventure: Adventure, designs: [TreasureDesign],
                        placements: [ChestPlacement]) async throws -> FamilyData
+    /// Saves a parent-managed design and its reviewed placement together, or nothing.
+    func saveParentTreasure(_ design: TreasureDesign, adventure: Adventure, placement: ChestPlacement) async throws -> FamilyData
     func saveDesign(_ design: TreasureDesign) async throws -> FamilyData
     /// Removes a design and its placements. Chests keep their saved copies.
     func deleteDesign(_ id: TreasureDesign.ID) async throws -> FamilyData
@@ -99,17 +101,9 @@ protocol FamilyStore: Sendable {
     /// never leaves an empty adventure behind. The placement follows the same rules as `place`.
     func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement) async throws -> FamilyData
     func removePlacement(_ id: ChestPlacement.ID) async throws -> FamilyData
-    /// Safe to repeat: the same run never adds a treasure twice.
+    /// Safe to repeat across restarts and legacy runs: one find per child per placement.
     func recordFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
                     method: FindMethod, at date: Date) async throws -> (CollectResult, FamilyData)
-}
-
-extension FamilyStore {
-    /// Two writes, for stores that can't do both at once. `LocalFamilyStore` does it in one.
-    func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement) async throws -> FamilyData {
-        _ = try await saveAdventure(adventure)
-        return try await place(placement)
-    }
 }
 
 // MARK: - The rules, shared by every store
@@ -155,10 +149,7 @@ extension FamilyData {
     mutating func saveHuntSetup(_ adventure: Adventure, designs: [TreasureDesign],
                                 placements: [ChestPlacement], now: Date) throws {
         guard self.adventure(adventure.id) == nil else { throw FamilyStoreError.adventureAlreadySaved }
-        guard Adventure.treasureCount.contains(placements.count) else {
-            throw placements.count > Adventure.treasureCount.upperBound
-                ? FamilyStoreError.adventureFull : FamilyStoreError.notEnoughTreasure
-        }
+        guard !placements.isEmpty else { throw FamilyStoreError.notEnoughTreasure }
         guard placements.map(\.id) == adventure.placementIDs || adventure.placementIDs.isEmpty else {
             throw FamilyStoreError.unknownPlacement
         }
@@ -174,10 +165,40 @@ extension FamilyData {
         self = copy
     }
 
+    /// Parent creation and spot confirmation are a single transaction. Old child provenance is
+    /// preserved when a parent edits an existing design.
+    mutating func saveParentTreasure(_ design: TreasureDesign, adventure: Adventure,
+                                    placement: ChestPlacement, now: Date) throws {
+        let parent = try requireParent()
+        guard placement.designID == design.id, placement.versionID == design.current.id,
+              placement.adventureID == adventure.id else { throw FamilyStoreError.unknownTreasure }
+        if let existing = self.design(design.id) {
+            guard existing.maker == design.maker else { throw FamilyStoreError.notInFamily }
+        } else {
+            guard design.maker == .parent(parent.id) else { throw FamilyStoreError.notInFamily }
+        }
+        var copy = self
+        try copy.saveDesign(design)
+        if copy.adventure(adventure.id) == nil {
+            var empty = adventure
+            empty.placementIDs = []
+            try copy.saveAdventure(empty)
+        }
+        try copy.place(placement, now: now)
+        self = copy
+    }
+
     mutating func saveDesign(_ design: TreasureDesign) throws {
+        let parent = try requireParent()
         try requireFamily(design.familyID)
-        if case .child(let childID) = design.maker, self.child(childID) == nil {
-            throw FamilyStoreError.unknownChild
+        switch design.maker {
+        case .parent(let id):
+            guard id == parent.id else { throw FamilyStoreError.notInFamily }
+        case .child(let childID):
+            // Existing child-made designs remain editable even after that profile was removed.
+            guard self.child(childID) != nil || self.design(design.id)?.maker == design.maker else {
+                throw FamilyStoreError.unknownChild
+            }
         }
         upsert(design, in: &designs)
     }
@@ -197,8 +218,7 @@ extension FamilyData {
         guard adventure.placementIDs.allSatisfy({ placement($0)?.adventureID == adventure.id }) else {
             throw FamilyStoreError.unknownPlacement
         }
-        guard Set(adventure.placementIDs).count == adventure.placementIDs.count,
-              adventure.placementIDs.count <= Adventure.treasureCount.upperBound else {
+        guard Set(adventure.placementIDs).count == adventure.placementIDs.count else {
             throw FamilyStoreError.adventureFull
         }
         if let hiddenBy = adventure.hiddenBy, child(hiddenBy) == nil { throw FamilyStoreError.unknownChild }
@@ -206,23 +226,29 @@ extension FamilyData {
     }
 
     mutating func saveAdventure(_ adventure: Adventure, placing placement: ChestPlacement, now: Date) throws {
-        try saveAdventure(adventure)
-        try place(placement, now: now)
+        var copy = self
+        try copy.saveAdventure(adventure)
+        try copy.place(placement, now: now)
+        self = copy
     }
 
     mutating func place(_ placement: ChestPlacement, now: Date) throws {
         try requireFamily(placement.familyID)
         try requireFamily(placement.placedBy)
-        guard placement.reviewedAt <= now else { throw FamilyStoreError.unreviewedSpot }
+        guard placement.reviewedAt <= now, placement.spot.latitude.isFinite, placement.spot.longitude.isFinite,
+              (-90...90).contains(placement.spot.latitude), (-180...180).contains(placement.spot.longitude) else {
+            throw FamilyStoreError.unreviewedSpot
+        }
         guard let adventureIndex = adventures.firstIndex(where: { $0.id == placement.adventureID }) else {
             throw FamilyStoreError.notInFamily
         }
-        guard let design = design(placement.designID), design.version(placement.versionID) != nil else {
+        try requireFamily(adventures[adventureIndex].familyID)
+        guard let design = design(placement.designID), design.deletedAt == nil,
+              let version = design.version(placement.versionID), version.designID == design.id else {
             throw FamilyStoreError.unknownTreasure
         }
         try requireFamily(design.familyID)
         let isNew = !adventures[adventureIndex].placementIDs.contains(placement.id)
-        if isNew && adventures[adventureIndex].isFull { throw FamilyStoreError.adventureFull }
         upsert(placement, in: &placements)
         if isNew {
             adventures[adventureIndex].placementIDs.append(placement.id)
@@ -238,25 +264,29 @@ extension FamilyData {
     }
 
     mutating func recordFind(child childID: ChildProfile.ID, placement placementID: ChestPlacement.ID,
-                             run: HuntRun.ID, method: FindMethod, at date: Date) throws -> CollectResult {
+                             run: HuntRun.ID, method: FindMethod, at date: Date, now: Date = .now) throws -> CollectResult {
         let parent = try requireParent()
         guard child(childID)?.parentID == parent.id else { throw FamilyStoreError.unknownChild }
 
         let key = CollectionRecord.Key(childID: childID, placementID: placementID)
-        if let index = collections.firstIndex(where: { $0.key == key }) {
-            var record = collections[index]
-            if record.firstRunID == run || record.foundAgainRunIDs.contains(run) {
-                return .alreadyCounted(record)
-            }
-            record.foundAgainRunIDs.append(run)
-            record.syncState = .waitingToSync
-            collections[index] = record
-            return .foundAgain(record)
+        if let record = collection(key) {
+            try requireFamily(record.familyID)
+            return .alreadyCounted(record)
         }
 
         guard let placement = placement(placementID) else { throw FamilyStoreError.unknownPlacement }
         try requireFamily(placement.familyID)
-        guard let version = design(placement.designID)?.version(placement.versionID) else {
+        try requireFamily(placement.placedBy)
+        guard placement.reviewedAt <= min(date, now), placement.spot.latitude.isFinite,
+              placement.spot.longitude.isFinite, (-90...90).contains(placement.spot.latitude),
+              (-180...180).contains(placement.spot.longitude) else {
+            throw FamilyStoreError.unreviewedSpot
+        }
+        guard let design = design(placement.designID), design.deletedAt == nil,
+              design.familyID == parent.id,
+              let adventure = adventure(placement.adventureID), adventure.familyID == parent.id,
+              adventure.placementIDs.contains(placement.id),
+              let version = design.version(placement.versionID), version.designID == design.id else {
             throw FamilyStoreError.unknownTreasure
         }
         let record = CollectionRecord(
@@ -323,6 +353,11 @@ actor LocalFamilyStore: FamilyStore {
         let now = clock()
         return try change { try $0.saveHuntSetup(adventure, designs: designs, placements: placements, now: now) }
     }
+    func saveParentTreasure(_ design: TreasureDesign, adventure: Adventure,
+                            placement: ChestPlacement) throws -> FamilyData {
+        let now = clock()
+        return try change { try $0.saveParentTreasure(design, adventure: adventure, placement: placement, now: now) }
+    }
     func saveDesign(_ design: TreasureDesign) throws -> FamilyData { try change { try $0.saveDesign(design) } }
     func deleteDesign(_ id: TreasureDesign.ID) throws -> FamilyData { try change { try $0.deleteDesign(id) } }
     func saveAdventure(_ adventure: Adventure) throws -> FamilyData { try change { try $0.saveAdventure(adventure) } }
@@ -342,7 +377,7 @@ actor LocalFamilyStore: FamilyStore {
     func recordFind(child: ChildProfile.ID, placement: ChestPlacement.ID, run: HuntRun.ID,
                     method: FindMethod, at date: Date) throws -> (CollectResult, FamilyData) {
         var data = try load()
-        let result = try data.recordFind(child: child, placement: placement, run: run, method: method, at: date)
+        let result = try data.recordFind(child: child, placement: placement, run: run, method: method, at: date, now: clock())
         if case .alreadyCounted = result { return (result, data) }
         try persistence.write(data)
         cache = data
