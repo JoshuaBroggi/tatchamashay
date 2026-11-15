@@ -57,47 +57,69 @@ struct HideTreasureFlow: View {
 private struct ChooseTreasureView: View {
     @Environment(AppModel.self) private var app
     @Binding var look: TreasureLook
+    @State private var painting = false
 
     var body: some View {
-        Form {
-            Section {
-                TreasureModelView(look: look)
-                    .frame(height: 180)
-                    .listRowInsets(EdgeInsets())
-                    .background(Palette.ground0)
-            }
-            Section("Appearance") {
-                Picker("Beast", selection: Binding(get: { look.model }, set: { model in
-                    if look.name == look.model.displayName { look.name = model.displayName }
-                    look.model = model
-                    look.color = model.defaultColor
-                })) {
-                    ForEach(BuiltInModel.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
+        VStack(spacing: 0) {
+            // One persistent preview for both details and paint controls. Opening the palette,
+            // changing steps or returning to details must preserve the user's camera pose.
+            TreasureModelView(look: look)
+                .frame(height: 220)
+                .background(Palette.ground0)
+                .overlay(alignment: .bottom) {
+                    Text("Pinch to zoom · Drag to turn")
+                        .font(.caption).foregroundStyle(Palette.textSecondary)
+                        .padding(8).allowsHitTesting(false)
                 }
-                .accessibilityIdentifier("beastModel")
-                Picker("Color", selection: $look.color) {
-                    ForEach(TreasureColor.allCases) { Text($0.displayName).tag($0) }
+            if painting {
+                TreasurePaintView(look: $look) { painting = false }
+            } else {
+                Form {
+                    Section("Appearance") {
+                        Picker("Beast", selection: Binding(get: { look.model }, set: { model in
+                            if look.name == look.model.displayName { look.name = model.displayName }
+                            look.model = model
+                            look.color = model.defaultColor
+                            look.paint = nil
+                        })) {
+                            if !BuiltInModel.allCases.contains(look.model) {
+                                Label(look.model.displayName, systemImage: look.model.symbol).tag(look.model)
+                            }
+                            ForEach(BuiltInModel.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
+                        }
+                        .accessibilityIdentifier("beastModel")
+                        Button { painting = true } label: {
+                            HStack {
+                                Label("Color & texture", systemImage: "paintpalette.fill")
+                                Spacer()
+                                ForEach(Array((look.paint?.colors ?? [PaintColor(look.color)]).enumerated()), id: \.offset) { _, color in
+                                    Circle().fill(Color(color)).frame(width: 22, height: 22)
+                                        .overlay(Circle().stroke(.primary.opacity(0.3)))
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("beastColor")
+                        Picker("Sparkles", selection: $look.sparkles) {
+                            ForEach(Sparkles.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                        }
+                        .accessibilityIdentifier("beastSparkles")
+                    }
+                    Section("Name and sound") {
+                        TextField("Funny name", text: $look.name)
+                            .accessibilityIdentifier("beastName")
+                            .submitLabel(.done)
+                        Picker("Sound", selection: $look.sound) {
+                            ForEach(TreasureSound.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                        }
+                        .accessibilityIdentifier("beastSound")
+                        Button { app.sounds.play(SoundEffect(look.sound)) } label: {
+                            Label("Play sound", systemImage: "speaker.wave.2")
+                        }
+                    }
                 }
-                .accessibilityIdentifier("beastColor")
-                Picker("Sparkles", selection: $look.sparkles) {
-                    ForEach(Sparkles.allCases) { Text($0.rawValue.capitalized).tag($0) }
-                }
-                .accessibilityIdentifier("beastSparkles")
-            }
-            Section("Name and sound") {
-                TextField("Funny name", text: $look.name)
-                    .accessibilityIdentifier("beastName")
-                    .submitLabel(.done)
-                Picker("Sound", selection: $look.sound) {
-                    ForEach(TreasureSound.allCases) { Text($0.rawValue.capitalized).tag($0) }
-                }
-                .accessibilityIdentifier("beastSound")
-                Button { app.sounds.play(SoundEffect(look.sound)) } label: {
-                    Label("Play sound", systemImage: "speaker.wave.2")
-                }
+                .scrollContentBackground(.hidden)
             }
         }
-        .scrollContentBackground(.hidden)
         .background(Palette.ground1.ignoresSafeArea())
         .onChange(of: look.sound) { app.sounds.play(SoundEffect(look.sound)) }
     }
@@ -160,7 +182,11 @@ struct ReviewSpotView: View {
         VStack(spacing: 0) {
             SpotMap(camera: $draft.camera, center: $draft.center, cameraDistance: $draft.cameraDistance, satellite: draft.satellite,
                     marks: family.mapPlacements.map(\.spot))
-                .frame(minHeight: 160)
+                // Keep the reviewed viewport stable as the hint keyboard opens and closes.
+                .frame(height: 220)
+                .clipped()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("spotMap")
             Form {
                 Section {
                     Text("Choose a spot for your child to find this beast. Once saved, it appears on their treasure map.")
@@ -198,7 +224,6 @@ struct ReviewSpotView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .frame(height: 340)
         }
         .background(Palette.ground1.ignoresSafeArea())
         .navigationTitle("Choose its spot")

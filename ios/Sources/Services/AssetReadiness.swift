@@ -15,7 +15,8 @@ struct BundledAssetLoaders: AssetLoaders {
 
     func modelLoads(_ model: BuiltInModel) async -> Bool {
         let look = TreasureLook(model: model, color: model.defaultColor, name: model.displayName)
-        return await !TreasureEntities.treasure(look, catalog: catalog).isFallback
+        let loaded = await TreasureEntities.treasure(look, catalog: catalog)
+        return !loaded.isFallback && loaded.hasRequiredAnimation
     }
 
     func chestLoads() async -> Bool { await TreasureEntities.chest(catalog: catalog) != nil }
@@ -39,6 +40,10 @@ enum AssetReadiness {
         }
         for look in looks where checkedModels.insert(look.model).inserted {
             if Task.isCancelled { return [] }
+            if !BuiltInModel.allCases.contains(look.model) {
+                problems.append("A saved beast uses a model from another version. A simple shape will appear; its saved look is kept.")
+                continue
+            }
             if await !loaders.modelLoads(look.model) {
                 problems.append("\(look.model.displayName) couldn't open. A simple shape will appear instead. Try reinstalling the app to restore it.")
             }

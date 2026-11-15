@@ -91,6 +91,9 @@ struct TreasureCatalog: Sendable {
         let namedParts: ChestParts?
         /// Optional gait for the opt-in character map. Existing idle motion is unchanged.
         var locomotion: Locomotion? = nil
+        var skeletalAnimation: SkeletalAnimation?
+        var provenance: Provenance?
+        var paintRegions: [PaintRegion]? = nil
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
     }
@@ -103,6 +106,32 @@ struct TreasureCatalog: Sendable {
             let phase: Float
         }
         let parts: [Part]
+    }
+
+    struct PaintRegion: Codable, Hashable, Identifiable, Sendable {
+        let id: String
+        let name: String
+        let parts: [String]
+    }
+
+    func paintRegions(for model: BuiltInModel) -> [PaintRegion] {
+        guard let entry = entry(for: model) else { return [] }
+        return entry.paintRegions ?? [PaintRegion(id: "body", name: "Main color", parts: entry.tintableParts)]
+    }
+
+    struct SkeletalAnimation: Decodable, Hashable, Sendable {
+        let name: String
+        let sourceClip: String
+        let speed: Float
+    }
+
+    struct Provenance: Decodable, Hashable, Sendable {
+        let title: String
+        let creator: String
+        let source: URL
+        let sourceCommit: String?
+        let usage: String
+        let changes: String
     }
 
     /// A part with its own pivot: wings and flippers flap, lids hinge open.
@@ -133,9 +162,9 @@ struct TreasureCatalog: Sendable {
     }
 }
 
-/// The idle motions the app plays in code (the USDZ files carry no animation).
+/// Procedural motions and the baked idle in a rigged USDZ.
 enum IdleMotion: String, Decodable, Hashable, Sendable {
-    case spin, bob, wiggle, flap, none
+    case spin, bob, wiggle, flap, none, skeletal
 }
 
 /// The manifest's sound effects. Raw values are the manifest's sound ids.

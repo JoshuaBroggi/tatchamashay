@@ -12,10 +12,46 @@ enum TreasureEntities {
     static func treasure(_ look: TreasureLook, catalog: TreasureCatalog = .bundled) async -> LoadedTreasure {
         if let entry = catalog.entry(for: look.model), let url = catalog.modelURL(for: entry),
            let entity = await load(url) {
-            tint(entity, parts: entry.tintableParts, color: look.color)
-            return LoadedTreasure(entity: entity, entry: entry, isFallback: false)
+            let loaded = LoadedTreasure(entity: entity, entry: entry, isFallback: false,
+                                        originalModels: originalModels(in: entity))
+            applyAppearance(look, to: loaded, catalog: catalog)
+            return loaded
         }
-        return LoadedTreasure(entity: FallbackTreasure.make(look.model, color: look.color), entry: nil, isFallback: true)
+        let fallback = FallbackTreasure.make(look.model, color: look.color)
+        fallback.name = "Fallback"
+        let loaded = LoadedTreasure(entity: fallback, entry: nil, isFallback: true,
+                                    originalModels: originalModels(in: fallback))
+        applyAppearance(look, to: loaded, catalog: catalog)
+        return loaded
+    }
+
+    /// Repaint the existing entity so orbit, pinch zoom, transforms and idle motion stay intact.
+    static func applyAppearance(_ look: TreasureLook, to loaded: LoadedTreasure,
+                                catalog: TreasureCatalog = .bundled) {
+        for original in loaded.originalModels { original.entity.components.set(original.model) }
+        if let entry = loaded.entry {
+            tint(loaded.entity, parts: entry.tintableParts, materialName: entry.tintMaterial, color: look.color)
+            if let paint = look.paint {
+                for region in catalog.paintRegions(for: look.model) {
+                    paintParts(loaded.entity, parts: region.parts,
+                               materialName: entry.idleMotion == .skeletal ? entry.tintMaterial : nil,
+                               color: paint.color(for: region.id), texture: paint.texture)
+                }
+            }
+        } else {
+            paintParts(loaded.entity, parts: [loaded.entity.name], color: look.primaryPaintColor,
+                       texture: look.paint?.texture ?? .natural)
+        }
+    }
+
+    private static func originalModels(in root: Entity) -> [LoadedTreasure.OriginalModel] {
+        var originals: [LoadedTreasure.OriginalModel] = []
+        visit(root) { entity in
+            if let model = entity.components[ModelComponent.self] {
+                originals.append(.init(entity: entity, model: model))
+            }
+        }
+        return originals
     }
 
     /// The treasure chest, or nil if its file can't load.
@@ -25,16 +61,30 @@ enum TreasureEntities {
     }
 
     /// Sets the base color of every material on the named parts and the meshes inside them.
-    static func tint(_ root: Entity, parts: [String], color: TreasureColor) {
+    static func tint(_ root: Entity, parts: [String], materialName: String? = nil, color: TreasureColor) {
+        paintParts(root, parts: parts, materialName: materialName, color: PaintColor(color), texture: .natural)
+    }
+
+    static func paintParts(_ root: Entity, parts: [String], materialName: String? = nil, color: PaintColor, texture: TreasureTexture) {
         let c = color.rgb
         let uiColor = UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
-        for name in parts {
-            guard let part = root.findEntity(named: name) else { continue }
+        let surface = PaintSurface.texture(texture)
+        // RealityKit can merge skinned parts under their armature. Match the bound material there.
+        let targets = materialName == nil ? parts.compactMap { root.findEntity(named: $0) } : [root]
+        for part in targets {
             visit(part) { entity in
                 guard var model = entity.components[ModelComponent.self] else { return }
                 model.materials = model.materials.map { material in
+                    guard materialName == nil || material.name == materialName else { return material }
                     var pbr = material as? PhysicallyBasedMaterial ?? PhysicallyBasedMaterial()
                     pbr.baseColor = .init(tint: uiColor)
+                    if let surface { pbr.baseColor.texture = .init(surface) }
+                    switch texture {
+                    case .natural: break
+                    case .velvet: pbr.roughness = 0.95; pbr.metallic = 0.0
+                    case .stripes, .speckles: pbr.roughness = 0.65; pbr.metallic = 0.0
+                    case .metallic: pbr.roughness = 0.2; pbr.metallic = 0.85
+                    }
                     return pbr
                 }
                 entity.components.set(model)
@@ -58,6 +108,16 @@ enum TreasureEntities {
         body(entity)
         for child in entity.children { visit(child, body) }
     }
+
+    /// USD importers may attach the clip to the root or its armature child. Play it on its owner.
+    /// Each beast exports only its chosen idle, so an attack clip can never be picked by accident.
+    static func skeletalClip(in entity: Entity) -> (entity: Entity, animation: AnimationResource)? {
+        if let animation = entity.availableAnimations.first { return (entity, animation) }
+        for child in entity.children {
+            if let clip = skeletalClip(in: child) { return clip }
+        }
+        return nil
+    }
 }
 
 /// A loaded treasure. `entry` is nil for a drawn stand-in, which has no idle motion.
@@ -66,6 +126,16 @@ struct LoadedTreasure {
     let entity: Entity
     let entry: TreasureCatalog.Entry?
     let isFallback: Bool
+    let originalModels: [OriginalModel]
+
+    struct OriginalModel {
+        let entity: Entity
+        let model: ModelComponent
+    }
+
+    var hasRequiredAnimation: Bool {
+        entry?.idleMotion != .skeletal || TreasureEntities.skeletalClip(in: entity) != nil
+    }
 
     /// The manifest's idle motion for this treasure, ready to drive each frame.
     func idleMotion() -> IdleMotionPlayer? {
@@ -73,7 +143,7 @@ struct LoadedTreasure {
     }
 }
 
-/// Plays a treasure's `idleMotion` in code: the USDZ files carry no animation.
+/// Plays procedural motions or a baked skeletal clip. Both obey the same Less motion switch.
 /// Create it after placing the entity, since it remembers each moving part's resting pose.
 @MainActor
 final class IdleMotionPlayer {
@@ -87,9 +157,14 @@ final class IdleMotionPlayer {
     let motion: IdleMotion
     private let body: Target?
     private let flaps: [Target]
+    private let skeletalClip: (entity: Entity, animation: AnimationResource)?
+    private let skeletalSpeed: Float
+    private var skeletalController: AnimationPlaybackController?
 
     init(root: Entity, entry: TreasureCatalog.Entry) {
         motion = entry.idleMotion
+        skeletalClip = entry.idleMotion == .skeletal ? TreasureEntities.skeletalClip(in: root) : nil
+        skeletalSpeed = entry.skeletalAnimation?.speed ?? 1
         let target = entry.idleMotionPart.flatMap { root.findEntity(named: $0) } ?? root
         body = Target(entity: target, rest: target.transform, axis: [0, 0, 1], degrees: 8)
         flaps = entry.idleMotion == .flap ? entry.movingParts.compactMap { part in
@@ -125,12 +200,21 @@ final class IdleMotionPlayer {
             }
         case .none:
             break
+        case .skeletal:
+            if skeletalController == nil, let clip = skeletalClip {
+                let controller = clip.entity.playAnimation(clip.animation.repeat(), transitionDuration: 0)
+                controller.speed = skeletalSpeed
+                skeletalController = controller
+            }
+            return // The skeleton owns its pose; never overwrite it with a whole-model transform.
         }
         body.entity.transform = pose
     }
 
     /// Back to the resting pose, e.g. when motion is turned off.
     func reset() {
+        skeletalController?.stop()
+        skeletalController = nil
         body.map { $0.entity.transform = $0.rest }
         flaps.forEach { $0.entity.transform = $0.rest }
     }

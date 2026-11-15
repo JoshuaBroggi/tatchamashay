@@ -13,11 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { THREE } from './lib/kit.mjs';
 import { toUSDA } from './lib/usd.mjs';
 import { woodPNG, ironPNG } from './lib/textures.mjs';
+import { PAINT_REGIONS } from './paint-regions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const assets = path.resolve(here, '..');
 const out = { models: path.join(assets, 'Models'), thumbs: path.join(assets, 'Thumbnails'), stage: path.join(here, '.build') };
-const ORDER = ['chest', 'octopus', 'clam', 'parrot', 'crown', 'star-compass', 'potion', 'dragon-egg', 'turtle', 'doubloon'];
+const ORDER = ['chest', 'octopus', 'clam', 'parrot', 'crown', 'star-compass', 'potion', 'dragon-egg', 'turtle', 'doubloon', 'spider'];
 const LIMIT = { chest: 2e6, treasure: 1.5e6 };
 
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
@@ -172,10 +173,13 @@ async function main() {
       idleMotionPart: built.idleMotionPart,
       movingParts: built.movingParts ?? [],
       namedParts: built.namedParts,
+      paintRegions: PAINT_REGIONS[id],
     });
   }
 
-  const models = ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id));
+  const models = [...ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id)),
+    ...[...entries.values()].filter((entry) => !ORDER.includes(entry.id))];
+  for (const model of models) if (PAINT_REGIONS[model.id]) model.paintRegions = PAINT_REGIONS[model.id];
   fs.writeFileSync(manifestPath, JSON.stringify({ ...old, version: 1, models }, null, 2) + '\n');
   if (failed) { console.error('Some models failed their checks.'); process.exit(1); }
 }

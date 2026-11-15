@@ -47,7 +47,7 @@ final class FamilySliceUITests: XCTestCase {
         snap("choose-treasure")
         app.buttons["chooseSpot"].tap()
 
-        let map = app.maps.firstMatch
+        let map = app.otherElements["spotMap"]
         XCTAssertTrue(map.waitForExistence(timeout: 5))
         sleep(3)
         let zoomHint = app.staticTexts["Zoom in until you can see paths, roads and water."]
