@@ -22,15 +22,28 @@ final class RestoredBeastUITests: XCTestCase {
             XCTAssertTrue(choice.waitForExistence(timeout: 5), "\(name) must be in the actual Beast picker")
             choice.tap()
             let preview = app.otherElements["treasureModel"]
-            let loaded = expectation(for: NSPredicate(format: "value == 'usdz'"), evaluatedWith: preview)
+            let loaded = expectation(for: NSPredicate(format: "value == 'usdz' AND label == %@", name), evaluatedWith: preview)
             wait(for: [loaded], timeout: 15)
-            app.buttons["beastColor"].tap()
+            let paintButton = app.buttons["beastColor"]
+            let ready = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: paintButton)
+            wait(for: [ready], timeout: 10)
+            paintButton.tap()
+            if !app.buttons["paintDone"].waitForExistence(timeout: 5) {
+                let attachment = XCTAttachment(screenshot: app.screenshot())
+                attachment.name = "\(name)-paint-controls-missing"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+                XCTFail("The paint controls did not open for \(name)")
+                return
+            }
             for color in ["red", "blue"] {
                 let swatch = app.buttons["paintSwatch-\(color)"]
                 reveal(swatch, in: app, upwards: true)
                 swatch.tap()
                 let painted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                    (try? Self.coloredFraction(Self.previewImage(in: app), color: color)) ?? 0 > 0.015
+                    // A front-facing four-legged creature occupies much less of the preview
+                    // than the upright Demogorgon; white or unchanged bodies still score zero.
+                    (try? Self.coloredFraction(Self.previewImage(in: app), color: color)) ?? 0 > 0.003
                 }, object: nil)
                 let result = XCTWaiter.wait(for: [painted], timeout: 10)
                 let attachment = XCTAttachment(image: try Self.previewImage(in: app))
@@ -50,10 +63,21 @@ final class RestoredBeastUITests: XCTestCase {
 
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, upwards: Bool) {
-        for _ in 0..<8 {
-            if element.isHittable { return }
-            if upwards { app.scrollViews.firstMatch.swipeUp() } else { app.scrollViews.firstMatch.swipeDown() }
+        let scroll = app.scrollViews.containing(.button, identifier: "paintDone").firstMatch
+        for _ in 0..<16 {
+            if element.exists && element.isHittable { return }
+            var moveUp = upwards
+            if element.exists && !element.frame.isEmpty {
+                moveUp = element.frame.midY > scroll.frame.midY
+            }
+            let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: moveUp ? 0.75 : 0.25))
+            let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: moveUp ? 0.35 : 0.65))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "unreachable-paint-control"
+        attachment.lifetime = .keepAlways
+        add(attachment)
         XCTAssertTrue(element.isHittable)
     }
 
@@ -64,7 +88,7 @@ final class RestoredBeastUITests: XCTestCase {
         let screenshot = app.screenshot().image
         let image = try XCTUnwrap(screenshot.cgImage)
         let scale = CGFloat(image.width) / app.frame.width
-        let frame = CGRect(x: 0, y: app.navigationBars.firstMatch.frame.maxY * scale,
+        let frame = CGRect(x: 0, y: app.navigationBars["Create a beast"].frame.maxY * scale,
                            width: CGFloat(image.width), height: 220 * scale)
         return UIImage(cgImage: try XCTUnwrap(image.cropping(to: frame)))
     }

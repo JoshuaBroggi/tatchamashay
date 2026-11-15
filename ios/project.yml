@@ -19,7 +19,6 @@ targets:
     platform: iOS
     sources:
       - Sources
-      - path: Resources/Assets.xcassets
       # Folder references keep the manifest's relative paths (Models/…, Sounds/…) in the bundle.
       - path: Assets/manifest.json
         buildPhase: resources
