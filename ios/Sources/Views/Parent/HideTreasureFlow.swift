@@ -184,6 +184,9 @@ struct ReviewSpotView: View {
                     marks: family.mapPlacements.map(\.spot))
                 // Keep the reviewed viewport stable as the hint keyboard opens and closes.
                 .frame(height: 220)
+                .clipped()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("spotMap")
             Form {
                 Section {
                     Text("Choose a spot for your child to find this beast. Once saved, it appears on their treasure map.")
