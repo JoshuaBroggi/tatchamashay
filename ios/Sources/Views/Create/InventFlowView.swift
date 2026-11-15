@@ -287,17 +287,27 @@ private struct ObjectScreen: View {
     }
 }
 
-/// The catalog's picture of a treasure, in its own color.
+/// Creatures move in the picker too; original treasures keep their lightweight still pictures.
 struct InventThumbnail: View {
     let model: BuiltInModel
     @Environment(AppModel.self) private var app
+    @State private var visible = false
 
     var body: some View {
-        if let url = app.catalog.colorThumbnailURL(for: model), let image = UIImage(contentsOfFile: url.path(percentEncoded: false)) {
-            Image(uiImage: image).resizable().scaledToFit().padding(6)
-        } else {
-            Image(systemName: model.symbol).font(.system(size: 44)).foregroundStyle(Color(model.defaultColor))
+        Group {
+            if app.catalog.entry(for: model)?.idleMotion == .skeletal, visible {
+                TreasureModelView(look: TreasureLook(model: model, color: model.defaultColor,
+                                                    sparkles: .none, name: model.displayName), catalog: app.catalog)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            } else if let url = app.catalog.colorThumbnailURL(for: model), let image = UIImage(contentsOfFile: url.path(percentEncoded: false)) {
+                Image(uiImage: image).resizable().scaledToFit().padding(6)
+            } else {
+                Image(systemName: model.symbol).font(.system(size: 44)).foregroundStyle(Color(model.defaultColor))
+            }
         }
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
     }
 }
 
