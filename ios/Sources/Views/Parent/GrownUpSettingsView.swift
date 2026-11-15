@@ -56,6 +56,10 @@ struct GrownUpSettingsView: View {
             } footer: {
                 Text("Tap a pirate to choose who's playing. Each pirate has their own chest. Pirates have no account and no public name.")
             }
+            Section("About") {
+                NavigationLink("Treasure makers & credits") { CreditsView() }
+                    .accessibilityIdentifier("treasureCredits")
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Palette.ground1.ignoresSafeArea())

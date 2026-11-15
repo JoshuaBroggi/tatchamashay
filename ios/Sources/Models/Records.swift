@@ -129,13 +129,14 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
     case dragonEgg
     case turtle, doubloon, spider
     case demogorgon, demodog, vineDog
+    case mulligan
     /// Keep models saved by another app version intact, even when their assets aren't bundled.
     case unavailable(String)
 
     /// Only bundled models can be chosen for a new beast.
     static let allCases: [BuiltInModel] = [
         .octopus, .clam, .parrot, .crown, .starCompass, .potion, .dragonEgg, .turtle, .doubloon, .spider,
-        .demogorgon, .demodog, .vineDog
+        .demogorgon, .demodog, .vineDog, .mulligan
     ]
 
     var rawValue: String {
@@ -153,6 +154,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "demogorgon"
         case .demodog: "demodog"
         case .vineDog: "vine-dog"
+        case .mulligan: "mulligan"
         case .unavailable(let savedID): savedID
         }
     }
@@ -199,6 +201,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "Vine Dog"
+        case .mulligan: "Mulligan"
         case .unavailable: "Saved beast"
         }
     }
@@ -219,6 +222,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "Demogorgon"
         case .demodog: "Demodog"
         case .vineDog: "vine dog"
+        case .mulligan: "Mulligan"
         case .unavailable: "treasure"
         }
     }
@@ -239,6 +243,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .demogorgon: "figure.stand"
         case .demodog: "pawprint.fill"
         case .vineDog: "leaf.fill"
+        case .mulligan: "pawprint.fill"
         case .unavailable: "shippingbox.fill"
         }
     }
@@ -257,6 +262,7 @@ enum BuiltInModel: RawRepresentable, Codable, CaseIterable, Hashable, Identifiab
         case .spider: .chestnut
         case .demogorgon: .coral
         case .demodog: .moss
+        case .mulligan: .moss
         case .unavailable: .gold
         }
     }

@@ -4,7 +4,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 13 treasures |
+| `Models/` | One USDZ per model: the chest and 14 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -27,6 +27,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 | `demogorgon` | Demogorgon | skeletal idle | Main body material |
 | `demodog` | Demodog | skeletal idle | Main body material |
 | `vine-dog` | Vine Dog | skeletal idle | Main body material |
+| `mulligan` | Mulligan | skeletal breathing, head/jaw and weight shifts | Authored colors retained |
 
 Treasures stand on y = 0, facing +Z. Original procedural files are 80–400 KB, and the chest is about 690 KB. The three restored skeletal models are about 1.7 MB each, below their 2 MB budget. Their existing single body material is one named paint area and supports the selected color and finish.
 

@@ -13,7 +13,9 @@
       "speed": 1,
       "triangleBudget": 12000,
       "tintMaterial": "Material_0",
-      "tintableParts": ["DemogorgonBody"],
+      "tintableParts": [
+        "DemogorgonBody"
+      ],
       "provenance": {
         "title": "Demogorgon",
         "creator": "Joshua Broggi / procedural web source",
@@ -35,7 +37,9 @@
       "speed": 1,
       "triangleBudget": 12000,
       "tintMaterial": "Material_0",
-      "tintableParts": ["DemodogBody"],
+      "tintableParts": [
+        "DemodogBody"
+      ],
       "provenance": {
         "title": "Demodog",
         "creator": "Joshua Broggi / procedural web source",
@@ -57,7 +61,9 @@
       "speed": 1,
       "triangleBudget": 12000,
       "tintMaterial": "Material_0",
-      "tintableParts": ["VineDogBody"],
+      "tintableParts": [
+        "VineDogBody"
+      ],
       "provenance": {
         "title": "Vine Dog",
         "creator": "Joshua Broggi / procedural web source",
@@ -65,6 +71,27 @@
         "sourceCommit": "2b397b3cad58d17722b5bd907433863b4881c9df",
         "usage": "Included by Joshua\u2019s explicit request for this private family build; character rights are not represented as original or CC-BY.",
         "changes": "Converted from the existing procedural rig; original vertex colors and Idle retained, wrinkle maps omitted, mesh detail reduced for iPhone."
+      }
+    },
+    {
+      "id": "mulligan",
+      "displayName": "Mulligan",
+      "file": "Models/Mulligan.usdz",
+      "thumbnail": "Thumbnails/mulligan.png",
+      "description": "Mulligan takes a deep breath and looks around your treasure chest.",
+      "defaultColor": "#A5AA78",
+      "source": "../Sources/Mulligan/mulligan.blend",
+      "clip": "Idle",
+      "speed": 1,
+      "triangleBudget": 22000,
+      "tintableParts": [],
+      "provenance": {
+        "title": "Mulligan \u2014 family-requested character adaptation",
+        "creator": "Codex / procedural Blender model and rig for Joshua Broggi",
+        "source": "https://github.com/JoshuaBroggi/tatchamashay/tree/a477def6fa1633b4b30f91e5fb6892499e65431a/ios/Assets/Sources/Mulligan",
+        "usage": "Created at Joshua\u2019s explicit request from five user-supplied toy photographs for this private family build. Underlying character and reference-photo rights are not claimed as original or CC-BY.",
+        "changes": "New iPhone-first Blender mesh and weighted 30-joint rig. Rebuilt narrow wedge skull and pointed V-shaped jaw with 88 fine teeth, violet lining/folds and a red tongue. Added 19 woven chest-cord layers, 20 shoulder nodules, facial branches and forearm creases. One baked six-second idle combines breathing, head turns, open-jaw movement, planted-foot weight shifts and toe flex; limb baking preserves bind roll. Converted through the shared USDZ pipeline.",
+        "sourceCommit": "a477def6fa1633b4b30f91e5fb6892499e65431a"
       }
     }
   ]
