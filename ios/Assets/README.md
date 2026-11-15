@@ -4,7 +4,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 9 treasures |
+| `Models/` | One USDZ per model: the chest and 10 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -23,6 +23,7 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 | `dragon-egg` | Dragon Egg | wiggle (egg only) | Shell |
 | `turtle` | Tumble the Sea Turtle | flap | Shell |
 | `doubloon` | Lucky Doubloon | spin | Face, Rim, Stamp |
+| `spider` | Silky the Spider | wiggle | Abdomen, Head, Legs |
 
 Each treasure is 0.13–0.35 m tall and stands on y = 0, facing +Z. Files are 80–400 KB, the chest is about 690 KB.
 
@@ -49,6 +50,7 @@ Model fields:
 | `heightMeters` | Height at scale 1, for framing the camera and placing the model in the chest |
 | `tintMaterial` | Name of the recolorable material (`"Tint"`). Absent on the chest |
 | `tintableParts` | Names of the meshes that use the tint material. Find each with `entity.findEntity(named:)` and set its material's base color to the child's color |
+| `paintRegions` | Optional named paint areas, each `{ id, name, parts }`. The editor labels these areas and the renderer applies the saved paint-pot assignment to their meshes. Listed parts are non-overlapping and exclude eyes and face details. `tools/paint-regions.mjs` is the generator's source of truth |
 | `defaultColor` | The tint color before the child picks one, as `#RRGGBB` (sRGB) |
 | `idleMotion` | `spin`, `bob`, `wiggle`, `flap` or `none`. USDZ carries no animation from these tools, so the app plays the motion in code |
 | `idleMotionPart` | Optional. Apply `idleMotion` to this part only (the dragon egg wiggles while its nest stays still). Absent means the whole model |
@@ -65,6 +67,14 @@ The tint material is near-white (`#EDEDED`), so either approach shows the chosen
 - multiply it (`PhysicallyBasedMaterial.baseColor.tint`).
 
 Other parts (eyes, gems, beaks, glass) keep their own fixed colors.
+
+Multi-color looks additionally paint the manifest's `paintRegions`; some regions deliberately include
+previously fixed details, such as the turtle's flippers or the egg's speckles. Legacy looks continue
+to use only `tintableParts`. Natural retains the bundled material finish; velvet, stripes and speckles
+use small deterministic maps generated and cached on device, while metallic changes the material's
+metalness and roughness. No textures are downloaded. Material updates preserve entity transforms
+and the preview camera. The neutral materials are restored before each repaint so switching back to
+Natural removes earlier texture and finish settings.
 
 ### The chest
 

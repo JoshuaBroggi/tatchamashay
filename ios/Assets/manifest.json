@@ -47,7 +47,30 @@
       ],
       "defaultColor": "#FF7A9C",
       "idleMotion": "wiggle",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "head",
+          "name": "Head",
+          "parts": [
+            "Head"
+          ]
+        },
+        {
+          "id": "arms",
+          "name": "Eight arms",
+          "parts": [
+            "Arms"
+          ]
+        },
+        {
+          "id": "spots",
+          "name": "Spots",
+          "parts": [
+            "Spots"
+          ]
+        }
+      ]
     },
     {
       "id": "clam",
@@ -74,6 +97,22 @@
             0
           ],
           "openDegrees": -60
+        }
+      ],
+      "paintRegions": [
+        {
+          "id": "top",
+          "name": "Top shell",
+          "parts": [
+            "ShellTop"
+          ]
+        },
+        {
+          "id": "bottom",
+          "name": "Bottom shell",
+          "parts": [
+            "ShellBottom"
+          ]
         }
       ]
     },
@@ -116,6 +155,31 @@
           ],
           "degrees": 35
         }
+      ],
+      "paintRegions": [
+        {
+          "id": "body",
+          "name": "Head & body",
+          "parts": [
+            "Head",
+            "Body"
+          ]
+        },
+        {
+          "id": "wings",
+          "name": "Wings",
+          "parts": [
+            "WingLeftFeathers",
+            "WingRightFeathers"
+          ]
+        },
+        {
+          "id": "tail",
+          "name": "Tail",
+          "parts": [
+            "Tail"
+          ]
+        }
       ]
     },
     {
@@ -134,7 +198,30 @@
       ],
       "defaultColor": "#F2C14E",
       "idleMotion": "spin",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "band",
+          "name": "Band",
+          "parts": [
+            "Band"
+          ]
+        },
+        {
+          "id": "points",
+          "name": "Points",
+          "parts": [
+            "Points"
+          ]
+        },
+        {
+          "id": "rim",
+          "name": "Rim",
+          "parts": [
+            "Rim"
+          ]
+        }
+      ]
     },
     {
       "id": "star-compass",
@@ -150,7 +237,23 @@
       ],
       "defaultColor": "#FFC93C",
       "idleMotion": "spin",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "star",
+          "name": "Star",
+          "parts": [
+            "Star"
+          ]
+        },
+        {
+          "id": "loop",
+          "name": "Loop",
+          "parts": [
+            "Loop"
+          ]
+        }
+      ]
     },
     {
       "id": "potion",
@@ -166,7 +269,31 @@
       ],
       "defaultColor": "#9B6BFF",
       "idleMotion": "bob",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "liquid",
+          "name": "Potion",
+          "parts": [
+            "Liquid"
+          ]
+        },
+        {
+          "id": "cork",
+          "name": "Cork & string",
+          "parts": [
+            "Cork",
+            "String"
+          ]
+        },
+        {
+          "id": "heart",
+          "name": "Heart tag",
+          "parts": [
+            "Heart"
+          ]
+        }
+      ]
     },
     {
       "id": "dragon-egg",
@@ -183,7 +310,23 @@
       "defaultColor": "#4FC48A",
       "idleMotion": "wiggle",
       "idleMotionPart": "Egg",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "shell",
+          "name": "Egg shell",
+          "parts": [
+            "Shell"
+          ]
+        },
+        {
+          "id": "spots",
+          "name": "Speckles",
+          "parts": [
+            "Speckles"
+          ]
+        }
+      ]
     },
     {
       "id": "turtle",
@@ -240,6 +383,33 @@
           ],
           "degrees": -15
         }
+      ],
+      "paintRegions": [
+        {
+          "id": "shell",
+          "name": "Shell",
+          "parts": [
+            "Shell"
+          ]
+        },
+        {
+          "id": "head",
+          "name": "Head",
+          "parts": [
+            "HeadSkin"
+          ]
+        },
+        {
+          "id": "flippers",
+          "name": "Flippers & tail",
+          "parts": [
+            "FlipperFrontLeftSkin",
+            "FlipperFrontRightSkin",
+            "FlipperBackLeftSkin",
+            "FlipperBackRightSkin",
+            "TailTip"
+          ]
+        }
       ]
     },
     {
@@ -258,7 +428,71 @@
       ],
       "defaultColor": "#F5B83D",
       "idleMotion": "spin",
-      "movingParts": []
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "face",
+          "name": "Coin",
+          "parts": [
+            "Face"
+          ]
+        },
+        {
+          "id": "rim",
+          "name": "Rim",
+          "parts": [
+            "Rim"
+          ]
+        },
+        {
+          "id": "stamp",
+          "name": "Stamp",
+          "parts": [
+            "Stamp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spider",
+      "displayName": "Silky the Spider",
+      "kind": "treasure",
+      "file": "Models/Spider.usdz",
+      "thumbnail": "Thumbnails/spider.png",
+      "description": "A curious little spider with eight long legs and a silky coat.",
+      "heightMeters": 0.174,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "Abdomen",
+        "Head",
+        "Legs"
+      ],
+      "defaultColor": "#5C3B2B",
+      "idleMotion": "wiggle",
+      "movingParts": [],
+      "paintRegions": [
+        {
+          "id": "abdomen",
+          "name": "Abdomen",
+          "parts": [
+            "Abdomen"
+          ]
+        },
+        {
+          "id": "head",
+          "name": "Head & chest",
+          "parts": [
+            "Head"
+          ]
+        },
+        {
+          "id": "legs",
+          "name": "Eight legs",
+          "parts": [
+            "Legs"
+          ]
+        }
+      ]
     }
   ],
   "sounds": [

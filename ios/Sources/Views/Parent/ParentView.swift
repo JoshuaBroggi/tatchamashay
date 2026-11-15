@@ -51,7 +51,7 @@ struct ParentView: View {
                             Button { editor = BeastEditorTarget(design: design) } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: design.current.look.model.symbol)
-                                        .foregroundStyle(Color(design.current.look.color))
+                                        .foregroundStyle(Color(design.current.look.primaryPaintColor))
                                         .frame(width: 28)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(design.current.look.name).foregroundStyle(Palette.textPrimary)
@@ -147,7 +147,7 @@ private struct HiddenRow: View {
         HStack(spacing: 12) {
             Image(systemName: look?.model.symbol ?? "questionmark")
                 .font(.title2)
-                .foregroundStyle(look.map { Color($0.color) } ?? Palette.textMuted)
+                .foregroundStyle(look.map { Color($0.primaryPaintColor) } ?? Palette.textMuted)
                 .frame(width: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(look?.name ?? "Treasure").font(Typeface.body(16, weight: .semibold))

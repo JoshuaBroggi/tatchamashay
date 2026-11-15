@@ -76,6 +76,8 @@ extension Color {
         let c = color.rgb
         self.init(red: c.red, green: c.green, blue: c.blue)
     }
+
+    init(_ color: PaintColor) { self.init(hex: color.hex) }
 }
 
 // MARK: - Shared pieces

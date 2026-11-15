@@ -29,7 +29,12 @@ remain. Existing story text is kept in saved records for compatibility but is no
 ## Parent creation
 
 1. Open Parents and choose **Create a beast** (or edit an existing design).
-2. Pick the model, color, sparkles, name and sound in one editor with a live preview and defaults.
+2. Pick the model, sparkles, name and sound in one editor with a live preview and defaults. **Color &
+   texture** has three short steps: choose one to three paint colors (named swatches, nature-inspired
+   palettes or a custom color), drag/tap them onto named parts, then choose a surface finish. The
+   preview keeps its pinch zoom and orbit while paint or sparkles change and while switching paint
+   steps. Opening the paint controls does not recreate the preview. Selecting a different beast
+   starts its default look. Previously saved single-color looks remain unchanged until edited.
 3. Review its location on a detailed map, optionally add a practical hint and confirm the spot.
 4. Save. The beast and placement save atomically and immediately become available on the map.
 

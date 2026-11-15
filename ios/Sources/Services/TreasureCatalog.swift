@@ -89,8 +89,20 @@ struct TreasureCatalog: Sendable {
         let movingParts: [MovingPart]
         /// Chest only.
         let namedParts: ChestParts?
+        var paintRegions: [PaintRegion]? = nil
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
+    }
+
+    struct PaintRegion: Codable, Hashable, Identifiable, Sendable {
+        let id: String
+        let name: String
+        let parts: [String]
+    }
+
+    func paintRegions(for model: BuiltInModel) -> [PaintRegion] {
+        guard let entry = entry(for: model) else { return [] }
+        return entry.paintRegions ?? [PaintRegion(id: "body", name: "Main color", parts: entry.tintableParts)]
     }
 
     /// A part with its own pivot: wings and flippers flap, lids hinge open.
