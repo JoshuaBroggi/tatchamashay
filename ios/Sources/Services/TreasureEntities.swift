@@ -12,7 +12,7 @@ enum TreasureEntities {
     static func treasure(_ look: TreasureLook, catalog: TreasureCatalog = .bundled) async -> LoadedTreasure {
         if let entry = catalog.entry(for: look.model), let url = catalog.modelURL(for: entry),
            let entity = await load(url) {
-            tint(entity, parts: entry.tintableParts, color: look.color)
+            tint(entity, parts: entry.tintableParts, materialName: entry.tintMaterial, color: look.color)
             return LoadedTreasure(entity: entity, entry: entry, isFallback: false)
         }
         return LoadedTreasure(entity: FallbackTreasure.make(look.model, color: look.color), entry: nil, isFallback: true)
@@ -24,15 +24,18 @@ enum TreasureEntities {
         return ChestEntity(root: entity, entry: catalog.chest)
     }
 
-    /// Sets the base color of every material on the named parts and the meshes inside them.
-    static func tint(_ root: Entity, parts: [String], color: TreasureColor) {
+    /// Tints the named material wherever RealityKit imports it. Skinned meshes can be combined
+    /// under their armature, leaving the manifest's named parts without a ModelComponent.
+    /// Catalogs without a material name keep the named-part behavior.
+    static func tint(_ root: Entity, parts: [String], materialName: String? = nil, color: TreasureColor) {
         let c = color.rgb
         let uiColor = UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
-        for name in parts {
-            guard let part = root.findEntity(named: name) else { continue }
+        let targets = materialName == nil ? parts.compactMap { root.findEntity(named: $0) } : [root]
+        for part in targets {
             visit(part) { entity in
                 guard var model = entity.components[ModelComponent.self] else { return }
                 model.materials = model.materials.map { material in
+                    guard materialName == nil || material.name == materialName else { return material }
                     var pbr = material as? PhysicallyBasedMaterial ?? PhysicallyBasedMaterial()
                     pbr.baseColor = .init(tint: uiColor)
                     return pbr

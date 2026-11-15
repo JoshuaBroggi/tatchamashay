@@ -139,17 +139,12 @@ struct TreasureCatalogTests {
         }
     }
 
-    @Test("Tinting sets the chosen color on the tintable parts")
+    @Test("Tinting sets the chosen color on every model's body material", arguments: BuiltInModel.allCases)
     @MainActor
-    func tints() async throws {
-        let loaded = await TreasureEntities.treasure(TreasureLook(model: .potion, color: .red, name: "x"), catalog: catalog)
-        let liquid = try #require(loaded.entity.findEntity(named: "Liquid"))
-        var colors: [UIColor] = []
-        TreasureEntities.visit(liquid) { entity in
-            for material in entity.components[ModelComponent.self]?.materials ?? [] {
-                if let pbr = material as? PhysicallyBasedMaterial { colors.append(pbr.baseColor.tint) }
-            }
-        }
+    func tints(model: BuiltInModel) async throws {
+        let loaded = await TreasureEntities.treasure(TreasureLook(model: model, color: .red, name: "x"), catalog: catalog)
+        #expect(!loaded.isFallback)
+        let colors = materials(in: loaded.entity).filter { $0.name == "Tint" }.map(\.baseColor.tint)
         #expect(!colors.isEmpty)
         let (r, g, b) = TreasureColor.red.rgb
         for color in colors {
@@ -157,6 +152,40 @@ struct TreasureCatalogTests {
             color.getRed(&cr, green: &cg, blue: &cb, alpha: &a)
             #expect(abs(cr - r) < 0.01 && abs(cg - g) < 0.01 && abs(cb - b) < 0.01)
         }
+    }
+
+    @Test("Cached beasts keep independent colors and preserve their eyes", arguments: [BuiltInModel.tRex, .scorpion, .spider])
+    @MainActor
+    func beastsKeepIndependentColors(model: BuiltInModel) async throws {
+        let entry = try #require(catalog.entry(for: model))
+        let url = try #require(catalog.modelURL(for: entry))
+        let original = try await Entity(contentsOf: url)
+        let fixedColors = materials(in: original).filter { $0.name != "Tint" }.map(\.baseColor.tint)
+        #expect(fixedColors.count >= 2, "The eyes and pupils keep their original colors")
+        let red = await TreasureEntities.treasure(TreasureLook(model: model, color: .red, name: "Red"), catalog: catalog)
+        let blue = await TreasureEntities.treasure(TreasureLook(model: model, color: .blue, name: "Blue"), catalog: catalog)
+        for (loaded, color) in [(red, TreasureColor.red), (blue, TreasureColor.blue)] {
+            #expect(!loaded.isFallback && loaded.hasRequiredAnimation)
+            let coloredMaterials = materials(in: loaded.entity)
+            #expect(coloredMaterials.filter { $0.name != "Tint" }.map(\.baseColor.tint) == fixedColors)
+            let bodyColors = coloredMaterials.filter { $0.name == "Tint" }.map(\.baseColor.tint)
+            #expect(!bodyColors.isEmpty)
+            let (r, g, b) = color.rgb
+            for bodyColor in bodyColors {
+                var cr: CGFloat = 0, cg: CGFloat = 0, cb: CGFloat = 0, a: CGFloat = 0
+                bodyColor.getRed(&cr, green: &cg, blue: &cb, alpha: &a)
+                #expect(abs(cr - r) < 0.01 && abs(cg - g) < 0.01 && abs(cb - b) < 0.01)
+            }
+        }
+    }
+
+    @MainActor
+    private func materials(in root: Entity) -> [PhysicallyBasedMaterial] {
+        var result: [PhysicallyBasedMaterial] = []
+        TreasureEntities.visit(root) { entity in
+            result += (entity.components[ModelComponent.self]?.materials ?? []).compactMap { $0 as? PhysicallyBasedMaterial }
+        }
+        return result
     }
 
     @Test("A file that won't load falls back to a drawn treasure")
