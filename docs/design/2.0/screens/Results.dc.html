@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Expedition results</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&amp;family=Inter:wght@400;600&amp;display=swap">
+<style>body{margin:0}a{color:#C3D5B6}a:hover{color:#FFFFFF}</style>
+</helmet>
+<div style="width: 1280px; height: 720px; box-sizing: border-box; padding: 40px 56px; display: flex; flex-direction: column; gap: 28px; background: #0E1A12; font-family: Inter, sans-serif; color: #E9EFD9">
+  <div style="display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #2E5236; padding-bottom: 18px">
+    <span style="font-size: 13px; font-weight: 600; letter-spacing: 4px; color: #6FCF97">EXPEDITION COMPLETE · 14:32</span>
+    <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 56px; font-weight: 800; letter-spacing: 2px; color: #F8FAEF">THE SUNKEN TEMPLE</h1>
+  </div>
+  <div style="flex-grow: 1; display: flex; gap: 36px">
+    <div style="flex: 0 0 420px; display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 3px; color: #C3D5B6">RELICS RECOVERED · 5 / 6</span>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{relics}}" as="r" hint-placeholder-count="6">
+          <div style="{{r.box}}"><span style="font-size: 12px; font-weight: 600; color: {{r.color}}">{{r.name}}</span></div>
+        </sc-for>
+      </div>
+      <div style="margin-top: auto; border: 1px solid #D4A24C; padding: 18px 20px; display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 13px; font-weight: 600; letter-spacing: 3px; color: #C3D5B6">CREW TOTAL</span>
+        <span style="font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 800; color: #D4A24C">9,870</span>
+      </div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 3px; color: #C3D5B6">CREW</span>
+      <sc-for list="{{crew}}" as="m" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 20px; padding: 16px 20px; background: #15271B; border: 1px solid #2E5236">
+          <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 800; color: #F8FAEF">{{m.name}}</span><span style="font-size: 13px; color: #C3D5B6">{{m.role}}</span></span>
+          <span style="font-size: 13px; font-weight: 600; letter-spacing: 1px; color: #D4A24C">{{m.award}}</span>
+          <span style="width: 90px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 800">{{m.score}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display: flex; justify-content: flex-end; gap: 14px">
+    <a href="Main.dc.html" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 58px; border: 1px solid #4E7A4A; box-sizing: border-box; color: #F8FAEF; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-decoration: none">BASE CAMP</a>
+    <a href="LevelSelect.dc.html" style="display: flex; align-items: center; justify-content: center; width: 240px; height: 58px; background: #D4A24C; color: #0E1A12; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: 2px; text-decoration: none">NEXT EXPEDITION</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const box = 'height: 92px; display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; ';
+    const relics = ['Jade idol','Gold mask','Obsidian blade','Bronze bell','Star coin','???'].map((name, i) => i < 5
+      ? { name, color: '#F8FAEF', box: box + 'background: linear-gradient(#2E5236, #15271B); border: 1px solid #4E7A4A' }
+      : { name, color: '#86A07E', box: box + 'border: 1px dashed #2E5236' });
+    return { relics, crew: [
+      { name: 'You', role: 'Cartographer', award: 'MAPPED 92%', score: '3,420' },
+      { name: 'jadefox', role: 'Climber', award: 'FOUND THE IDOL', score: '4,250' },
+      { name: 'River', role: 'Medic', award: '3 REVIVES', score: '2,200' }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

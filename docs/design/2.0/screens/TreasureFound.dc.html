@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Treasure found</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&amp;family=Inter:wght@400;600&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1280px; height: 720px; position: relative; overflow: hidden; background: #08110B; font-family: Inter, sans-serif; color: #F8FAEF">
+  <div style="position: absolute; left: 340px; top: 80px; width: 600px; height: 480px; background: radial-gradient(circle, rgba(212,162,76,0.45) 0%, rgba(212,162,76,0) 65%)"></div>
+  <div style="position: absolute; left: 520px; top: 170px; width: 240px; height: 300px; border: 1px dashed #86A07E; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 2px; color: #C3D5B6; text-align: center">RELIC 3D MODEL<br>slow rotate</div>
+  <div style="position: absolute; left: 0; right: 0; bottom: 70px; display: flex; flex-direction: column; align-items: center; gap: 10px">
+    <span style="font-size: 13px; font-weight: 600; letter-spacing: 5px; color: #D4A24C">LEGENDARY RELIC FOUND</span>
+    <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 72px; font-weight: 800; letter-spacing: 2px">THE JADE IDOL</h1>
+    <p style="margin: 0; font-size: 16px; color: #C3D5B6; max-width: 560px; text-align: center">Carved around 900 AD, buried when the temple flooded. Found by <span style="color: #F8FAEF; font-weight: 600">jadefox</span>.</p>
+    <div style="display: flex; gap: 32px; margin-top: 12px; font-size: 14px">
+      <span><span style="color: #C3D5B6">Value</span> <span style="font-weight: 600; color: #D4A24C">+2,000</span></span>
+      <span><span style="color: #C3D5B6">Collection</span> <span style="font-weight: 600">3 / 12 jade pieces</span></span>
+    </div>
+    <div style="display: flex; gap: 14px; margin-top: 16px">
+      <button style="width: 200px; height: 54px; border: 0; background: #D4A24C; color: #0E1A12; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 2px; cursor: pointer">KEEP EXPLORING</button>
+      <button style="width: 200px; height: 54px; border: 1px solid #4E7A4A; background: transparent; color: #F8FAEF; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 2px; cursor: pointer">VIEW IN JOURNAL</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>

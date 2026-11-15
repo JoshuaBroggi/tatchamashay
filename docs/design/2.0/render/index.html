@@ -1,0 +1,26 @@
+<!doctype html><html><body style="margin:0;background:transparent">
+<script type="importmap">{"imports":{"three":"/nm/three/build/three.module.js","three/addons/":"/nm/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+const r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+r.setSize(800,1000); r.outputColorSpace=THREE.SRGBColorSpace; r.toneMapping=THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+const dl=new DRACOLoader(); dl.setDecoderPath('/nm/three/examples/jsm/libs/draco/gltf/');
+const L=new GLTFLoader(); L.setDRACOLoader(dl);
+window.shoot=async(file,name,yaw)=>{
+  const s=new THREE.Scene();
+  s.add(new THREE.HemisphereLight(0xdff7ff,0x2a3a20,1.6));
+  const k=new THREE.DirectionalLight(0xffe2a8,3); k.position.set(3,5,4); s.add(k);
+  const rim=new THREE.DirectionalLight(0x7fe3f0,4); rim.position.set(-4,3,-4); s.add(rim); const f=new THREE.DirectionalLight(0xffffff,2.2); f.position.set(0,1,6); s.add(f);
+  const g=await L.loadAsync('/models/'+encodeURIComponent(file)); const m=g.scene;
+  m.rotation.y=yaw; s.add(m);
+  const b=new THREE.Box3().setFromObject(m), c=b.getCenter(new THREE.Vector3()), z=b.getSize(new THREE.Vector3());
+  m.position.sub(c); const h=Math.max(z.y, z.x*1.25, z.z*0.8);
+  const cam=new THREE.PerspectiveCamera(30,0.8,0.01,1000); cam.position.set(0,h*0.12,h*2.1); cam.lookAt(0,0,0);
+  r.render(s,cam);
+  await fetch('/save/'+name,{method:'POST',body:r.domElement.toDataURL('image/png')});
+  return 'saved '+name+' '+JSON.stringify(z);
+};
+window.ready=true;
+</script></body></html>
