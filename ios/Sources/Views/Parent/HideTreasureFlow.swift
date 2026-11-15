@@ -33,7 +33,7 @@ struct HideTreasureFlow: View {
                         }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        NavigationLink("Next") {
+                        NavigationLink("Choose hiding spot") {
                             ReviewSpotView(look: look, editing: editing?.id, draft: $review) {
                                 dismiss()
                             }
@@ -163,6 +163,9 @@ struct ReviewSpotView: View {
                 .frame(minHeight: 160)
             Form {
                 Section {
+                    Text("Choose a spot for your child to find this beast. Once saved, it appears on their treasure map.")
+                        .font(Typeface.body(14))
+                        .foregroundStyle(Palette.textSecondary)
                     Picker("Map", selection: $draft.satellite) {
                         Text("Map").tag(false)
                         Text("Satellite").tag(true)
@@ -186,7 +189,7 @@ struct ReviewSpotView: View {
                         }
                 }
                 Section {
-                    Button(saving ? "Saving…" : "Save on map") { save() }
+                    Button(saving ? "Saving…" : "Hide for your child") { save() }
                         .disabled(!canSave)
                         .accessibilityIdentifier("hideHere")
                     if let message = family.errorMessage {

@@ -32,6 +32,9 @@ final class ParentSetupUITests: XCTestCase {
         XCTAssertEqual(preservedHint.value as? String, "By the back step", "Back and Next preserve the placement draft")
         XCTAssertEqual(app.switches["spotChecked"].value as? String, "1")
         let save = app.buttons["hideHere"]
+        XCTAssertEqual(save.label, "Hide for your child")
+        XCTAssertFalse(app.buttons["Hide it for Dad"].exists)
+        XCTAssertFalse(app.buttons["Hide it for Mom"].exists)
         XCTAssertTrue(save.isEnabled, "one reviewed treasure is enough")
         save.tap()
 
