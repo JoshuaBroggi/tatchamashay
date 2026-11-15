@@ -2,13 +2,11 @@ import Foundation
 import Observation
 import UIKit
 
-/// The grown-up's switches for sound, the spoken guide and motion (PLAN.md: "sound and motion can be
-/// turned down"). `GuideVoice`, `SoundEffects` and `TreasureModelView` all read these.
+/// Parent controls for sound and motion. Applies to previews and play alike.
 @MainActor
 @Observable
 final class PlaySettings {
     var soundOn: Bool { didSet { save(soundOn, Key.sound) } }
-    var spokenGuideOn: Bool { didSet { save(spokenGuideOn, Key.spokenGuide) } }
 
     /// Turns off idle motions and big animations. Follows the system's Reduce Motion setting until the
     /// grown-up flips it here.
@@ -39,7 +37,6 @@ final class PlaySettings {
 
     private enum Key {
         static let sound = "play.soundOn"
-        static let spokenGuide = "play.spokenGuideOn"
         static let reducedMotion = "play.reducedMotion"
     }
 
@@ -51,7 +48,6 @@ final class PlaySettings {
         self.defaults = defaults
         self.systemReduceMotion = systemReduceMotion
         soundOn = defaults?.object(forKey: Key.sound) as? Bool ?? true
-        spokenGuideOn = defaults?.object(forKey: Key.spokenGuide) as? Bool ?? true
         reducedMotionChoice = defaults?.object(forKey: Key.reducedMotion) as? Bool
     }
 

@@ -58,7 +58,7 @@ enum PirateAvatar: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Who made a treasure: a parent, or a child with the parent's help.
+/// Creation provenance. New designs are parent-made; child cases remain for legacy saves.
 enum TreasureMaker: Codable, Hashable, Sendable {
     case parent(ParentAccount.ID)
     case child(ChildProfile.ID)
@@ -114,7 +114,7 @@ struct TreasureLook: Codable, Hashable, Sendable {
     var sparkles: Sparkles = .some
     var name: String
     var sound: TreasureSound = .chime
-    /// A short story the parent types.
+    /// Legacy story text, retained for save compatibility and never shown in the journey.
     var story: String = ""
 }
 
@@ -207,7 +207,7 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Milestone 1's colors, then the eight the hide-for-parent flow offers (`hide-for-parent.md`).
+/// Saved color values, shared by the parent editor and legacy collections.
 enum TreasureColor: String, Codable, CaseIterable, Identifiable, Sendable {
     case gold, sea, coral, storm, moss, ruby
     case red, orange, yellow, green, blue, purple, pink
@@ -282,8 +282,7 @@ struct ChestPlacement: Identifiable, Codable, Hashable, Sendable {
     var hintBlank: String?
 }
 
-/// The familiar place a hunt happens in, chosen by the parent on a detailed map. Spot review starts
-/// there, and **Get ready** checks its map.
+/// A legacy hunt area, retained in saved records. Parents review each new placement individually.
 struct PlayArea: Codable, Hashable, Sendable {
     var center: Coordinate
     /// Roughly how far the hunt reaches from `center`, in meters.
@@ -292,27 +291,24 @@ struct PlayArea: Codable, Hashable, Sendable {
     var name: String = ""
 }
 
-/// A hunt: a guide, a goal, 3–5 placements in play order, and a finale.
-/// `AdventureRules.swift` has the size rules and `HuntProgress`, which walks a run through them.
+/// A legacy grouping of placements. The map combines all groups and ignores their story metadata.
 struct Adventure: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var familyID: ParentAccount.ID
     var title: String
     var guideName: String = "Captain Tumblebeard"
     var goal: String
-    /// Play order. The hunt always looks for the first one not yet found this run.
+    /// Saved membership order; it does not constrain discovery order.
     var placementIDs: [ChestPlacement.ID] = []
     /// The closing line shown when the last treasure is found ("Back to the ship!").
     var finale: String = "Back to the ship!"
-    /// The guide's id in `Content/Stories` (`guide:` in an adventure file). Nil before milestone 2.
+    /// Legacy guide identifier; runtime play does not load narrative content.
     var guideID: String?
-    /// The starter adventure this was made from (`id:` in its story file), whose goal, reveal and
-    /// finale lines the guide speaks. Nil for an adventure the parent wrote.
+    /// Legacy story identifier, retained for existing saved groups.
     var storyID: String?
     /// Where the hunt happens. Nil for milestone 1 adventures.
     var playArea: PlayArea?
-    /// The child who invented this adventure's treasure and hid it for the grown-up (the
-    /// hide-for-parent flow). The hunt can say who hid it. Nil for adventures the parent made.
+    /// Legacy creator metadata; the child remains the player regardless of who created a design.
     var hiddenBy: ChildProfile.ID?
     var createdAt = Date()
     var syncState: SyncState = .waitingToSync
@@ -353,7 +349,7 @@ struct CollectionRecord: Identifiable, Codable, Hashable, Sendable {
     var foundAgainCount: Int { foundAgainRunIDs.count }
 }
 
-/// One play-through of an adventure. Replaying starts a new run.
+/// Legacy run metadata retained for decoding older collections; new finds never reset progress.
 struct HuntRun: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var adventureID: Adventure.ID

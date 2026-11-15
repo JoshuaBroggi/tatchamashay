@@ -1,3 +1,5 @@
+> The iPhone is the sole supported game. Browser gameplay is retired. See PLAN.md for the current simplified journey.
+
 # Tatchamashay 2.0 — Road to the iPhone
 
 How we get from "works in the simulator" to a production-quality app in the family's hands.

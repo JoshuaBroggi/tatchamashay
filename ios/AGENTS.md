@@ -8,163 +8,64 @@ Joshua's connected physical iPhone. Push, merge, and phone deployment have stand
 Test in the live installed app without adding approval, staging, or pre-release device-QA gates.
 Preserve the phone's saved family and collections; never launch with reset or test-fixture arguments.
 
-SwiftUI iPhone app (iOS 18+, MapKit, RealityKit): a private, parent-run pirate treasure hunt.
-`PLAN.md` is the product plan; its "Product rules" win over the design mockups. The repo root
-`AGENTS.md` automatic-delivery rule applies here; its legacy gameplay guidance concerns the old web game.
 
-## Build, test, run
+SwiftUI iPhone app (iOS 18+, MapKit, RealityKit): a private family treasure map. Read `PLAN.md` for
+current product rules. This is the sole supported game; `archive/browser/` is retired reference
+source. The app has no live multiplayer backend.
 
-Built with Xcode 27 and `xcodegen` (`brew install xcodegen`). The `.xcodeproj` is generated from
-`project.yml` and is not committed.
+## Product invariants
+
+- The child is always the player. Map and My Chest are the only child tabs.
+- Parents create/edit/place beasts behind the Parents gate. No role switching or child creation flow.
+- All valid, saved, unfound placements across all legacy adventure groups appear on the map. Collection
+  order is unrestricted. Target selection must reset GPS tracking without hiding other markers.
+- A collection is unique for (child, placement) for its lifetime. Save before celebration. Failed
+  writes change nothing. Old run IDs/stickers remain decodable, but new play does not replay hunts.
+- Collected appearances are immutable saved copies. Editing/removing designs or placements must never
+  change the chest. Preserve stable IDs and legacy decoding, including unused story fields.
+- Only parents confirm real locations on a detailed map; validate family ownership, coordinates and
+  review timestamps in the store. Automatic placement belongs only in isolated Demo mode.
+- GPS uses freshness/accuracy checks and hysteresis. Keep the parent's We found it fallback.
+- There are no stories, narrative openings/finales, ordered hunts, minimum-three or maximum-five
+  restrictions, or manual Get ready flow. Asset checks are automatic and do not require a network.
+
+## Build and test
+
+Xcode 27, Swift 6 and `xcodegen` (`brew install xcodegen`). Warnings are errors. The generated
+`.xcodeproj` and build outputs are not committed. There are no third-party Swift packages.
 
 ```bash
 cd ios
-scripts/build.sh build              # generate the project and build for the simulator
-scripts/build.sh test               # unit tests and the end-to-end walkthrough
-scripts/walkthrough.sh <sim-udid>   # all tests on one simulator, plus screenshots
-open Tatchamashay.xcodeproj         # after any build.sh run
+scripts/build.sh build
+scripts/build.sh test
+# For one simulator, pass its UUID as the second argument.
 ```
 
-Warnings are errors (`SWIFT_TREAT_WARNINGS_AS_ERRORS`). Swift 6 language mode.
+UI tests launch with `-silent`, `-resetFamily`, or `-huntFixture` (debug-only). `-huntFixture` installs
+reviewed treasures in Golden Gate Park. Grant location on a new simulator:
 
-`scripts/walkthrough.sh` puts the simulator at the walkthrough's spot with
-`xcrun simctl location <udid> set 37.7694,-122.4862`, runs every test, and saves screenshots
-(full size in `build/screenshots`, small JPEGs in `docs/screenshots`). The walkthrough UI test
-(`UITests/FamilySliceUITests.swift`) is milestone 1's definition of done: set up, hide a treasure
-on a reviewed spot, walk up, double-tap Dig!, open the chest, restart, check the chest, replay.
-`UITests/HuntUITests.swift` walks milestone 2's 3-treasure hunt (screenshots `21-…` to `26-…`): far,
-warm, Dig!, foggy GPS and We found it, 2 of 3, finale.
-`UITests/ParentSetupUITests.swift` sets up a 3-chest starter adventure end to end and reaches
-**Get ready**'s Ready! (its screenshots are `setup-*`).
+```bash
+xcrun simctl privacy <udid> grant location com.tatchamashay.app
+xcrun simctl location <udid> set 37.7694,-122.4862
+```
 
-To try it by hand: boot a simulator, set its location as above, install
-`build/Build/Products/Debug-iphonesimulator/Tatchamashay.app`, and grant location with
-`xcrun simctl privacy <udid> grant location com.tatchamashay.app`. Launch with `-resetFamily`
-(debug builds only) to start from an empty family.
+The simulator stops reporting unchanged location after about ten seconds; nudge the location for a
+fresh fix. Check reveals and location behavior on a real phone before shipping.
 
 ## Layout
 
-| Folder | What lives there |
-|---|---|
-| `Sources/Models/Records.swift` | The plan's data and access model as types: `ParentAccount`, `ChildProfile`, `TreasureDesign`/`TreasureVersion`, `ChestPlacement`, `Adventure`, `CollectionRecord`, `PublicationState`, `SyncState`, `HuntRun` |
-| `Sources/Rules/FindRules.swift` | GPS rules: freshness, accuracy, Dig! radius with hysteresis, warm/cold |
-| `Sources/Services/FamilyStore.swift` | `FamilyStore` protocol, the shared record rules (`FamilyData` extension), and the on-device `LocalFamilyStore` |
-| `Sources/Services/FamilyModel.swift` | Observable app state over a store; Demo mode's separate in-memory family |
-| `Sources/Rules/AdventureRules.swift` | 3–5 treasures per adventure, `HuntProgress` (next treasure, finale) |
-| `Sources/Rules/SetupRules.swift` | Parent setup: `MapReview` (how far to zoom before choosing), `HuntDraft` (a hunt before it's saved) |
-| `Sources/Services/GetReady.swift` | **Get ready**: checks every model, sound and line loads, and warns about the map |
-| `Sources/Services/TreasureCatalog.swift` | `Assets/manifest.json` as types: treasures, chest, sounds |
-| `Sources/Services/TreasureEntities.swift` | Loads USDZ models, tints them, plays idle motions; the chest with its lid |
-| `Sources/Services/StoryLibrary.swift` | `Content/Stories/` front matter as types; placeholder filling |
-| `Sources/Services/GuideVoice.swift`, `SoundEffects.swift`, `PlaySettings.swift` | Spoken guide, sound effects, and the grown-up's sound/voice/motion switches |
-| `Sources/Views/Hunt`, `Chest`, `Parent`, `Shared` | Screens, by milestone-2 track |
-| `Assets/` | Built-in models, thumbnails and sounds (bundled: `manifest.json`, `Models/`, `Sounds/`, `Thumbnails/`) |
-| `Content/Stories/` | Guide, starter adventures, hide flow (bundled as `Stories/`) |
-| `Tests/` | Unit tests (Swift Testing) |
-| `UITests/` | The end-to-end walkthrough |
+- `Sources/App/TatchamashayApp.swift`: child tabs, parent gate, real/demo separation.
+- `Sources/Services/FamilyModel.swift`: map eligibility, selected child, parent writes and collection.
+- `Sources/Services/FamilyStore.swift`: validated, atomic mutations and local JSON persistence.
+- `Sources/Models/Records.swift`: current records plus legacy adventure/story fields for decoding.
+- `Sources/Rules/FindRules.swift`, `SetupRules.swift`: GPS and detailed-map review rules.
+- `Sources/Views/Hunt/`: all-unfound map, target selection and reveal presentation.
+- `Sources/Views/Parent/`: single beast editor, spot review and parent settings.
+- `Sources/Views/Chest/`: saved collection, reveal and interactive 3D detail.
+- `Sources/Services/AssetReadiness.swift`: automatic bundled model/sound checks.
+- `Assets/`: original bundled models, thumbnails and sounds; `Assets/README.md` covers regeneration.
+- `Tests/`, `UITests/`: rules/persistence tests and simulator journey tests.
 
-The one third-party dependency is [Yams](https://github.com/jpsim/Yams) (MIT, via Swift Package
-Manager in `project.yml`), for the stories' YAML.
-
-## Milestone 2 ownership
-
-Five tracks build milestone 2 in parallel. Each owns its folders; nobody edits another track's
-folders. Shared files change only additively (new types, cases, optional fields, methods), each
-change with tests, so another track's code keeps compiling.
-
-| Track | Owns |
-|---|---|
-| A. Parent setup | `Views/Parent/`, offline **Get ready** |
-| B. The hunt | `Views/Hunt/`, `LocationService` |
-| C. Guide and story | `Views/Guide/`, how `StoryLibrary` and `GuideVoice` are used in screens |
-| D. Chest and reveal | `Views/Chest/` |
-| E. Child creation | `Views/Create/` |
-| Shared (additive only, with tests) | `Records.swift`, `FamilyStore`, `FamilyModel`, `Theme`, `AdventureRules`, `TreasureCatalog`, `TreasureEntities`, `TreasureModelView`, `StoryLibrary`, `GuideVoice`, `SoundEffects`, `PlaySettings` |
-
-Shared pieces to use instead of writing your own:
-
-- **Models:** `TreasureCatalog.bundled` (entries, thumbnails, sound files), `TreasureModelView(look:)`
-  for a treasure on screen, `TreasureEntities.treasure(_:)` / `.chest()` for your own RealityKit
-  scene. `ChestEntity` has `lid`, `innerGlow`, `runes`, `setLidOpen(_:)` and `setRuneGlow(_:)`.
-- **Stories:** `StoryLibrary.bundled` → `GuideStory`, `AdventureStory`, `HideFlowStory`. Fill lines
-  with `StoryContext` (`guide.lines(for: .greeting, context:)`); lines it can't fill are dropped.
-- **Sound and voice:** `AppModel.sounds.play(.dig)`, `AppModel.voice.speak(lines, as: guide)`. Both
-  check `PlaySettings`; tests use `SilentSoundEffects` and `SilentGuideVoice`.
-- **Motion:** read `PlaySettings.reducesMotion(system:)` with SwiftUI's `accessibilityReduceMotion`
-  before any big animation. `PlaySettings` is in the environment.
-- **Adventures:** `Adventure.readiness`, `Adventure.isFull`, `FamilyModel.progress` (`HuntProgress`:
-  `next`, `nextNumber`, `step(afterFinding:)` → `.next` or `.finale`). A starter adventure sets
-  `Adventure.storyID`/`guideID` and `ChestPlacement.storyTreasureID`.
-- **Hunt moments (track B → track C):** the hunt never speaks or shows guide lines. It sets
-  `AppModel.huntMoment: HuntMomentEvent?` (`moment: GuideMoment`, 1-based `treasureNumber`, `total`,
-  `placementID`, `at`) once per event: `.greeting` (hunt start), `.gettingClose`, `.digReady`,
-  `.foggyGPS`, `.reveal` (found by Dig!), `.weFoundIt` (found by the grown-up), `.nextTreasure` and
-  `.finale` (when a reveal closes). Watch it with `.onChange(of: app.huntMoment)` and speak the
-  matching guide lines. `HuntMomentTracker` (`Views/Hunt/HuntMoments.swift`) owns the rules: GPS
-  drift never repeats a moment, and foggy GPS fires again only after 20 s of good signal.
-- UI tests launch with `-silent` so nothing speaks. `-huntFixture` (debug builds) starts from a ready
-  3-treasure adventure in Golden Gate Park (`Views/Hunt/HuntFixture.swift`); `UITests/HuntUITests`
-  walks it.
-- **The grown-up and pirates:** `FamilyModel.grownUpName` fills `{grown_up}` (what the child calls
-  the parent, falling back to their name). `FamilyModel.child` is the pirate playing now
-  (`choosePlayingChild`); `children` lists them all.
-- **Where a hunt happens:** `Adventure.playArea` (center, radius, the parent's name for it). A
-  placement from a starter story keeps the parent's blank in `ChestPlacement.hintBlank`; `hint` is
-  already filled.
-- **Chest reveal:** `ChestOpeningView(look:foundAgain:hiddenBy:onDone:)` plays the reveal for a find
-  that is already saved; `onDone` runs once, when the child taps **Into my chest**. While it is on
-  screen `AppModel.isRevealing` is true: the guide waits for it to turn false before speaking (it is
-  set on appear and cleared on close). The reveal becomes skippable once a whole one has been seen
-  on this phone (`RevealMemory`, cleared by `-resetFamily`).
-
-## Rules that the code enforces
-
-- One collection record per child per placement. `recordFind` is safe to repeat: the same hunt
-  run never adds twice; a replay run adds a "found it again" sticker. A failed save changes nothing,
-  so a retry behaves like the first try.
-- A collection stores a saved copy (`TreasureLook`) of the version found. The chest only reads
-  saved copies; editing a design adds a version and deleting it never touches chests.
-- An adventure holds at most 5 treasures, each once, in play order; 3 makes it ready. The hunt
-  looks for the first one not yet found this run, and the last find leads to the finale.
-- Built-in treasure ids are the manifest's. Looks saved with milestone 1 ids (`gem`, `orb`) load as
-  the nearest new treasure; never rename an id.
-- Placements must belong to the family and carry a review time that isn't in the future. Only the
-  parent's hide and setup flows create them, after zooming in to a detailed map (`MapReview`) and
-  confirming the spot.
-- A new hunt saves all at once (`saveHuntSetup`): 3–5 placements in play order, or nothing.
-- The family keeps at least one pirate. Removing one removes their chest, after the parent confirms.
-- Get ready is Ready! only when every check passes; the map can only warn, since Apple Maps can't
-  promise offline tiles.
-- GPS: fixes older than 10 s or worse than 30 m are ignored. Dig! appears within 40 m and hides
-  only after 4 s beyond 60 m. With no trusted fix the map says it's foggy and points to We found it.
-- Demo mode uses its own in-memory family and is the only place with automatic placement and the
-  "Sail here" button.
-
-## The backend seam (milestone 3)
-
-Replace `LocalFamilyStore` with another `FamilyStore`. Keep the rules in the `FamilyData`
-extension (or enforce the same ones on the server), including the unique (child, placement) key.
-Every record carries `syncState`; local records stay `waitingToSync` until a server exists.
-
-## Simulator note
-
-The simulator stops sending location updates while the location doesn't change, so after about
-10 seconds standing still the hunt turns foggy. A real phone keeps reporting. Nudge the location
-(`xcrun simctl location <udid> set …`) to get a fresh fix.
-
-On a simulator that has never run the app, grant location first
-(`xcrun simctl privacy <udid> grant location com.tatchamashay.app`). Otherwise the hide flow's map
-starts zoomed out and the walkthrough fails at "the map should be detailed enough to review".
-
-After the walkthrough restarts the app, the replay's 3D reveal sometimes stops drawing on the
-simulator: the text moves on but the chest picture freezes. The scene keeps running underneath, and
-`main`'s older reveal showed no model at all at the same step. Check the replay on a real phone.
-
-## App shell
-
-- **Icon:** `swift scripts/make_icon.swift` redraws `Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png`.
-- **Privacy manifest:** `Resources/PrivacyInfo.xcprivacy` (no tracking, nothing collected, `UserDefaults`
-  for the app's own settings). Add an entry if new code reads file timestamps, disk space or uptime.
-- **Grown-up gate:** `GrownUpGate` (`Views/Shared/GrownUpGate.swift`) asks a two-digit multiplication
-  before the Grown-ups tab opens, once per app session. Debug builds launched with `-silent` skip it,
-  so the UI tests walk straight in.
+Use `TreasureModelView`, `TreasureEntities`, `TreasureCatalog`, `SoundEffects` and `PlaySettings` rather
+than rebuilding their functionality. Respect reduced motion. Keep animation and asset I/O out of
+per-frame game updates. Future sync must enforce the same store rules server-side.

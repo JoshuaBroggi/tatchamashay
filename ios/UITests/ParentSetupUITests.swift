@@ -1,163 +1,128 @@
+import CoreLocation
 import XCTest
 
-/// Milestone 2's parent setup end to end: pick a place, say what the pirate calls you, choose a
-/// starter adventure, give each of its 3 chests a treasure, a clue and a reviewed spot, save, and
-/// see **Get ready** reach Ready!. Then the grown-ups' settings.
-///
-/// Start the simulator at the park first, e.g. `xcrun simctl location booted set 37.7694,-122.4862`.
-/// Set SCREENSHOT_DIR (via TEST_RUNNER_SCREENSHOT_DIR) to also save screenshots as PNG files.
+/// One parent-created beast is immediately playable, without an adventure or story setup.
 final class ParentSetupUITests: XCTestCase {
-    private var app: XCUIApplication!
-    private var step = 0
+    override func setUp() { continueAfterFailure = false }
 
-    override func setUp() {
-        continueAfterFailure = false
+    @MainActor
+    func testCreateOneBeastThenReturnToChildMap() {
+        XCUIDevice.shared.location = XCUILocation(location: CLLocation(latitude: 37.7694, longitude: -122.4862))
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetFamily", "-silent"]
+        app.launch()
+        ParentTestJourney.createFamily(in: app)
+        XCTAssertEqual(app.tabBars.buttons.count, 2)
+        XCTAssertFalse(app.tabBars.buttons["Make"].exists)
+        ParentTestJourney.openParents(in: app)
+        app.buttons["hideTreasure"].tap()
+
+        let name = app.textFields["beastName"]
+        ParentTestJourney.replace(name, with: "Sleepy Sprout", in: app)
+        XCTAssertFalse(app.textFields["A short story (optional)"].exists)
+        app.buttons["chooseSpot"].tap()
+        ParentTestJourney.reviewSpot(in: app)
+        ParentTestJourney.replace(app.textFields["spotHint"], with: "By the back step", in: app)
+        XCTAssertEqual(app.switches["spotChecked"].value as? String, "1", "Typing a hint keeps the reviewed viewpoint")
+        app.navigationBars["Choose its spot"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["chooseSpot"].waitForExistence(timeout: 5))
+        app.buttons["chooseSpot"].tap()
+        let preservedHint = app.textFields["spotHint"]
+        XCTAssertTrue(preservedHint.waitForExistence(timeout: 5))
+        XCTAssertEqual(preservedHint.value as? String, "By the back step", "Back and Next preserve the placement draft")
+        XCTAssertEqual(app.switches["spotChecked"].value as? String, "1")
+        let save = app.buttons["hideHere"]
+        XCTAssertEqual(save.label, "Hide for your child")
+        XCTAssertFalse(app.buttons["Hide it for Dad"].exists)
+        XCTAssertFalse(app.buttons["Hide it for Mom"].exists)
+        XCTAssertTrue(save.isEnabled, "one reviewed treasure is enough")
+        save.tap()
+
+        XCTAssertTrue(app.buttons["hideTreasure"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Ready to find"].exists)
+        XCTAssertFalse(app.buttons["getReady"].exists)
+        XCTAssertFalse(app.buttons["setupHunt"].exists)
+        app.buttons["parentDone"].tap()
+        XCTAssertTrue(app.buttons["chooseTreasure"].waitForExistence(timeout: 5))
+        app.buttons["chooseTreasure"].tap()
+        XCTAssertTrue(app.buttons["Choose Sleepy Sprout"].waitForExistence(timeout: 5))
     }
 
     @MainActor
-    func testSetUpAThreeChestAdventure() throws {
-        app = XCUIApplication()
-        app.launchArguments = ["-resetFamily", "-silent"]
+    func testParentSettingsKeepChildProfilesAndSoundControls() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetFamily", "-huntFixture", "-silent"]
         app.launch()
+        ParentTestJourney.openParents(in: app)
+        let settings = app.buttons["grownUpSettings"]
+        if !settings.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        settings.tap()
+        XCTAssertTrue(app.switches["soundToggle"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.switches["voiceToggle"].exists)
+        app.buttons["addPirate"].tap()
+        let name = app.textFields["pirateNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Captain Mia")
+        app.buttons["savePirate"].tap()
+        XCTAssertTrue(app.staticTexts["Captain Mia"].waitForExistence(timeout: 5))
+        app.buttons.containing(.staticText, identifier: "Captain Mia").firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Playing"].exists)
+    }
+}
 
+/// Shared steps use the real parent gate and reviewed-map flow, with no test-only bypass.
+@MainActor
+enum ParentTestJourney {
+    static func createFamily(in app: XCUIApplication) {
         let fields = app.textFields
+        XCTAssertTrue(fields.element(boundBy: 0).waitForExistence(timeout: 5))
         fields.element(boundBy: 0).tap()
-        fields.element(boundBy: 0).typeText("Josh")
+        fields.element(boundBy: 0).typeText("Dad")
         fields.element(boundBy: 1).tap()
         fields.element(boundBy: 1).typeText("Captain Emmanuel")
         app.buttons["startAdventure"].tap()
+        XCTAssertTrue(app.buttons["parents"].waitForExistence(timeout: 5))
+    }
 
-        app.tabBars.buttons["Grown-ups"].tap()
-        XCTAssertTrue(app.buttons["setupHunt"].waitForExistence(timeout: 5))
-        snap("grown-ups")
-        app.buttons["setupHunt"].tap()
+    static func openParents(in app: XCUIApplication) {
+        let parents = app.buttons["parents"]
+        XCTAssertTrue(parents.waitForExistence(timeout: 5))
+        parents.tap()
+        let answer = app.textFields["parentGateAnswer"]
+        XCTAssertTrue(answer.waitForExistence(timeout: 5))
+        answer.tap()
+        answer.typeText("25")
+        app.buttons["parentGateContinue"].tap()
+        XCTAssertTrue(app.buttons["hideTreasure"].waitForExistence(timeout: 5))
+    }
 
-        // 1. Where are you playing?
+    static func replace(_ field: XCUIElement, with text: String, in app: XCUIApplication) {
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        if !field.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        field.tap()
+        let old = field.value as? String ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count) + text)
+        if app.keyboards.buttons["Done"].exists { app.keyboards.buttons["Done"].tap() }
+    }
+
+    static func reviewSpot(in app: XCUIApplication) {
         let map = app.maps.firstMatch
         XCTAssertTrue(map.waitForExistence(timeout: 5))
-        sleep(3)
-        zoomIn(map, until: app.staticTexts["Zoom in to your park or backyard."])
-        let placeName = app.textFields["placeName"]
-        placeName.tap()
-        placeName.typeText("Golden Gate Park\n")
-        snap("place")
-        app.buttons["playHere"].tap()
-
-        // 2. What does your pirate call you?
-        XCTAssertTrue(app.buttons["call-Dad"].waitForExistence(timeout: 5))
-        app.buttons["call-Dad"].tap()
-        snap("grown-up")
-        app.buttons["grownUpNext"].tap()
-
-        // 3. Pick an adventure
-        let story = app.buttons["story-moon-pebbles"]
-        XCTAssertTrue(story.waitForExistence(timeout: 5))
-        snap("adventure")
-        story.tap()
-
-        // 4. Three chests: treasure, clue, spot
-        XCTAssertTrue(app.buttons["chest-1"].waitForExistence(timeout: 5))
-        snap("chests")
-        let saveHunt = app.buttons["saveHunt"]
-        XCTAssertFalse(saveHunt.isEnabled, "can't save before every chest is hidden")
-
-        let picks: [(model: String, blank: String)] = [("clam", "big tree"), ("star-compass", "red slide"),
-                                                       ("doubloon", "swing high")]
-        for (i, pick) in picks.enumerated() {
-            app.buttons["chest-\(i + 1)"].tap()
-            let model = app.buttons["model-\(pick.model)"]
-            XCTAssertTrue(model.waitForExistence(timeout: 5))
-            model.tap()
-            let blank = app.textFields["clueBlank"]
-            if !blank.isHittable { app.collectionViews.firstMatch.swipeUp() }
-            blank.tap()
-            blank.typeText(pick.blank + "\n")
-            if i == 0 { snap("chest-treasure-and-clue") }
-            let pickSpot = app.buttons["pickSpot"]
-            if !pickSpot.isHittable { app.collectionViews.firstMatch.swipeUp() }
-            pickSpot.tap()
-
-            let spotMap = app.maps.firstMatch
-            XCTAssertTrue(spotMap.waitForExistence(timeout: 5))
-            sleep(2)
-            // Each chest a little way from the last.
-            spotMap.swipeLeft(velocity: .slow)
-            zoomIn(spotMap, until: app.staticTexts["Zoom in until you can see paths, roads and water."])
-            let hideHere = app.buttons["hideHere"]
-            XCTAssertFalse(hideHere.isEnabled, "can't hide before the parent confirms the spot")
-            let checked = app.switches["spotChecked"]
-            if !checked.isHittable { app.collectionViews.firstMatch.swipeUp() }
-            checked.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            if i == 0 { snap("chest-spot") }
-            XCTAssertTrue(hideHere.isEnabled)
-            hideHere.tap()
-
-            let done = app.buttons["chestDone"]
-            XCTAssertTrue(done.waitForExistence(timeout: 5))
-            if !done.isHittable { app.collectionViews.firstMatch.swipeUp() }
-            XCTAssertTrue(done.isEnabled, "chest \(i + 1) has a treasure, a clue and a spot")
-            done.tap()
-            XCTAssertTrue(app.buttons["chest-\(i + 1)"].waitForExistence(timeout: 5))
-            XCTAssertEqual(app.buttons["chest-\(i + 1)"].value as? String, "done")
-        }
-        snap("chests-done")
-        XCTAssertTrue(saveHunt.isEnabled)
-        saveHunt.tap()
-
-        // 5. Get ready
-        XCTAssertTrue(app.staticTexts["readyState"].waitForExistence(timeout: 30), "everything loads on the phone")
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Without signal the map may be blank'"))
-            .firstMatch.exists, "the map warning is always shown")
-        snap("get-ready")
-        app.buttons["getReadyDone"].tap()
-
-        XCTAssertTrue(app.staticTexts["The Sleepy Blue Pebble"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["The Giggly Gold Pebble"].exists)
-        XCTAssertTrue(app.staticTexts["The Twinkly Silver Pebble"].exists)
-        XCTAssertTrue(app.staticTexts["Clue: Look near the big tree."].exists)
-        XCTAssertTrue(app.staticTexts["The Three Moon Pebbles"].exists)
-        snap("hunt-saved")
-
-        // Settings
-        app.buttons["grownUpSettings"].tap()
-        let sound = app.switches["soundToggle"]
-        XCTAssertTrue(sound.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.textFields["settingsGrownUpName"].value as? String, "Dad")
-        sound.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        XCTAssertEqual(sound.value as? String, "0")
-        app.buttons["addPirate"].tap()
-        let pirateName = app.textFields["pirateNameField"]
-        XCTAssertTrue(pirateName.waitForExistence(timeout: 5))
-        pirateName.tap()
-        pirateName.typeText("Captain Mia")
-        app.buttons["savePirate"].tap()
-        XCTAssertTrue(app.staticTexts["Captain Mia"].waitForExistence(timeout: 5))
-        snap("settings")
-        sound.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()   // leave sound on
-    }
-
-    @MainActor
-    private func zoomIn(_ map: XCUIElement, until hint: XCUIElement) {
-        var pinches = 0
-        while hint.exists && pinches < 8 {
+        let hint = app.staticTexts["Zoom in until you can see paths, roads and water."]
+        sleep(2)
+        var tries = 0
+        while hint.exists && tries < 8 {
             map.pinch(withScale: 3, velocity: 3)
             sleep(1)
-            pinches += 1
+            tries += 1
         }
-        XCTAssertFalse(hint.exists, "the map should be detailed enough to review")
-    }
-
-    @MainActor
-    private func snap(_ name: String) {
-        step += 1
-        let shot = XCUIScreen.main.screenshot()
-        let attachment = XCTAttachment(screenshot: shot)
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
-            let url = URL(fileURLWithPath: dir).appendingPathComponent(String(format: "setup-%02d-%@.png", step, name))
-            try? shot.pngRepresentation.write(to: url)
-        }
+        XCTAssertFalse(hint.exists, "the map must show paths, roads and water")
+        let save = app.buttons["hideHere"]
+        XCTAssertFalse(save.isEnabled, "the parent must confirm the spot")
+        let checked = app.switches["spotChecked"]
+        if !checked.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        checked.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(save.isEnabled)
     }
 }

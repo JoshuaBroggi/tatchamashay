@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:party": "partykit dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "deploy:party": "partykit deploy"
+    "dev": "node retired.cjs",
+    "dev:party": "node retired.cjs",
+    "build": "node retired.cjs",
+    "preview": "node retired.cjs",
+    "deploy:party": "node retired.cjs"
   },
   "dependencies": {
     "@react-three/drei": "9.99.0",

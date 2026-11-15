@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// The grown-ups' switches: sound, the spoken guide and motion, what the pirate calls you, and the
-/// pirate profiles on this phone.
+/// Sound, motion and the child profiles on this phone, accessible only through parent controls.
 struct GrownUpSettingsView: View {
     @Environment(PlaySettings.self) private var settings
     @Environment(FamilyModel.self) private var family
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
-    @State private var grownUpName = ""
     @State private var editing: ChildProfile?
     @State private var adding = false
 
@@ -17,8 +15,6 @@ struct GrownUpSettingsView: View {
             Section {
                 Toggle("Sounds", isOn: $settings.soundOn)
                     .accessibilityIdentifier("soundToggle")
-                Toggle("Guide speaks out loud", isOn: $settings.spokenGuideOn)
-                    .accessibilityIdentifier("voiceToggle")
                 Toggle("Less motion", isOn: Binding(
                     get: { settings.reducesMotion(system: systemReduceMotion) },
                     set: { settings.reducedMotion = $0 }
@@ -31,16 +27,6 @@ struct GrownUpSettingsView: View {
                 Text("Sound and motion")
             } footer: {
                 Text("Less motion keeps treasures still and makes the chest open gently.")
-            }
-
-            Section {
-                TextField("Dad, Mom, a name…", text: $grownUpName)
-                    .accessibilityIdentifier("settingsGrownUpName")
-                    .onSubmit { Task { await family.setGrownUpName(grownUpName.trimmed) } }
-            } header: {
-                Text("What your pirate calls you")
-            } footer: {
-                Text("The guide says it out loud: \"Stay with \(family.grownUpName ?? "Dad")!\"")
             }
 
             Section {
@@ -74,13 +60,6 @@ struct GrownUpSettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Palette.ground1.ignoresSafeArea())
         .navigationTitle("Settings")
-        .onAppear { grownUpName = family.parent?.childCallsMe ?? family.parent?.displayName ?? "" }
-        .onDisappear {
-            let name = grownUpName.trimmed
-            if name != (family.parent?.childCallsMe ?? family.parent?.displayName ?? "") {
-                Task { await family.setGrownUpName(name) }
-            }
-        }
         .sheet(item: $editing) { child in
             PirateEditor(child: child, canRemove: family.children.count > 1)
         }
@@ -98,6 +77,7 @@ private struct PirateEditor: View {
     @State private var name = ""
     @State private var avatar = PirateAvatar.parrot
     @State private var confirmingRemove = false
+    @State private var saving = false
 
     var body: some View {
         NavigationStack {
@@ -117,6 +97,9 @@ private struct PirateEditor: View {
                         Button("Remove \(child.pirateName)", role: .destructive) { confirmingRemove = true }
                     }
                 }
+                if let message = family.errorMessage {
+                    Section { Text(message).foregroundStyle(Palette.gold) }
+                }
             }
             .navigationTitle(child == nil ? "New pirate" : "Edit pirate")
             .navigationBarTitleDisplayMode(.inline)
@@ -124,7 +107,7 @@ private struct PirateEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.trimmed.isEmpty)
+                        .disabled(name.trimmed.isEmpty || saving)
                         .accessibilityIdentifier("savePirate")
                 }
             }
@@ -137,7 +120,7 @@ private struct PirateEditor: View {
                     guard let child else { return }
                     Task {
                         await family.removeChild(child)
-                        dismiss()
+                        if family.errorMessage == nil { dismiss() }
                     }
                 }
             } message: {
@@ -147,6 +130,8 @@ private struct PirateEditor: View {
     }
 
     private func save() {
+        guard !saving else { return }
+        saving = true
         Task {
             if var child {
                 child.pirateName = name.trimmed
@@ -155,6 +140,7 @@ private struct PirateEditor: View {
             } else {
                 await family.addChild(pirateName: name.trimmed, avatar: avatar)
             }
+            saving = false
             if family.errorMessage == nil { dismiss() }
         }
     }

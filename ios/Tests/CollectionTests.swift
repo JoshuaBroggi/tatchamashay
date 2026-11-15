@@ -56,7 +56,7 @@ struct CollectionTests {
         #expect(data.collections.count == 1)
     }
 
-    @Test("A replay earns a found-it-again sticker, not a second treasure")
+    @Test("A different legacy run ID cannot reset a collected treasure")
     func replay() async throws {
         let store = try await f.makeStore()
         let firstRun = UUID(), replay = UUID()
@@ -64,10 +64,10 @@ struct CollectionTests {
         let (again, _) = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: replay, method: .parentConfirmed, at: .now)
         let (repeatTap, data) = try await store.recordFind(child: f.child.id, placement: f.placement.id, run: replay, method: .dig, at: .now)
 
-        guard case .foundAgain = again else { Issue.record("replay should count as found again"); return }
+        guard case .alreadyCounted = again else { Issue.record("a collected treasure stays counted"); return }
         guard case .alreadyCounted = repeatTap else { Issue.record("a double tap on a replay changes nothing"); return }
         #expect(data.collections.count == 1)
-        #expect(data.collections[0].foundAgainCount == 1)
+        #expect(data.collections[0].foundAgainCount == 0)
         #expect(data.collections[0].method == .dig, "the first find is kept")
     }
 
@@ -113,5 +113,86 @@ struct PlacementTests {
         later.id = UUID()
         later.reviewedAt = .now.addingTimeInterval(3600)
         await #expect(throws: FamilyStoreError.unreviewedSpot) { _ = try await store.place(later) }
+    }
+}
+
+@Suite("First finds validate saved placement records")
+struct MalformedFindTests {
+    let fixture = Fixture()
+    let now = Date(timeIntervalSince1970: 1_000)
+
+    private func fixtureData() async throws -> FamilyData { try await fixture.makeStore().load() }
+
+    @Test("Invalid persisted coordinates and future reviews cannot be collected", arguments: [0, 1, 2, 3])
+    func invalidSpot(_ variant: Int) async throws {
+        var data = try await fixtureData()
+        switch variant {
+        case 0: data.placements[0].spot.latitude = 100
+        case 1: data.placements[0].spot.longitude = .infinity
+        case 2: data.placements[0].reviewedAt = now.addingTimeInterval(100)
+        default: data.placements[0].spot.longitude = -181
+        }
+        let clockNow = now
+        let store = LocalFamilyStore(persistence: MemoryPersistence(data), clock: { clockNow })
+        await #expect(throws: FamilyStoreError.unreviewedSpot) {
+            // A caller-supplied future find time cannot bypass the store's clock.
+            _ = try await store.recordFind(child: fixture.child.id, placement: fixture.placement.id,
+                                           run: UUID(), method: .dig, at: now.addingTimeInterval(3_600))
+        }
+        #expect(try await store.load() == data)
+    }
+
+    @Test("A placement recorded by another family cannot be collected")
+    func foreignPlacer() async throws {
+        var data = try await fixtureData()
+        data.placements[0].placedBy = UUID()
+        let store = LocalFamilyStore(persistence: MemoryPersistence(data))
+        await #expect(throws: FamilyStoreError.notInFamily) {
+            _ = try await store.recordFind(child: fixture.child.id, placement: fixture.placement.id,
+                                           run: UUID(), method: .dig, at: .now)
+        }
+        #expect(try await store.load().collections.isEmpty)
+    }
+
+    @Test("An existing collection must belong to the family before returning its saved copy")
+    func foreignCollection() async throws {
+        var data = try await fixtureData()
+        data.collections.append(CollectionRecord(familyID: UUID(), childID: fixture.child.id,
+                                                 placementID: fixture.placement.id, versionID: fixture.design.current.id,
+                                                 savedCopy: Fixture.originalLook, foundAt: .now, method: .dig,
+                                                 firstRunID: UUID()))
+        let store = LocalFamilyStore(persistence: MemoryPersistence(data))
+        await #expect(throws: FamilyStoreError.notInFamily) {
+            _ = try await store.recordFind(child: fixture.child.id, placement: fixture.placement.id,
+                                           run: UUID(), method: .dig, at: .now)
+        }
+        #expect(try await store.load() == data)
+    }
+
+    @Test("A reviewed placement cannot be saved into another family's stored group")
+    func foreignGroup() async throws {
+        var data = try await fixtureData()
+        data.adventures[0].familyID = UUID()
+        let store = LocalFamilyStore(persistence: MemoryPersistence(data))
+        await #expect(throws: FamilyStoreError.notInFamily) {
+            _ = try await store.place(fixture.placement)
+        }
+        #expect(try await store.load() == data)
+    }
+
+    @Test("A stored version cannot point at a different design")
+    func invalidVersionLink() async throws {
+        var data = try await fixtureData()
+        var json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.family.encode(fixture.design)) as? [String: Any])
+        var versions = try #require(json["versions"] as? [[String: Any]])
+        versions[0]["designID"] = UUID().uuidString
+        json["versions"] = versions
+        data.designs[0] = try JSONDecoder.family.decode(TreasureDesign.self, from: JSONSerialization.data(withJSONObject: json))
+        let store = LocalFamilyStore(persistence: MemoryPersistence(data))
+        await #expect(throws: FamilyStoreError.unknownTreasure) {
+            _ = try await store.recordFind(child: fixture.child.id, placement: fixture.placement.id,
+                                           run: UUID(), method: .dig, at: .now)
+        }
+        #expect(try await store.load().collections.isEmpty)
     }
 }
