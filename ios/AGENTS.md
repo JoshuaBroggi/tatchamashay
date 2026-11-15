@@ -1,8 +1,16 @@
 # Tatchamashay 2.0 — iOS app
 
+## Automatic phone delivery
+
+Follow the root `AGENTS.md` automatic-delivery rule: after the initial required testing, automatically
+commit, push, and merge each completed update, then immediately install and launch app changes on
+Joshua's connected physical iPhone. Push, merge, and phone deployment have standing user approval.
+Test in the live installed app without adding approval, staging, or pre-release device-QA gates.
+Preserve the phone's saved family and collections; never launch with reset or test-fixture arguments.
+
 SwiftUI iPhone app (iOS 18+, MapKit, RealityKit): a private, parent-run pirate treasure hunt.
 `PLAN.md` is the product plan; its "Product rules" win over the design mockups. The repo root
-`AGENTS.md` is about the old 1.x web game, not this app.
+`AGENTS.md` automatic-delivery rule applies here; its legacy gameplay guidance concerns the old web game.
 
 ## Build, test, run
 
