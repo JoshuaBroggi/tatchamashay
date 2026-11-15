@@ -79,6 +79,49 @@ struct TreasureCatalogTests {
         }
     }
 
+    @Test("Every beast loads a real skeletal animation, including a cloned cached model")
+    @MainActor
+    func beastsHaveSkeletalAnimations() async throws {
+        for model in [BuiltInModel.tRex, .scorpion, .spider] {
+            let entry = try #require(catalog.entry(for: model))
+            #expect(entry.idleMotion == .skeletal)
+            let specification = try #require(entry.skeletalAnimation)
+            #expect(specification.name == "GentleIdle")
+            #expect(specification.speed > 0 && specification.speed <= 1)
+            let url = try #require(catalog.modelURL(for: entry))
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            #expect(try #require(size) < 2_000_000)
+            // The second load uses the prototype cache, as replaying a treasure does.
+            for _ in 0..<2 {
+                let loaded = await TreasureEntities.treasure(
+                    TreasureLook(model: model, color: .pink, name: model.displayName), catalog: catalog)
+                #expect(!loaded.isFallback)
+                let clip = try #require(TreasureEntities.skeletalClip(in: loaded.entity))
+                #expect(!clip.entity.availableAnimations.isEmpty)
+                #expect(clip.animation.duration > 0)
+                #expect(loaded.hasRequiredAnimation)
+            }
+        }
+    }
+
+    @Test("The credits screen includes every imported model with complete attribution")
+    func creditsMatchManifest() throws {
+        let expected = ["t-rex": "TAREK SAAD", "scorpion": "anthonyvanoo", "spider": "jonmariano21"]
+        #expect(Set(catalog.creditedModels.map(\.id)) == Set(expected.keys))
+        #expect(Set(catalog.creditedModels.map(\.id)) == Set(catalog.treasures.filter {
+            $0.skeletalAnimation != nil
+        }.map(\.id)))
+        for entry in catalog.creditedModels {
+            let credit = try #require(entry.attribution)
+            #expect(credit.author == expected[entry.id])
+            #expect(!credit.title.isEmpty && !credit.changes.isEmpty)
+            #expect(credit.source.host() == "sketchfab.com")
+            #expect(credit.authorURL.host() == "sketchfab.com")
+            #expect(credit.license == "CC BY 4.0")
+            #expect(credit.licenseURL.absoluteString == "https://creativecommons.org/licenses/by/4.0/")
+        }
+    }
+
     @Test("Tinting sets the chosen color on the tintable parts")
     @MainActor
     func tints() async throws {

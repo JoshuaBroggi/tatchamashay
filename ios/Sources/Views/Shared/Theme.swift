@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreText
 
 /// Colors from the 2.0 design mockups (docs/design/2.0/README.md on the design branch).
 enum Palette {
@@ -59,8 +60,16 @@ enum Typeface {
     }
 
     private static func custom(_ name: String, _ size: CGFloat) -> Font? {
-        UIFont(name: name, size: size) != nil ? .custom(name, size: size) : nil
+        _ = registeredFonts
+        return UIFont(name: name, size: size) != nil ? .custom(name, size: size) : nil
     }
+
+    /// Register once from bundled resources; no network and no signing/project changes.
+    private static let registeredFonts: Void = {
+        if let url = Bundle.main.url(forResource: "BarlowCondensed-ExtraBold", withExtension: "ttf") {
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+    }()
 }
 
 extension Color {

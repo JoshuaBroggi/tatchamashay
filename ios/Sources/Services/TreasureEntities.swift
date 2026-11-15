@@ -58,6 +58,16 @@ enum TreasureEntities {
         body(entity)
         for child in entity.children { visit(child, body) }
     }
+
+    /// USD importers may attach the clip to the root or its armature child. Play it on its owner.
+    /// Each beast exports only its chosen idle, so an attack clip can never be picked by accident.
+    static func skeletalClip(in entity: Entity) -> (entity: Entity, animation: AnimationResource)? {
+        if let animation = entity.availableAnimations.first { return (entity, animation) }
+        for child in entity.children {
+            if let clip = skeletalClip(in: child) { return clip }
+        }
+        return nil
+    }
 }
 
 /// A loaded treasure. `entry` is nil for a drawn stand-in, which has no idle motion.
@@ -67,13 +77,17 @@ struct LoadedTreasure {
     let entry: TreasureCatalog.Entry?
     let isFallback: Bool
 
+    var hasRequiredAnimation: Bool {
+        entry?.idleMotion != .skeletal || TreasureEntities.skeletalClip(in: entity) != nil
+    }
+
     /// The manifest's idle motion for this treasure, ready to drive each frame.
     func idleMotion() -> IdleMotionPlayer? {
         entry.map { IdleMotionPlayer(root: entity, entry: $0) }
     }
 }
 
-/// Plays a treasure's `idleMotion` in code: the USDZ files carry no animation.
+/// Plays procedural motions or a baked skeletal clip. Both obey the same Less motion switch.
 /// Create it after placing the entity, since it remembers each moving part's resting pose.
 @MainActor
 final class IdleMotionPlayer {
@@ -87,9 +101,14 @@ final class IdleMotionPlayer {
     let motion: IdleMotion
     private let body: Target?
     private let flaps: [Target]
+    private let skeletalClip: (entity: Entity, animation: AnimationResource)?
+    private let skeletalSpeed: Float
+    private var skeletalController: AnimationPlaybackController?
 
     init(root: Entity, entry: TreasureCatalog.Entry) {
         motion = entry.idleMotion
+        skeletalClip = entry.idleMotion == .skeletal ? TreasureEntities.skeletalClip(in: root) : nil
+        skeletalSpeed = entry.skeletalAnimation?.speed ?? 1
         let target = entry.idleMotionPart.flatMap { root.findEntity(named: $0) } ?? root
         body = Target(entity: target, rest: target.transform, axis: [0, 0, 1], degrees: 8)
         flaps = entry.idleMotion == .flap ? entry.movingParts.compactMap { part in
@@ -125,12 +144,21 @@ final class IdleMotionPlayer {
             }
         case .none:
             break
+        case .skeletal:
+            if skeletalController == nil, let clip = skeletalClip {
+                let controller = clip.entity.playAnimation(clip.animation.repeat(), transitionDuration: 0)
+                controller.speed = skeletalSpeed
+                skeletalController = controller
+            }
+            return // The skeleton owns its pose; never overwrite it with a whole-model transform.
         }
         body.entity.transform = pose
     }
 
     /// Back to the resting pose, e.g. when motion is turned off.
     func reset() {
+        skeletalController?.stop()
+        skeletalController = nil
         body.map { $0.entity.transform = $0.rest }
         flaps.forEach { $0.entity.transform = $0.rest }
     }

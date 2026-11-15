@@ -1,10 +1,10 @@
 # Tatchamashay 2.0 assets
 
-The treasure chest, the built-in treasures and the sound effects for the iPhone app. Everything here is made from scratch by the scripts in `tools/`: no downloaded models, textures or samples, and nothing from the 1.x game's `public/models/`. The designs are original and avoid film, game and brand characters.
+The treasure chest, built-in treasures and sound effects for the iPhone app. The chest, nine original treasures and sounds are made from scratch by `tools/`. Three CC-BY creatures from the old game are converted by `tools/import-beasts.py`, with their original attribution in `manifest.json` and the grown-up's **Treasure makers & credits** screen. See [BEASTS.md](BEASTS.md) for provenance, tone choices and exclusions.
 
 | Folder | What's in it |
 |---|---|
-| `Models/` | One USDZ per model: the chest and 9 treasures |
+| `Models/` | One USDZ per model: the chest and 12 treasures |
 | `Thumbnails/` | Renders of every model (see [Thumbnails](#thumbnails)) |
 | `Sounds/` | Short AAC sounds (`.m4a`): four effects and eight treasure sounds |
 | `manifest.json` | One entry per model and per sound. The app reads this instead of hard-coding file or part names |
@@ -23,8 +23,11 @@ The treasure chest, the built-in treasures and the sound effects for the iPhone 
 | `dragon-egg` | Dragon Egg | wiggle (egg only) | Shell |
 | `turtle` | Tumble the Sea Turtle | flap | Shell |
 | `doubloon` | Lucky Doubloon | spin | Face, Rim, Stamp |
+| `t-rex` | Buddy Rex | skeletal greeting | BeastBody |
+| `scorpion` | Scooter the Scorpion | skeletal idle | BeastBody |
+| `spider` | Button the Spider | skeletal tiptoe | BeastBody |
 
-Each treasure is 0.13–0.35 m tall and stands on y = 0, facing +Z. Files are 80–400 KB, the chest is about 690 KB.
+Original treasures are 0.13–0.35 m tall and stand on y = 0, facing +Z. Their files are 80–400 KB; the chest is about 690 KB. The creatures fit a 0.32 m box and stay below 2 MB each. Their white eyes and dark pupils stay fixed while the body takes the child's color.
 
 ## manifest.json
 
@@ -50,7 +53,9 @@ Model fields:
 | `tintMaterial` | Name of the recolorable material (`"Tint"`). Absent on the chest |
 | `tintableParts` | Names of the meshes that use the tint material. Find each with `entity.findEntity(named:)` and set its material's base color to the child's color |
 | `defaultColor` | The tint color before the child picks one, as `#RRGGBB` (sRGB) |
-| `idleMotion` | `spin`, `bob`, `wiggle`, `flap` or `none`. USDZ carries no animation from these tools, so the app plays the motion in code |
+| `idleMotion` | `spin`, `bob`, `wiggle`, `flap`, `none` or `skeletal`. The first five use procedural motion; `skeletal` loops the USDZ's single baked joint animation |
+| `skeletalAnimation` | Imported creatures only: exported `name`, original `sourceClip`, and playback `speed`. Less motion disables playback |
+| `attribution` | Imported creatures only: original title, author, author URL, source URL, license, license URL, and adaptation notes. The credits screen renders these entries directly |
 | `idleMotionPart` | Optional. Apply `idleMotion` to this part only (the dragon egg wiggles while its nest stays still). Absent means the whole model |
 | `movingParts` | Parts with their own pivot, each `{ part, motion, axis, ... }`. `motion: "flap"` gives `degrees`, the swing either side of rest; `motion: "hinge"` gives `openDegrees`, the angle that opens it. `axis` is in the part's parent space |
 | `namedParts` | Chest only: `lid`, `base`, `innerGlow` and `runes` part names |
@@ -96,6 +101,14 @@ npm run sounds            # the sound effects and treasure sounds
 Each model is a small JavaScript file in `tools/models/`. It builds the model from three.js shapes, with named groups and meshes, and a table of materials. `lib/usd.mjs` writes it out as USD, keeping the groups (so the lid and wings keep their pivots) and the names. three.js's own `USDZExporter` was not used, because it flattens the hierarchy and renames every part. The chest's wood and iron textures are drawn pixel by pixel in `lib/textures.mjs`, after the look of the design mockup's `render/chest.html`.
 
 The build checks every file with `usdchecker --arkit` and fails if a treasure is over 1.5 MB or the chest is over 2 MB. To add a treasure, copy a file in `tools/models/`, add its id to `ORDER` in `build.mjs`, and run the build. Name any part the child can recolor with the `Tint` material.
+
+The procedural builder preserves imported creature entries. Rebuild creatures separately with Blender 4.5 (its own Python includes `bpy` and `pxr`):
+
+```bash
+blender --background --factory-startup --python ios/Assets/tools/import-beasts.py
+```
+
+Run from the repository root. The importer reads only its three allowlisted sources from `web/public/models/` or `public/models/`. It exports armatures and animation through Blender's USD exporter; it does not use the static exporter in `lib/usd.mjs`. It renders thumbnails, copies original embedded credit metadata into the manifest, and refuses output without skeletal time samples or above 2 MB. Runtime RealityKit loading is covered by `TreasureCatalogTests` (not run for this change at Joshua's request).
 
 ## Thumbnails
 

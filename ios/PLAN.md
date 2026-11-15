@@ -98,7 +98,7 @@ The old game lives in the same repo, `github.com/joshuabroggi/tatchamashay`. Spl
 |---|---|
 | Old game code | Not reused; 2.0 is written fresh. |
 | License | The repo is GPL today, which conflicts with App Store distribution. Before choosing a license for `ios/`, confirm who owns the rights: commit history shows a single author, but check for code an AI tool or anyone else added, and for third-party code. If you own everything, `ios/` can have its own license. |
-| 3D models | No provenance recorded. Not used in the first release. Built-in treasures are made fresh. |
+| 3D models | Original built-in treasures plus explicitly approved CC-BY creatures with embedded provenance, an in-app credits screen, and gentle skeletal animation. See `Assets/BEASTS.md` for the allowlist and exclusions. Branded and unconfirmed-license models are not shipped. |
 | Apple Developer account | Reused: team, signing, App Store Connect. Confirm there are no existing app records or bundle IDs under the old name. |
 | PartyKit | Not used. The family version doesn't need live multiplayer, and running two backends isn't justified. Look again only if the public world happens. |
 | Backend | No server in milestones 0–2; everything is on the phone. Milestone 3 adds one backend for the parent account and family sync. Supabase is the leading option; CloudKit's private family sharing is the alternative. Decide before milestone 3. |

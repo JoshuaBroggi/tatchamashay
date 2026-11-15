@@ -42,6 +42,9 @@ struct TreasureCatalog: Sendable {
 
     func entry(for model: BuiltInModel) -> Entry? { treasures.first { $0.id == model.rawValue } }
 
+    /// The credits screen reads the same entries as the model loader, so attribution cannot drift.
+    var creditedModels: [Entry] { (treasures + [chest]).filter { $0.attribution != nil } }
+
     /// The file for a manifest path, if it is in the bundle.
     func url(for path: String?) -> URL? {
         guard let path, !path.isEmpty else { return nil }
@@ -89,8 +92,27 @@ struct TreasureCatalog: Sendable {
         let movingParts: [MovingPart]
         /// Chest only.
         let namedParts: ChestParts?
+        /// A single gentle skeletal clip, baked into the USDZ. Absent for procedural treasures.
+        var skeletalAnimation: SkeletalAnimation?
+        var attribution: Attribution?
 
         var model: BuiltInModel? { BuiltInModel(rawValue: id) }
+    }
+
+    struct SkeletalAnimation: Decodable, Hashable, Sendable {
+        let name: String
+        let sourceClip: String
+        let speed: Float
+    }
+
+    struct Attribution: Decodable, Hashable, Sendable {
+        let title: String
+        let author: String
+        let authorURL: URL
+        let source: URL
+        let license: String
+        let licenseURL: URL
+        let changes: String
     }
 
     /// A part with its own pivot: wings and flippers flap, lids hinge open.
@@ -121,9 +143,9 @@ struct TreasureCatalog: Sendable {
     }
 }
 
-/// The idle motions the app plays in code (the USDZ files carry no animation).
+/// Original treasures move procedurally; imported beasts use their USDZ's skeletal clip.
 enum IdleMotion: String, Decodable, Hashable, Sendable {
-    case spin, bob, wiggle, flap, none
+    case spin, bob, wiggle, flap, none, skeletal
 }
 
 /// The manifest's sound effects. Raw values are the manifest's sound ids.

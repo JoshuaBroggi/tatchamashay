@@ -175,7 +175,10 @@ async function main() {
     });
   }
 
-  const models = ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id));
+  // Imported skeletal models are built by import-beasts.py; keep their entries when rebuilding
+  // the original procedural treasures.
+  const models = [...ORDER.filter((id) => entries.has(id)).map((id) => entries.get(id)),
+    ...[...entries.values()].filter((entry) => !ORDER.includes(entry.id))];
   fs.writeFileSync(manifestPath, JSON.stringify({ ...old, version: 1, models }, null, 2) + '\n');
   if (failed) { console.error('Some models failed their checks.'); process.exit(1); }
 }

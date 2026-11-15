@@ -126,6 +126,8 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case potion
     case dragonEgg = "dragon-egg"
     case turtle, doubloon
+    case tRex = "t-rex"
+    case scorpion, spider
 
     var id: String { rawValue }
 
@@ -159,6 +161,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "Dragon Egg"
         case .turtle: "Tumble the Sea Turtle"
         case .doubloon: "Lucky Doubloon"
+        case .tRex: "Buddy Rex"
+        case .scorpion: "Scooter the Scorpion"
+        case .spider: "Button the Spider"
         }
     }
 
@@ -174,6 +179,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "dragon egg"
         case .turtle: "turtle"
         case .doubloon: "coin"
+        case .tRex: "dinosaur"
+        case .scorpion: "scorpion"
+        case .spider: "spider"
         }
     }
 
@@ -189,6 +197,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dragonEgg: "oval.portrait.fill"
         case .turtle: "tortoise.fill"
         case .doubloon: "circle.circle.fill"
+        case .tRex: "pawprint.fill"
+        case .scorpion: "ant.fill"
+        case .spider: "ladybug.fill"
         }
     }
 
@@ -203,6 +214,9 @@ enum BuiltInModel: String, Codable, CaseIterable, Identifiable, Sendable {
         case .potion: .purple
         case .dragonEgg: .moss
         case .turtle: .sea
+        case .tRex: .green
+        case .scorpion: .purple
+        case .spider: .pink
         }
     }
 }

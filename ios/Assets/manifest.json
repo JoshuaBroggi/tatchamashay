@@ -259,6 +259,96 @@
       "defaultColor": "#F5B83D",
       "idleMotion": "spin",
       "movingParts": []
+    },
+    {
+      "id": "t-rex",
+      "displayName": "Buddy Rex",
+      "kind": "treasure",
+      "file": "Models/BuddyRex.usdz",
+      "thumbnail": "Thumbnails/t-rex.png",
+      "description": "A tiny dinosaur with a big, wiggly hello.",
+      "heightMeters": 0.0927,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "BeastBody"
+      ],
+      "defaultColor": "#40C46B",
+      "idleMotion": "skeletal",
+      "movingParts": [],
+      "skeletalAnimation": {
+        "name": "GentleIdle",
+        "sourceClip": "CINEMA_4D_Main",
+        "speed": 0.75
+      },
+      "attribution": {
+        "title": "Rigged T-Rex Fabulous",
+        "author": "TAREK SAAD",
+        "authorURL": "https://sketchfab.com/Tarek.Saad.Khalifa",
+        "source": "https://sketchfab.com/3d-models/rigged-t-rex-fabulous-4083ead8f9aa49b5b10407717bf6f60a",
+        "license": "CC BY 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by/4.0/",
+        "changes": "Converted to USDZ; plain tintable toy colors; one slowed, in-place skeletal clip. New gentle head-and-tail greeting on the original skeleton. Oversized eyes skinned to the head; original textures removed."
+      }
+    },
+    {
+      "id": "scorpion",
+      "displayName": "Scooter the Scorpion",
+      "kind": "treasure",
+      "file": "Models/ScooterScorpion.usdz",
+      "thumbnail": "Thumbnails/scorpion.png",
+      "description": "A little purple pal doing a sleepy wiggle.",
+      "heightMeters": 0.0956,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "BeastBody"
+      ],
+      "defaultColor": "#996BFF",
+      "idleMotion": "skeletal",
+      "movingParts": [],
+      "skeletalAnimation": {
+        "name": "GentleIdle",
+        "sourceClip": "Idle",
+        "speed": 0.65
+      },
+      "attribution": {
+        "title": "Scorpion",
+        "author": "anthonyvanoo",
+        "authorURL": "https://sketchfab.com/anthonyvanoo",
+        "source": "https://sketchfab.com/3d-models/scorpion-4c0fd62d33ab4d2592ee0a1d985a480d",
+        "license": "CC BY 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by/4.0/",
+        "changes": "Converted to USDZ; plain tintable toy colors; one slowed, in-place skeletal clip. Oversized eyes skinned to the head; original textures removed."
+      }
+    },
+    {
+      "id": "spider",
+      "displayName": "Button the Spider",
+      "kind": "treasure",
+      "file": "Models/ButtonSpider.usdz",
+      "thumbnail": "Thumbnails/spider.png",
+      "description": "Eight little feet practicing a silly tiptoe dance.",
+      "heightMeters": 0.0984,
+      "tintMaterial": "Tint",
+      "tintableParts": [
+        "BeastBody"
+      ],
+      "defaultColor": "#FF7A9C",
+      "idleMotion": "skeletal",
+      "movingParts": [],
+      "skeletalAnimation": {
+        "name": "GentleIdle",
+        "sourceClip": "walk cycle",
+        "speed": 0.3
+      },
+      "attribution": {
+        "title": "hi-fi-spider",
+        "author": "jonmariano21",
+        "authorURL": "https://sketchfab.com/jonmariano21",
+        "source": "https://sketchfab.com/3d-models/hi-fi-spider-ff8a4433a5d449a3a0fc54989185a024",
+        "license": "CC BY 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by/4.0/",
+        "changes": "Converted to USDZ; plain tintable toy colors; one slowed, in-place skeletal clip. Oversized eyes skinned to the head; original textures removed. Body mesh decimated and hair cards removed for a smooth toy finish."
+      }
     }
   ],
   "sounds": [

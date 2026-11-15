@@ -101,13 +101,15 @@ struct ChestTile: View {
                     StickerBadge(count: item.stickers)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
+            .frame(height: 84)
             Text(item.look.name)
-                .font(Typeface.body(11, weight: .semibold))
+                .font(Typeface.body(14, weight: .semibold))
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(8)
-        .frame(height: 118)
+        .frame(minHeight: 140)
         .background(Palette.ground2)
         .overlay(Rectangle().stroke(Palette.borderQuiet, lineWidth: 1))
     }
@@ -201,9 +203,11 @@ struct SpinnableTreasure: View {
     /// Off while another tab is showing, so a hidden 3D view never competes with the chest reveal.
     @State private var onScreen = false
 
+    private var still: Bool { settings?.reducesMotion(system: systemReduceMotion) ?? systemReduceMotion }
+
     var body: some View {
         ZStack {
-            if onScreen { stage }
+            if onScreen { stage.id(still) }
         }
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false }
@@ -238,8 +242,12 @@ struct SpinnableTreasure: View {
             content.add(fill)
 
             let spinner = spinner
-            spinner.coast = !(settings?.reducesMotion(system: systemReduceMotion) ?? systemReduceMotion)
+            spinner.coast = !still
+            let idle = !still && loaded.entry?.idleMotion == .skeletal ? loaded.idleMotion() : nil
+            var elapsed: TimeInterval = 0
             spinner.subscription = content.subscribe(to: SceneEvents.Update.self) { event in
+                elapsed += event.deltaTime
+                idle?.update(time: elapsed)
                 spinner.step(event.deltaTime)
                 pivot.orientation = simd_quatf(angle: spinner.angle, axis: [0, 1, 0])
             }
