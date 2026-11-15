@@ -182,7 +182,8 @@ struct ReviewSpotView: View {
         VStack(spacing: 0) {
             SpotMap(camera: $draft.camera, center: $draft.center, cameraDistance: $draft.cameraDistance, satellite: draft.satellite,
                     marks: family.mapPlacements.map(\.spot))
-                .frame(minHeight: 160)
+                // Keep the reviewed viewport stable as the hint keyboard opens and closes.
+                .frame(height: 220)
             Form {
                 Section {
                     Text("Choose a spot for your child to find this beast. Once saved, it appears on their treasure map.")
@@ -220,7 +221,6 @@ struct ReviewSpotView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .frame(height: 340)
         }
         .background(Palette.ground1.ignoresSafeArea())
         .navigationTitle("Choose its spot")
