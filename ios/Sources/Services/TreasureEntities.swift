@@ -30,10 +30,11 @@ enum TreasureEntities {
                                 catalog: TreasureCatalog = .bundled) {
         for original in loaded.originalModels { original.entity.components.set(original.model) }
         if let entry = loaded.entry {
-            tint(loaded.entity, parts: entry.tintableParts, color: look.color)
+            tint(loaded.entity, parts: entry.tintableParts, materialName: entry.tintMaterial, color: look.color)
             if let paint = look.paint {
                 for region in catalog.paintRegions(for: look.model) {
-                    paintParts(loaded.entity, parts: region.parts, color: paint.color(for: region.id), texture: paint.texture)
+                    paintParts(loaded.entity, parts: region.parts, materialName: region.materialName,
+                               color: paint.color(for: region.id), texture: paint.texture)
                 }
             }
         } else {
@@ -58,20 +59,22 @@ enum TreasureEntities {
         return ChestEntity(root: entity, entry: catalog.chest)
     }
 
-    /// Sets the base color of every material on the named parts and the meshes inside them.
-    static func tint(_ root: Entity, parts: [String], color: TreasureColor) {
-        paintParts(root, parts: parts, color: PaintColor(color), texture: .natural)
+    /// Match a skinned body's rendered material even when its named object has no mesh component.
+    static func tint(_ root: Entity, parts: [String], materialName: String? = nil, color: TreasureColor) {
+        paintParts(root, parts: parts, materialName: materialName, color: PaintColor(color), texture: .natural)
     }
 
-    static func paintParts(_ root: Entity, parts: [String], color: PaintColor, texture: TreasureTexture) {
+    static func paintParts(_ root: Entity, parts: [String], materialName: String? = nil,
+                           color: PaintColor, texture: TreasureTexture) {
         let c = color.rgb
         let uiColor = UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
         let surface = PaintSurface.texture(texture)
-        for name in parts {
-            guard let part = root.findEntity(named: name) else { continue }
+        let targets = materialName == nil ? parts.compactMap { root.findEntity(named: $0) } : [root]
+        for part in targets {
             visit(part) { entity in
                 guard var model = entity.components[ModelComponent.self] else { return }
                 model.materials = model.materials.map { material in
+                    guard materialName == nil || material.name == materialName else { return material }
                     var pbr = material as? PhysicallyBasedMaterial ?? PhysicallyBasedMaterial()
                     pbr.baseColor = .init(tint: uiColor)
                     if let surface { pbr.baseColor.texture = .init(surface) }
@@ -104,6 +107,14 @@ enum TreasureEntities {
         body(entity)
         for child in entity.children { visit(child, body) }
     }
+
+    static func skeletalClip(in entity: Entity) -> (entity: Entity, animation: AnimationResource)? {
+        if let animation = entity.availableAnimations.first { return (entity, animation) }
+        for child in entity.children {
+            if let clip = skeletalClip(in: child) { return clip }
+        }
+        return nil
+    }
 }
 
 /// A loaded treasure. `entry` is nil for a drawn stand-in, which has no idle motion.
@@ -113,6 +124,10 @@ struct LoadedTreasure {
     let entry: TreasureCatalog.Entry?
     let isFallback: Bool
     let originalModels: [OriginalModel]
+
+    var hasRequiredAnimation: Bool {
+        entry?.idleMotion != .skeletal || TreasureEntities.skeletalClip(in: entity) != nil
+    }
 
     struct OriginalModel {
         let entity: Entity
@@ -139,9 +154,14 @@ final class IdleMotionPlayer {
     let motion: IdleMotion
     private let body: Target?
     private let flaps: [Target]
+    private let skeletalClip: (entity: Entity, animation: AnimationResource)?
+    private let skeletalSpeed: Float
+    private var skeletalController: AnimationPlaybackController?
 
     init(root: Entity, entry: TreasureCatalog.Entry) {
         motion = entry.idleMotion
+        skeletalClip = entry.idleMotion == .skeletal ? TreasureEntities.skeletalClip(in: root) : nil
+        skeletalSpeed = entry.skeletalAnimation?.speed ?? 1
         let target = entry.idleMotionPart.flatMap { root.findEntity(named: $0) } ?? root
         body = Target(entity: target, rest: target.transform, axis: [0, 0, 1], degrees: 8)
         flaps = entry.idleMotion == .flap ? entry.movingParts.compactMap { part in
@@ -177,12 +197,21 @@ final class IdleMotionPlayer {
             }
         case .none:
             break
+        case .skeletal:
+            if skeletalController == nil, let clip = skeletalClip {
+                let controller = clip.entity.playAnimation(clip.animation.repeat(), transitionDuration: 0)
+                controller.speed = skeletalSpeed
+                skeletalController = controller
+            }
+            return
         }
         body.entity.transform = pose
     }
 
     /// Back to the resting pose, e.g. when motion is turned off.
     func reset() {
+        skeletalController?.stop()
+        skeletalController = nil
         body.map { $0.entity.transform = $0.rest }
         flaps.forEach { $0.entity.transform = $0.rest }
     }
