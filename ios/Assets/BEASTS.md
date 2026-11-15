@@ -41,11 +41,13 @@ pink snout/lower limbs, yellow teeth and claws, and black branching back/rump ri
 character adaptation for the private family build, not a claim of original character or photo
 rights, and is not labeled CC-BY. Manifest provenance feeds the existing in-app credits.
 
-`mulligan` adds one 678,798-byte USDZ, a transparent 512 × 512 thumbnail and a 30-joint skin. Its
+`mulligan` adds one 678,051-byte USDZ, a transparent 512 × 512 thumbnail and a 30-joint skin. Its
 single six-second `GentleIdle` combines breathing, head turns, jaw movement, planted-foot weight
 shifts and toe flex. The converter records 12,000 triangles, 145 joint samples and 29 changing
 joints with a stationary Root. Authored colors are retained. The enum/manifest additions reuse
 the shared live picker, preview, chest/detail animation player, Less motion and readiness checks.
+The head-shape revision narrows the skull by 45% and the lower jaw by 50% to match Joshua's
+references, including the lips, teeth, mouth lining and forehead ridges; it retains the same rig.
 
 The [complete source and art renders](Sources/Mulligan/README.md) include the deterministic
 authoring script, `.blend`, source/reference records, export metadata and idle preview. Simulator
